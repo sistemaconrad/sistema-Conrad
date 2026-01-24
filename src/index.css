@@ -2,30 +2,95 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer utilities {
+  .animate-slide-in-right {
+    animation: slideInRight 0.3s ease-out;
+  }
+  
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+  
+  @keyframes slideInRight {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  
+  @keyframes scaleIn {
+    from {
+      transform: scale(0.9);
+      opacity: 0;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+}
+
 @layer base {
+  html {
+    font-size: 15px; /* Base ligeramente reducida */
+  }
+  
   * {
     @apply border-gray-200;
   }
+  
   body {
     @apply bg-gray-50 text-gray-900;
+    font-size: 0.875rem; /* 13.125px */
+    line-height: 1.45;
+    zoom: 0.9; /* Zoom muy sutil - 10% más pequeño */
+  }
+  
+  /* Sin restricciones para permitir header full width */
+  #root {
+    @apply w-full;
+  }
+  
+  h1 {
+    @apply text-lg font-bold;
+  }
+  
+  h2 {
+    @apply text-base font-semibold;
+  }
+  
+  h3 {
+    @apply text-sm font-medium;
+  }
+  
+  button {
+    @apply text-sm;
+  }
+  
+  input, select, textarea {
+    @apply text-sm;
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+    @apply bg-blue-600 text-white px-3 py-1.5 text-sm rounded hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500;
   }
   
   .btn-secondary {
-    @apply bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
+    @apply bg-gray-200 text-gray-700 px-3 py-1.5 text-sm rounded hover:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500;
   }
   
   .btn-danger {
-    @apply bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2;
+    @apply bg-red-600 text-white px-3 py-1.5 text-sm rounded hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500;
   }
   
   .input-field {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+    @apply w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
   }
   
   .input-field:disabled {
@@ -33,7 +98,7 @@
   }
   
   .card {
-    @apply bg-white rounded-lg shadow-md p-6;
+    @apply bg-white rounded-lg shadow p-4;
   }
   
   .label {
