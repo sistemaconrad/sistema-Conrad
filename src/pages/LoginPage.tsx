@@ -10,12 +10,29 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
+  // Cargar usuarios de localStorage o usar default
+  const getUsers = () => {
+    const stored = localStorage.getItem('conrad_users');
+    if (stored) {
+      return JSON.parse(stored);
+    }
+    // Usuario admin por defecto
+    const defaultUsers = [
+      { username: 'admin', password: 'admin123', nombre: 'Administrador' }
+    ];
+    localStorage.setItem('conrad_users', JSON.stringify(defaultUsers));
+    return defaultUsers;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Login simple - puedes cambiar estas credenciales
-    if (username === 'admin' && password === 'admin123') {
+    const users = getUsers();
+    const user = users.find((u: any) => u.username === username && u.password === password);
+    
+    if (user) {
       localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('nombreUsuarioConrad', user.nombre);
       onLogin();
     } else {
       setError('Usuario o contraseña incorrectos');
@@ -118,14 +135,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             Iniciar Sesión
           </button>
         </form>
-
-        <div className="mt-6 text-center text-sm text-gray-600">
-          <p>Credenciales por defecto:</p>
-          <p className="font-mono bg-gray-100 p-2 rounded mt-2">
-            Usuario: <strong>admin</strong><br />
-            Contraseña: <strong>admin123</strong>
-          </p>
-        </div>
       </div>
     </div>
   );

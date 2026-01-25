@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Calendar, DollarSign, CheckCircle2, Save, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { format } from 'date-fns';
+import { generarCuadreExcel } from '../utils/cuadre-excel-generator';
 
 interface CuadrePorFormaPago {
   forma_pago: string;
@@ -130,7 +131,7 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
     setLoading(false);
   };
 
-  const descargarCuadre = (formato: 'csv' | 'pdf') => {
+  const descargarCuadre = async (formato: 'csv' | 'pdf') => {
     if (!efectivoContado || efectivoContado === '' || !tarjetaContado || tarjetaContado === '' || !transferenciaContado || transferenciaContado === '') {
       alert('Debe ingresar todos los montos contados');
       return;
@@ -152,53 +153,32 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
 
     const fechaFormateada = format(new Date(fecha + 'T12:00:00'), 'dd/MM/yyyy');
     const horaActual = format(new Date(), 'HH:mm');
-    
-    let contenido = '';
-    let nombreArchivo = `Cuadre_${fecha}_${format(new Date(), 'HHmm')}`;
-    let mimeType = '';
 
     if (formato === 'csv') {
-      // Formato CSV (Excel)
-      contenido = `CUADRE DE CAJA DIARIO - CONRAD\n`;
-      contenido += `Fecha,${fechaFormateada}\n`;
-      contenido += `Hora de Cuadre,${horaActual}\n`;
-      contenido += `\n`;
-      contenido += `RESUMEN\n`;
-      contenido += `Total Consultas,${cuadre?.total_consultas || 0}\n`;
-      contenido += `Total Ventas,${(cuadre?.total_ventas || 0).toFixed(2)}\n`;
-      contenido += `\n`;
-      contenido += `CUADRE POR FORMA DE PAGO\n`;
-      contenido += `Forma de Pago,Esperado,Contado,Diferencia,Estado\n`;
-      contenido += `Efectivo,${efectivoEsperado.toFixed(2)},${efectivoContadoNum.toFixed(2)},${diferencias.efectivo.toFixed(2)},${Math.abs(diferencias.efectivo) < 0.01 ? 'OK' : 'DIFERENCIA'}\n`;
-      contenido += `Tarjeta,${tarjetaEsperada.toFixed(2)},${tarjetaContadoNum.toFixed(2)},${diferencias.tarjeta.toFixed(2)},${Math.abs(diferencias.tarjeta) < 0.01 ? 'OK' : 'DIFERENCIA'}\n`;
-      contenido += `Transferencia,${transferenciaEsperada.toFixed(2)},${transferenciaContadoNum.toFixed(2)},${diferencias.transferencia.toFixed(2)},${Math.abs(diferencias.transferencia) < 0.01 ? 'OK' : 'DIFERENCIA'}\n`;
-      contenido += `\n`;
-      contenido += `RESULTADO,${cuadreCorrecto ? 'CUADRE CORRECTO' : 'CUADRE CON DIFERENCIAS'}\n`;
-      if (observaciones) {
-        contenido += `\nOBSERVACIONES\n"${observaciones}"\n`;
-      }
-      contenido += `\n`;
-      contenido += `DETALLE POR FORMA DE PAGO\n`;
-      contenido += `Forma de Pago,Cantidad,Total\n`;
-      cuadre?.cuadres_forma_pago.forEach(c => {
-        contenido += `${getFormaPagoNombre(c.forma_pago)},${c.cantidad},${c.total.toFixed(2)}\n`;
+      // Usar el nuevo generador de Excel profesional
+      await generarCuadreExcel({
+        fecha: fechaFormateada,
+        horaActual,
+        totalConsultas: cuadre?.total_consultas || 0,
+        totalVentas: cuadre?.total_ventas || 0,
+        efectivoEsperado,
+        efectivoContado: efectivoContadoNum,
+        tarjetaEsperada,
+        tarjetaContado: tarjetaContadoNum,
+        transferenciaEsperada,
+        transferenciaContado: transferenciaContadoNum,
+        diferencias,
+        cuadreCorrecto,
+        observaciones,
+        cuadresPorFormaPago: cuadre?.cuadres_forma_pago.map(c => ({
+          forma_pago: getFormaPagoNombre(c.forma_pago),
+          cantidad: c.cantidad,
+          total: c.total
+        })) || []
       });
-      nombreArchivo += '.csv';
-      mimeType = 'text/csv;charset=utf-8';
-
-      // Descargar archivo
-      const blob = new Blob([contenido], { type: mimeType });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = nombreArchivo;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
 
       alert(cuadreCorrecto ? 
-        `✅ Cuadre correcto! Archivo Excel descargado.` : 
+        `✅ Cuadre correcto! Archivo Excel descargado con formato profesional.` : 
         `⚠️ Cuadre con diferencias. Archivo Excel descargado para revisión.`
       );
 

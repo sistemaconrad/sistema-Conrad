@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, FileText, Users, BarChart3, Trash2 } from 'lucide-react';
+import { Plus, FileText, Users, BarChart3, Trash2, FileSpreadsheet, Settings } from 'lucide-react';
 import { NuevoPacienteModal } from '../components/NuevoPacienteModal';
 import { Autocomplete } from '../components/Autocomplete';
 import { Paciente, Medico, SubEstudio, TipoCobro, FormaPago, DetalleConsulta } from '../types';
@@ -33,11 +33,66 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const [numeroTransferencia, setNumeroTransferencia] = useState('');
   const [numeroVoucher, setNumeroVoucher] = useState('');
 
+  // Función para determinar si es horario normal
+  const esHorarioNormal = () => {
+    const now = new Date();
+    const dia = now.getDay(); // 0 = Domingo, 6 = Sábado
+    const hora = now.getHours();
+    
+    // Lunes a Viernes 7am-4pm
+    if (dia >= 1 && dia <= 5) {
+      return hora >= 7 && hora < 16;
+    }
+    // Sábado 7am-11am
+    if (dia === 6) {
+      return hora >= 7 && hora < 11;
+    }
+    return false;
+  };
+
+  // Auto-seleccionar tipo de cobro según horario
+  useEffect(() => {
+    const horarioNormal = esHorarioNormal();
+    setTipoCobro(horarioNormal ? 'normal' : 'especial');
+  }, []);
+
   // Cargar estudios y sub-estudios
   useEffect(() => {
     cargarEstudios();
     cargarSubEstudios();
   }, []);
+
+  // Actualizar precios cuando cambie el tipo de cobro
+  useEffect(() => {
+    if (descripcion.length > 0) {
+      const nuevaDescripcion = descripcion.map(item => {
+        const subEstudio = subEstudios.find(se => se.id === item.sub_estudio_id);
+        if (!subEstudio) return item;
+
+        const nuevoPrecio = tipoCobro === 'normal' 
+          ? subEstudio.precio_normal 
+          : tipoCobro === 'social' 
+          ? subEstudio.precio_social 
+          : subEstudio.precio_especial;
+
+        return { ...item, precio: nuevoPrecio };
+      });
+      setDescripcion(nuevaDescripcion);
+    }
+  }, [tipoCobro]);
+
+  // Combinación de teclas secreta: Ctrl + Shift + U para Gestión de Usuarios
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'U') {
+        e.preventDefault();
+        onNavigate('usuarios');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onNavigate]);
 
   const cargarEstudios = async () => {
     try {
@@ -75,22 +130,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   );
 
   // Verificar si estamos en horario normal
-  const esHorarioNormal = () => {
-    const now = new Date();
-    const dia = now.getDay(); // 0 = Domingo, 6 = Sábado
-    const hora = now.getHours();
-    
-    // Lunes a Viernes 7am-4pm
-    if (dia >= 1 && dia <= 5) {
-      return hora >= 7 && hora < 16;
-    }
-    // Sábado 7am-11am
-    if (dia === 6) {
-      return hora >= 7 && hora < 11;
-    }
-    return false;
-  };
-
   // Agregar sub-estudio a descripción
   const agregarSubEstudio = () => {
     if (!subEstudioSeleccionado) return;
@@ -387,6 +426,13 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           >
             <BarChart3 size={20} />
             Estadísticas
+          </button>
+          <button 
+            onClick={() => onNavigate('reportes')}
+            className="btn-secondary flex items-center gap-2"
+          >
+            <FileSpreadsheet size={20} />
+            Reportes
           </button>
         </div>
       </div>

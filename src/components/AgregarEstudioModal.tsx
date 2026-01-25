@@ -21,7 +21,7 @@ export const AgregarEstudioModal: React.FC<AgregarEstudioModalProps> = ({
   const [estudioSeleccionado, setEstudioSeleccionado] = useState('');
   const [subEstudioSeleccionado, setSubEstudioSeleccionado] = useState('');
   const [nuevosEstudios, setNuevosEstudios] = useState<any[]>([]);
-  const [tipoCobro] = useState<TipoCobro>(consulta.tipo_cobro);
+  const [tipoCobro, setTipoCobro] = useState<TipoCobro>(consulta.tipo_cobro);
 
   useEffect(() => {
     cargarEstudios();
@@ -180,11 +180,47 @@ export const AgregarEstudioModal: React.FC<AgregarEstudioModalProps> = ({
           <div>
             <h2 className="text-2xl font-bold text-gray-800">Agregar Estudios</h2>
             <p className="text-sm text-gray-600">Paciente: {consulta.pacientes.nombre}</p>
-            <p className="text-xs text-gray-500">Tipo de cobro: {consulta.tipo_cobro.toUpperCase()}</p>
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
             <X size={24} />
           </button>
+        </div>
+
+        {/* Selector de tipo de cobro */}
+        <div className="card mb-4">
+          <h3 className="text-sm font-semibold mb-3">Tipo de Cobro</h3>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setTipoCobro('normal')}
+              className={`flex-1 py-2 px-4 rounded-lg border-2 font-medium transition-all ${
+                tipoCobro === 'normal'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-300 hover:border-blue-300'
+              }`}
+            >
+              Normal
+            </button>
+            <button
+              onClick={() => setTipoCobro('social')}
+              className={`flex-1 py-2 px-4 rounded-lg border-2 font-medium transition-all ${
+                tipoCobro === 'social'
+                  ? 'border-green-500 bg-green-50 text-green-700'
+                  : 'border-gray-300 hover:border-green-300'
+              }`}
+            >
+              Social
+            </button>
+            <button
+              onClick={() => setTipoCobro('especial')}
+              className={`flex-1 py-2 px-4 rounded-lg border-2 font-medium transition-all ${
+                tipoCobro === 'especial'
+                  ? 'border-purple-500 bg-purple-50 text-purple-700'
+                  : 'border-gray-300 hover:border-purple-300'
+              }`}
+            >
+              Especial
+            </button>
+          </div>
         </div>
 
         {/* Selector de estudios */}

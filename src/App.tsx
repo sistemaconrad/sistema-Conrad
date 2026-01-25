@@ -7,6 +7,14 @@ import { ReferentesPage } from './pages/ReferentesPage';
 import { PacientesPage } from './pages/PacientesPage';
 import { CuadreDiarioPage } from './pages/CuadreDiarioPage';
 import { EstadisticasPage } from './pages/EstadisticasPage';
+import { ReportesPage } from './pages/ReportesPage';
+import { GestionUsuariosPage } from './pages/GestionUsuariosPage';
+
+// Módulo de Inventario
+import { InventarioHomePage } from './pages/InventarioHomePage';
+import { ProductosInventarioPage } from './pages/ProductosInventarioPage';
+import { MovimientosPage } from './pages/MovimientosPage';
+import { ProveedoresPage } from './pages/ProveedoresPage';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -71,6 +79,10 @@ function App() {
           return <CuadreDiarioPage onBack={() => setCurrentPage('home')} />;
         case 'estadisticas':
           return <EstadisticasPage onBack={() => setCurrentPage('home')} />;
+        case 'reportes':
+          return <ReportesPage onBack={() => setCurrentPage('home')} />;
+        case 'usuarios':
+          return <GestionUsuariosPage onBack={() => setCurrentPage('home')} />;
         default:
           return <HomePage onNavigate={setCurrentPage} />;
       }
@@ -88,6 +100,62 @@ function App() {
           </button>
         </div>
         {renderPage()}
+      </div>
+    );
+  }
+
+  // Si está en el módulo de inventario
+  if (currentModule === 'inventario') {
+    const renderPage = () => {
+      switch (currentPage) {
+        case 'home':
+          return <InventarioHomePage onNavigate={setCurrentPage} />;
+        case 'productos':
+          return <ProductosInventarioPage onBack={() => setCurrentPage('home')} />;
+        case 'movimientos':
+          return <MovimientosPage onBack={() => setCurrentPage('home')} />;
+        case 'proveedores':
+          return <ProveedoresPage onBack={() => setCurrentPage('home')} />;
+        case 'reportes':
+          return <InventarioHomePage onNavigate={setCurrentPage} />; // TODO: Crear ReportesPage
+        default:
+          return <InventarioHomePage onNavigate={setCurrentPage} />;
+      }
+    };
+
+    return (
+      <div>
+        <div className="fixed top-4 right-4 z-50">
+          <button
+            onClick={handleBackToDashboard}
+            className="bg-white shadow-md px-3 py-1.5 rounded hover:bg-gray-50 transition-colors text-xs font-medium border border-gray-300"
+          >
+            ← Dashboard
+          </button>
+        </div>
+        {renderPage()}
+      </div>
+    );
+  }
+
+  // Si está en el módulo de visitadoras médicas
+  if (currentModule === 'visitadoras') {
+    return (
+      <div>
+        <div className="fixed top-4 right-4 z-50">
+          <button
+            onClick={handleBackToDashboard}
+            className="bg-white shadow-md px-3 py-1.5 rounded hover:bg-gray-50 transition-colors text-xs font-medium border border-gray-300"
+          >
+            ← Dashboard
+          </button>
+        </div>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-gray-800 mb-4">🚧 Módulo de Visitadoras Médicas</h1>
+            <p className="text-gray-600">En construcción - Próximamente disponible</p>
+          </div>
+        </div>
       </div>
     );
   }
