@@ -11,6 +11,7 @@ import { EstadisticasPage } from './pages/EstadisticasPage';
 import { ReportesPage } from './pages/ReportesPage';
 import { GestionUsuariosPage } from './pages/GestionUsuariosPage';
 import { ComisionesPage } from './pages/ComisionesPage';
+import { ContabilidadPage } from './pages/ContabilidadPage';
 
 // Módulo de Inventario
 import { InventarioHomePage } from './pages/InventarioHomePage';
@@ -87,6 +88,8 @@ function App() {
           return <ReportesPage onBack={() => setCurrentPage('home')} />;
         case 'comisiones':
           return <ComisionesPage onBack={() => setCurrentPage('home')} />;
+        case 'contabilidad':
+          return <ContabilidadPage onBack={() => setCurrentPage('home')} />;
         case 'usuarios':
           return <GestionUsuariosPage onBack={() => setCurrentPage('home')} />;
         default:
@@ -149,6 +152,10 @@ function App() {
   }
 
   // Si está en el módulo de visitadoras médicas
+  if (currentModule === 'contabilidad') {
+    return <ContabilidadPage onBack={handleBackToDashboard} />;
+  }
+
   if (currentModule === 'visitadoras') {
     return (
       <div>

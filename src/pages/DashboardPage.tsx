@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, Package, LogOut, FileText, Users } from 'lucide-react';
+import { Activity, Package, LogOut, FileText, Users, Banknote } from 'lucide-react';
 
 interface DashboardPageProps {
   onNavigateToModule: (module: string) => void;
@@ -41,6 +41,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       icon: Package,
       color: 'green',
       gradient: 'from-green-500 to-green-600',
+      disabled: false
+    },
+    {
+      id: 'contabilidad',
+      name: 'Contabilidad',
+      description: 'Gestión financiera, ingresos y gastos',
+      icon: Banknote,
+      color: 'emerald',
+      gradient: 'from-emerald-500 to-emerald-600',
       disabled: false
     },
     {
