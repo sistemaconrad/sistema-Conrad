@@ -16,6 +16,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const [pacienteActual, setPacienteActual] = useState<(Paciente & { id: string }) | null>(null);
   const [medicoActual, setMedicoActual] = useState<Medico | null>(null);
   const [sinInfoMedico, setSinInfoMedico] = useState(false);
+  const [esServicioMovil, setEsServicioMovil] = useState(false);
 
   // Estados del formulario principal
   const [tipoCobro, setTipoCobro] = useState<TipoCobro>('normal');
@@ -152,6 +153,15 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     const subEstudio = subEstudios.find(se => se.id === subEstudioSeleccionado);
     if (!subEstudio) return;
 
+    // ✅ VALIDACIÓN: Solo RX para servicios móviles
+    if (esServicioMovil) {
+      const estudio = estudios.find(e => e.id === subEstudio.estudio_id);
+      if (estudio && estudio.nombre.toUpperCase() !== 'RX') {
+        alert('⚠️ Servicios Móviles: Solo se permiten estudios de RX');
+        return;
+      }
+    }
+
     const precio = tipoCobro === 'normal' 
       ? subEstudio.precio_normal 
       : tipoCobro === 'social' 
@@ -187,7 +197,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   };
 
   // Guardar nuevo paciente
-  const handleGuardarPaciente = async (paciente: Paciente, medico: Medico | null, sinInfo: boolean) => {
+  const handleGuardarPaciente = async (paciente: Paciente, medico: Medico | null, sinInfo: boolean, esServicioMovil: boolean = false) => {
     try {
       // Insertar paciente
       const { data: pacienteData, error: pacienteError } = await supabase
@@ -218,8 +228,20 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       setPacienteActual(pacienteData);
       setMedicoActual(medico);
       setSinInfoMedico(sinInfo);
+      setEsServicioMovil(esServicioMovil);
+      
+      // Forzar tipo especial para servicios móviles (precio personalizado)
+      if (esServicioMovil) {
+        setTipoCobro('especial');
+      }
+      
       setShowNuevoModal(false);
-      alert('Paciente guardado exitosamente');
+      
+      if (esServicioMovil) {
+        alert('📱 Servicio Móvil registrado. Recuerda: Solo estudios RX con precio personalizado.');
+      } else {
+        alert('Paciente guardado exitosamente');
+      }
     } catch (error) {
       console.error('Error al guardar paciente:', error);
       alert('Error al guardar paciente');
@@ -274,29 +296,34 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     const totales = calcularTotales();
 
     try {
-      // Calcular el próximo número de paciente del día
-      const fechaHoy = format(new Date(), 'yyyy-MM-dd');
+      // Calcular el próximo número de paciente del día (solo para pacientes regulares)
+      let siguienteNumero = null;
       
-      const { data: ultimaConsulta } = await supabase
-        .from('consultas')
-        .select('numero_paciente')
-        .eq('fecha', fechaHoy)
-        .or('anulado.is.null,anulado.eq.false') // Solo contar las activas
-        .order('numero_paciente', { ascending: false })
-        .limit(1)
-        .single();
-      
-      const siguienteNumero = (ultimaConsulta?.numero_paciente || 0) + 1;
+      if (!esServicioMovil) {
+        const fechaHoy = format(new Date(), 'yyyy-MM-dd');
+        
+        const { data: ultimaConsulta } = await supabase
+          .from('consultas')
+          .select('numero_paciente')
+          .eq('fecha', fechaHoy)
+          .or('anulado.is.null,anulado.eq.false') // Solo contar las activas
+          .or('es_servicio_movil.is.null,es_servicio_movil.eq.false') // No contar móviles
+          .order('numero_paciente', { ascending: false })
+          .limit(1)
+          .single();
+        
+        siguienteNumero = (ultimaConsulta?.numero_paciente || 0) + 1;
+      }
 
       // Crear consulta
       const { data: consultaData, error: consultaError } = await supabase
   .from('consultas')
   .insert([{
-    numero_paciente: siguienteNumero,
+    numero_paciente: siguienteNumero, // null para servicios móviles
     paciente_id: pacienteActual.id,
     medico_id: medicoActual?.id || null,
     medico_recomendado: medicoActual?.nombre || null, // ✅ Guardar nombre del médico
-    tipo_cobro: tipoCobro,
+    tipo_cobro: esServicioMovil ? 'especial' : tipoCobro, // Servicios móviles con precio especial (personalizado)
     requiere_factura: requiereFactura,
     nit: requiereFactura ? nit : null,
     forma_pago: formaPago,
@@ -305,7 +332,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     numero_voucher: formaPago === 'tarjeta' ? numeroVoucher : null,
     sin_informacion_medico: sinInfoMedico,
     justificacion_especial: tipoCobro === 'normal' && !horarioNormal ? justificacionEspecial : null,
-    fecha: format(new Date(), 'yyyy-MM-dd')
+    fecha: format(new Date(), 'yyyy-MM-dd'),
+    es_servicio_movil: esServicioMovil
   }])
   .select()
   .single();
@@ -623,13 +651,15 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               <div className="grid md:grid-cols-2 gap-4">
                 <Autocomplete
                   label="Estudio"
-                  options={estudios.map(e => ({ id: e.id, nombre: e.nombre }))}
+                  options={estudios
+                    .filter(e => !esServicioMovil || e.nombre.toUpperCase() === 'RX')
+                    .map(e => ({ id: e.id, nombre: e.nombre }))}
                   value={estudioSeleccionado}
                   onChange={(val) => {
                     setEstudioSeleccionado(val);
                     setSubEstudioSeleccionado('');
                   }}
-                  placeholder="Seleccione estudio"
+                  placeholder={esServicioMovil ? "Solo estudios RX disponibles" : "Seleccione estudio"}
                 />
                 
                 <Autocomplete

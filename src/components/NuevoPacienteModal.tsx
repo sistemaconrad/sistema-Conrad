@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase';
 interface NuevoPacienteModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (paciente: Paciente, medico: Medico | null, sinInfoMedico: boolean) => void;
+  onSave: (paciente: Paciente, medico: Medico | null, sinInfoMedico: boolean, esServicioMovil: boolean) => void;
 }
 
 export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
@@ -27,6 +27,7 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
   // Estado del médico
   const [esReferente, setEsReferente] = useState(true);
   const [sinInformacion, setSinInformacion] = useState(false);
+  const [esServicioMovil, setEsServicioMovil] = useState(false); // NUEVO
   const [nombreMedico, setNombreMedico] = useState('');
   const [telefonoMedico, setTelefonoMedico] = useState('');
   const [departamentoMedico, setDepartamentoMedico] = useState('');
@@ -102,6 +103,7 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
     setMunicipioPaciente('');
     setEsReferente(true);
     setSinInformacion(false);
+    setEsServicioMovil(false);
     setNombreMedico('');
     setTelefonoMedico('');
     setDepartamentoMedico('');
@@ -167,7 +169,7 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
     // IMPORTANTE: Si tiene nombre de médico, siempre mostrar en impresión
     const sinInfoParaImprimir = !tieneMedico || sinInformacion;
     
-    onSave(paciente, medico, sinInfoParaImprimir);
+    onSave(paciente, medico, sinInfoParaImprimir, esServicioMovil);
     resetForm();
   };
 
@@ -289,13 +291,14 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
             <h3 className="text-xl font-semibold mb-4 text-green-700">Datos del Médico</h3>
             
             <div className="space-y-4">
-              <div className="flex gap-4">
+              <div className="flex gap-4 flex-wrap">
                 <label className="flex items-center">
                   <input
                     type="radio"
-                    checked={esReferente}
+                    checked={esReferente && !esServicioMovil}
                     onChange={() => {
                       setEsReferente(true);
+                      setEsServicioMovil(false);
                       setNombreMedico('');
                       setTelefonoMedico('');
                       setDepartamentoMedico('');
@@ -310,9 +313,10 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                 <label className="flex items-center">
                   <input
                     type="radio"
-                    checked={!esReferente}
+                    checked={!esReferente && !esServicioMovil}
                     onChange={() => {
                       setEsReferente(false);
+                      setEsServicioMovil(false);
                       setMedicoSeleccionado(null);
                       setNombreMedico('');
                       setTelefonoMedico('');
@@ -324,6 +328,25 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                     disabled={sinInformacion}
                   />
                   No Referente
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    checked={esServicioMovil}
+                    onChange={() => {
+                      setEsServicioMovil(true);
+                      setEsReferente(false);
+                      setMedicoSeleccionado(null);
+                      setNombreMedico('');
+                      setTelefonoMedico('');
+                      setDepartamentoMedico('');
+                      setMunicipioMedico('');
+                      setDireccionMedico('');
+                    }}
+                    className="mr-2"
+                    disabled={sinInformacion}
+                  />
+                  <span className="text-purple-700 font-medium">📱 Servicio Móvil</span>
                 </label>
               </div>
 
@@ -340,21 +363,33 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                 </label>
               </div>
 
-              {esReferente && !sinInformacion ? (
-                <Autocomplete
-                  label="Nombre del Médico"
-                  options={medicosReferentes.map(m => ({ id: m.id || '', nombre: m.nombre }))}
-                  value={nombreMedico}
-                  onChange={handleMedicoReferenteChange}
-                  placeholder="Buscar médico referente"
-                  disabled={sinInformacion}
-                  required={!sinInformacion}
-                />
-              ) : (
-                <div>
-                  <label className="label">
-                    Nombre {!sinInformacion && <span className="text-red-500">*</span>}
-                  </label>
+              {/* Mostrar nota informativa para servicios móviles */}
+              {esServicioMovil && (
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                  <p className="text-sm text-purple-800">
+                    <strong>📱 Servicio Móvil:</strong> Este registro no cuenta como paciente regular ni genera comisión. Solo se registran estudios RX con precio personalizado.
+                  </p>
+                </div>
+              )}
+
+              {/* Campos de médico - Solo si NO es servicio móvil */}
+              {!esServicioMovil && (
+                <>
+                  {esReferente && !sinInformacion ? (
+                    <Autocomplete
+                      label="Nombre del Médico"
+                      options={medicosReferentes.map(m => ({ id: m.id || '', nombre: m.nombre }))}
+                      value={nombreMedico}
+                      onChange={handleMedicoReferenteChange}
+                      placeholder="Buscar médico referente"
+                      disabled={sinInformacion}
+                      required={!sinInformacion}
+                    />
+                  ) : (
+                    <div>
+                      <label className="label">
+                        Nombre {!sinInformacion && <span className="text-red-500">*</span>}
+                      </label>
                   <input
                     type="text"
                     className="input-field"
@@ -417,6 +452,8 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                   rows={3}
                 />
               </div>
+              </>
+              )}
             </div>
           </div>
         </div>

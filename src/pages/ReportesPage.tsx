@@ -98,14 +98,21 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
         }
       });
 
-      // ✅ Filtrar consultas anuladas DESPUÉS de obtenerlas
+      // ✅ Filtrar consultas anuladas Y servicios móviles DESPUÉS de obtenerlas
       // Solo incluir si anulado es false, null, o undefined (NO true)
+      // Y si NO es servicio móvil
       const consultas = consultasRaw?.filter(c => {
         const esAnulada = c.anulado === true;
+        const esMovil = c.es_servicio_movil === true;
+        
         if (esAnulada) {
           console.log('Filtrando (anulada):', c.pacientes?.nombre);
         }
-        return !esAnulada;
+        if (esMovil) {
+          console.log('Filtrando (servicio móvil):', c.pacientes?.nombre);
+        }
+        
+        return !esAnulada && !esMovil;
       }) || [];
 
       console.log('Total consultas raw:', consultasRaw?.length);
@@ -134,6 +141,68 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
     } catch (error) {
       console.error('Error:', error);
       showToast('Error al generar reporte', 'error');
+    } finally {
+      setGenerando(false);
+    }
+  };
+
+  const handleGenerarReporteMoviles = async () => {
+    setGenerando(true);
+    try {
+      let primerDia: string, ultimoDia: string;
+
+      if (tipoReporte === 'dia') {
+        primerDia = fechaUnica;
+        ultimoDia = fechaUnica;
+      } else if (tipoReporte === 'rango') {
+        primerDia = fechaInicio;
+        ultimoDia = fechaFin;
+      } else {
+        const fecha = new Date(anio, mes - 1, 1);
+        primerDia = new Date(fecha.getFullYear(), fecha.getMonth(), 1).toISOString().split('T')[0];
+        ultimoDia = new Date(fecha.getFullYear(), fecha.getMonth() + 1, 0).toISOString().split('T')[0];
+      }
+
+      const { data: consultasRaw, error } = await supabase
+        .from('consultas')
+        .select(`
+          *,
+          pacientes(nombre, edad, edad_valor, edad_tipo),
+          medicos(nombre),
+          detalle_consultas(
+            sub_estudios(
+              nombre,
+              estudios(id, nombre)
+            ),
+            precio,
+            numero_factura,
+            nit,
+            numero_voucher,
+            numero_transferencia
+          )
+        `)
+        .gte('fecha', primerDia)
+        .lte('fecha', ultimoDia)
+        .eq('es_servicio_movil', true) // SOLO servicios móviles
+        .order('fecha', { ascending: true });
+
+      if (error) throw error;
+
+      const consultas = consultasRaw?.filter(c => c.anulado !== true) || [];
+
+      if (!consultas || consultas.length === 0) {
+        showToast('No hay servicios móviles en este período', 'info');
+        setGenerando(false);
+        return;
+      }
+
+      // Usar el mismo generador
+      await generarReporteExcel(mes, anio, consultas);
+      
+      showToast('Reporte de servicios móviles generado exitosamente', 'success');
+    } catch (error) {
+      console.error('Error al generar reporte:', error);
+      showToast('Error al generar el reporte de móviles', 'error');
     } finally {
       setGenerando(false);
     }
@@ -327,23 +396,44 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
               </div>
             )}
 
-            <button
-              onClick={handleGenerarReporte}
-              disabled={generando}
-              className="w-full btn-primary flex items-center justify-center gap-2 py-3 text-lg"
-            >
-              {generando ? (
-                <>
-                  <LoadingSpinner />
-                  Generando reporte...
-                </>
-              ) : (
-                <>
-                  <Download size={24} />
-                  Generar y Descargar Reporte
-                </>
-              )}
-            </button>
+            {/* Botones de acción */}
+            <div className="space-y-3">
+              <button
+                onClick={handleGenerarReporte}
+                disabled={generando}
+                className="w-full btn-primary flex items-center justify-center gap-2 py-3 text-lg"
+              >
+                {generando ? (
+                  <>
+                    <LoadingSpinner />
+                    Generando reporte...
+                  </>
+                ) : (
+                  <>
+                    <Download size={24} />
+                    Generar Reporte Regular
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleGenerarReporteMoviles}
+                disabled={generando}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg flex items-center justify-center gap-2 py-3 text-lg transition-colors disabled:bg-gray-400"
+              >
+                {generando ? (
+                  <>
+                    <LoadingSpinner />
+                    Generando reporte móviles...
+                  </>
+                ) : (
+                  <>
+                    <Download size={24} />
+                    📱 Generar Reporte Móviles
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>

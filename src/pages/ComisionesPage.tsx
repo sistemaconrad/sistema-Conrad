@@ -82,7 +82,8 @@ export const ComisionesPage: React.FC<ComisionesPageProps> = ({ onBack }) => {
         .lte('fecha', fechaFin)
         .not('medico_id', 'is', null)
         .eq('sin_informacion_medico', false)
-        .or('anulado.is.null,anulado.eq.false');
+        .or('anulado.is.null,anulado.eq.false')
+        .or('es_servicio_movil.is.null,es_servicio_movil.eq.false'); // Excluir servicios móviles
 
       if (error) throw error;
 

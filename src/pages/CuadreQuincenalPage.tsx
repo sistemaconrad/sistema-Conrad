@@ -32,7 +32,7 @@ export const CuadreQuincenalPage: React.FC<CuadreQuincenalPageProps> = ({ onBack
         : new Date(anio, mes - 1 + 1, 0, 23, 59, 59); // Último día del mes
 
       // ✅ CAMBIO PRINCIPAL: Obtener TODAS las consultas con estado de cuenta que tengan médico
-      const { data: consultas, error } = await supabase
+      const { data: consultasRaw, error } = await supabase
         .from('consultas')
         .select(`
           *,
@@ -50,6 +50,9 @@ export const CuadreQuincenalPage: React.FC<CuadreQuincenalPageProps> = ({ onBack
         .order('created_at');
 
       if (error) throw error;
+
+      // ✅ Filtrar consultas anuladas
+      const consultas = consultasRaw?.filter(c => c.anulado !== true) || [];
 
       if (!consultas || consultas.length === 0) {
         alert('No hay estados de cuenta de pacientes referidos en esta quincena');

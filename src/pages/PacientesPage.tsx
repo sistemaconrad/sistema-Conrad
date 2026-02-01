@@ -14,6 +14,7 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
   const [fecha, setFecha] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [consultas, setConsultas] = useState<any[]>([]);
   const [filtroBusqueda, setFiltroBusqueda] = useState('');
+  const [pestanaActiva, setPestanaActiva] = useState<'todos' | 'regulares' | 'moviles'>('regulares');
   const [loading, setLoading] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAgregarEstudioModal, setShowAgregarEstudioModal] = useState(false);
@@ -509,6 +510,40 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
           </div>
         </div>
 
+        {/* Pestañas */}
+        <div className="mb-6 flex gap-2 border-b border-gray-200">
+          <button
+            onClick={() => setPestanaActiva('regulares')}
+            className={`px-6 py-3 font-medium transition-colors ${
+              pestanaActiva === 'regulares'
+                ? 'border-b-2 border-blue-600 text-blue-600'
+                : 'text-gray-600 hover:text-blue-600'
+            }`}
+          >
+            👥 Pacientes Regulares
+          </button>
+          <button
+            onClick={() => setPestanaActiva('moviles')}
+            className={`px-6 py-3 font-medium transition-colors ${
+              pestanaActiva === 'moviles'
+                ? 'border-b-2 border-purple-600 text-purple-600'
+                : 'text-gray-600 hover:text-purple-600'
+            }`}
+          >
+            📱 Servicios Móviles
+          </button>
+          <button
+            onClick={() => setPestanaActiva('todos')}
+            className={`px-6 py-3 font-medium transition-colors ${
+              pestanaActiva === 'todos'
+                ? 'border-b-2 border-gray-600 text-gray-600'
+                : 'text-gray-500 hover:text-gray-600'
+            }`}
+          >
+            📋 Todos
+          </button>
+        </div>
+
         {/* Lista de consultas */}
         {loading ? (
           <div className="text-center py-12">
@@ -516,9 +551,15 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
           </div>
         ) : (
           <>
-            {consultas.filter(c => 
-              c.pacientes.nombre.toLowerCase().includes(filtroBusqueda.toLowerCase())
-            ).length === 0 ? (
+            {consultas
+              .filter(c => {
+                // Filtrar por pestaña
+                if (pestanaActiva === 'regulares' && c.es_servicio_movil === true) return false;
+                if (pestanaActiva === 'moviles' && c.es_servicio_movil !== true) return false;
+                // Filtrar por nombre
+                return c.pacientes.nombre.toLowerCase().includes(filtroBusqueda.toLowerCase());
+              })
+              .length === 0 ? (
               <div className="card text-center py-12">
                 <p className="text-lg text-gray-600">No hay consultas para esta fecha</p>
                 <p className="text-sm text-gray-500 mt-2">
@@ -528,7 +569,13 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
             ) : (
               <div className="space-y-4">
                 {consultas
-                  .filter(c => c.pacientes.nombre.toLowerCase().includes(filtroBusqueda.toLowerCase()))
+                  .filter(c => {
+                    // Filtrar por pestaña
+                    if (pestanaActiva === 'regulares' && c.es_servicio_movil === true) return false;
+                    if (pestanaActiva === 'moviles' && c.es_servicio_movil !== true) return false;
+                    // Filtrar por nombre
+                    return c.pacientes.nombre.toLowerCase().includes(filtroBusqueda.toLowerCase());
+                  })
                   .map((consulta, index) => {
                   const total = consulta.detalle_consultas.reduce((sum: number, d: any) => sum + d.precio, 0);
                   
@@ -546,10 +593,22 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
                         </div>
                       )}
                       <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <h3 className={`text-lg font-bold ${consulta.anulado ? 'text-red-700 line-through' : 'text-blue-700'}`}>
-                            {consulta.anulado ? '#ANULADO' : `#${consulta.numero_paciente || (index + 1)}`} - {consulta.pacientes.nombre}
-                          </h3>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className={`text-lg font-bold ${consulta.anulado ? 'text-red-700 line-through' : consulta.es_servicio_movil ? 'text-purple-700' : 'text-blue-700'}`}>
+                              {consulta.anulado 
+                                ? '#ANULADO' 
+                                : consulta.es_servicio_movil 
+                                  ? '📱 MÓVIL'
+                                  : `#${consulta.numero_paciente || (index + 1)}`
+                              } - {consulta.pacientes.nombre}
+                            </h3>
+                            {consulta.es_servicio_movil && (
+                              <span className="bg-purple-100 text-purple-700 text-xs font-bold px-3 py-1 rounded-full border border-purple-300">
+                                Sin número
+                              </span>
+                            )}
+                          </div>
                           <p className="text-sm text-gray-600">
                             Edad: {consulta.pacientes.edad} años | Tel: {consulta.pacientes.telefono}
                           </p>

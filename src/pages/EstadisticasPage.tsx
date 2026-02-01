@@ -65,8 +65,8 @@ export const EstadisticasPage: React.FC<EstadisticasPageProps> = ({ onBack }) =>
 
       if (error) throw error;
 
-      // ✅ Filtrar consultas anuladas
-      const consultas = consultasRaw?.filter(c => c.anulado !== true) || [];
+      // ✅ Filtrar consultas anuladas y servicios móviles
+      const consultas = consultasRaw?.filter(c => c.anulado !== true && c.es_servicio_movil !== true) || [];
 
       if (!consultas || consultas.length === 0) {
         setLoading(false);
