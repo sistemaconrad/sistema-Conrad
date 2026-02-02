@@ -175,7 +175,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     };
 
     setDescripcion([...descripcion, nuevoDetalle]);
-    setEstudioSeleccionado('');
+    // Solo limpiar sub-estudio, mantener el estudio seleccionado
     setSubEstudioSeleccionado('');
   };
 
@@ -392,35 +392,43 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         'Cancelar = Orden para Médico (sin precios)'
       );
 
-      if (tipoRecibo) {
-        // Recibo completo
-        const htmlCompleto = generarReciboCompleto(datosRecibo);
-        abrirRecibo(htmlCompleto, 'Recibo Completo');
-      } else {
-        // Recibo para médico
-        const htmlMedico = generarReciboMedico(datosRecibo);
-        abrirRecibo(htmlMedico, 'Orden Médico');
+      try {
+        if (tipoRecibo) {
+          // Recibo completo
+          const htmlCompleto = generarReciboCompleto(datosRecibo);
+          abrirRecibo(htmlCompleto, 'Recibo Completo');
+        } else {
+          // Recibo para médico
+          const htmlMedico = generarReciboMedico(datosRecibo);
+          abrirRecibo(htmlMedico, 'Orden Médico');
+        }
+      } catch (errorImpresion) {
+        console.error('Error al imprimir:', errorImpresion);
+        alert('Advertencia: La consulta se guardó pero hubo un problema al abrir la impresión. Puede reimprimir desde Pacientes.');
+        // No limpiamos el formulario si falla la impresión
+        return;
       }
       
-      // Limpiar formulario después de imprimir
-      setTimeout(() => {
-        alert('Consulta guardada exitosamente');
-        setPacienteActual(null);
-        setMedicoActual(null);
-        setSinInfoMedico(false);
-        setTipoCobro('normal');
-        setJustificacionEspecial('');
-        setShowJustificacion(false);
-        setEstudioSeleccionado('');
-        setSubEstudioSeleccionado('');
-        setDescripcion([]);
-        setRequiereFactura(false);
-        setNit('');
-        setFormaPago('efectivo');
-        setNumeroFactura('');
-        setNumeroTransferencia('');
-        setNumeroVoucher('');
-      }, 1000);
+      // Solo limpiar si todo salió bien
+      alert('✅ Consulta guardada exitosamente');
+      
+      // Limpiar formulario después de guardar e imprimir exitosamente
+      setPacienteActual(null);
+      setMedicoActual(null);
+      setSinInfoMedico(false);
+      setEsServicioMovil(false);
+      setTipoCobro('normal');
+      setJustificacionEspecial('');
+      setShowJustificacion(false);
+      setEstudioSeleccionado('');
+      setSubEstudioSeleccionado('');
+      setDescripcion([]);
+      setRequiereFactura(false);
+      setNit('');
+      setFormaPago('efectivo');
+      setNumeroFactura('');
+      setNumeroTransferencia('');
+      setNumeroVoucher('');
       
     } catch (error) {
       console.error('Error al guardar consulta:', error);
@@ -674,11 +682,18 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
 
               <button
                 onClick={agregarSubEstudio}
-                className="btn-primary mt-4"
+                className="btn-primary mt-4 flex items-center gap-2 justify-center"
                 disabled={!subEstudioSeleccionado}
               >
-                Agregar a Descripción
+                <Plus size={18} />
+                Agregar {estudioSeleccionado && descripcion.length > 0 ? 'Otro' : 'a Descripción'}
               </button>
+
+              {estudioSeleccionado && descripcion.length > 0 && (
+                <p className="text-sm text-green-600 mt-2 text-center">
+                  ✓ Puedes seguir agregando más estudios del mismo tipo
+                </p>
+              )}
             </div>
 
             {/* Descripción */}

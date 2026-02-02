@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Download, Calendar, DollarSign, Users } from 'lucide-react';
+import { ArrowLeft, Download, Calendar, DollarSign, Users, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 
@@ -11,55 +11,27 @@ interface MedicoComision {
   medico_id: string;
   medico_nombre: string;
   total_pacientes: number;
-  comisiones_por_estudio: { [estudioNombre: string]: number }; // Dinámico
+  comisiones_por_estudio: { [key: string]: number }; // Dinámico
   total_comision: number;
   pacientes: any[];
   seleccionado: boolean;
-}
-
-interface EstudioConComision {
-  id: string;
-  nombre: string;
-  porcentaje_comision: number;
 }
 
 export const ComisionesPage: React.FC<ComisionesPageProps> = ({ onBack }) => {
   const [fechaInicio, setFechaInicio] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [fechaFin, setFechaFin] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
   const [medicos, setMedicos] = useState<MedicoComision[]>([]);
-  const [estudiosConComision, setEstudiosConComision] = useState<EstudioConComision[]>([]);
   const [loading, setLoading] = useState(false);
   const [medicoExpandido, setMedicoExpandido] = useState<string | null>(null);
 
   useEffect(() => {
-    cargarEstudiosConComision();
-  }, []);
-
-  useEffect(() => {
-    if (estudiosConComision.length > 0) {
-      calcularComisiones();
-    }
-  }, [fechaInicio, fechaFin, estudiosConComision]);
-
-  const cargarEstudiosConComision = async () => {
-    const { data, error } = await supabase
-      .from('estudios')
-      .select('id, nombre, porcentaje_comision')
-      .gt('porcentaje_comision', 0)
-      .eq('activo', true)
-      .order('nombre');
-
-    if (error) {
-      console.error('Error al cargar estudios:', error);
-      return;
-    }
-
-    setEstudiosConComision(data || []);
-  };
+    calcularComisiones();
+  }, [fechaInicio, fechaFin]);
 
   const calcularComisiones = async () => {
     setLoading(true);
     try {
+      // Obtener todas las consultas del período con médico asignado
       const { data: consultas, error } = await supabase
         .from('consultas')
         .select(`
@@ -83,27 +55,34 @@ export const ComisionesPage: React.FC<ComisionesPageProps> = ({ onBack }) => {
         .not('medico_id', 'is', null)
         .eq('sin_informacion_medico', false)
         .or('anulado.is.null,anulado.eq.false')
-        .or('es_servicio_movil.is.null,es_servicio_movil.eq.false'); // Excluir servicios móviles
+        .or('es_servicio_movil.is.null,es_servicio_movil.eq.false');
 
       if (error) throw error;
 
+      // Agrupar por médico y calcular comisiones
       const medicoMap = new Map<string, MedicoComision>();
 
       consultas?.forEach(consulta => {
+        // NO generar comisión si:
+        // 1. tipo_cobro es 'social' o 'personalizado'
+        // 2. forma_pago es 'estado_cuenta'
+        // 3. es_servicio_movil es true
+        if (consulta.tipo_cobro === 'social' || 
+            consulta.tipo_cobro === 'personalizado' ||
+            consulta.forma_pago === 'estado_cuenta' ||
+            consulta.es_servicio_movil === true) {
+          return; // Saltar esta consulta
+        }
+
         const medicoId = consulta.medico_id;
         const medicoNombre = consulta.medicos?.nombre || 'Desconocido';
 
         if (!medicoMap.has(medicoId)) {
-          const comisionesIniciales: { [key: string]: number } = {};
-          estudiosConComision.forEach(est => {
-            comisionesIniciales[est.nombre] = 0;
-          });
-
           medicoMap.set(medicoId, {
             medico_id: medicoId,
             medico_nombre: medicoNombre,
             total_pacientes: 0,
-            comisiones_por_estudio: comisionesIniciales,
+            comisiones_por_estudio: {}, // Dinámico
             total_comision: 0,
             pacientes: [],
             seleccionado: true
@@ -113,58 +92,35 @@ export const ComisionesPage: React.FC<ComisionesPageProps> = ({ onBack }) => {
         const medico = medicoMap.get(medicoId)!;
         medico.total_pacientes++;
 
-        // ✅ IMPORTANTE: Genera comisión SOLO si:
-        // 1. Tipo de cobro es "normal" o "especial"
-        // 2. Y forma de pago NO es "estado_cuenta"
-        const generaComision = 
-          (consulta.tipo_cobro === 'normal' || consulta.tipo_cobro === 'especial') 
-          && consulta.forma_pago !== 'estado_cuenta';
+        // Calcular total de la consulta
+        const totalConsulta = consulta.detalle_consultas?.reduce((sum, d) => sum + d.precio, 0) || 0;
+        
+        // Determinar el tipo de estudio y su porcentaje
+        const primerDetalle = consulta.detalle_consultas?.[0];
+        const estudioNombre = primerDetalle?.sub_estudios?.estudios?.nombre || 'Otros';
+        const porcentaje = primerDetalle?.sub_estudios?.estudios?.porcentaje_comision || 0;
+        
+        // Calcular comisión sobre el TOTAL de la consulta
+        const comisionTotal = totalConsulta * (porcentaje / 100);
 
-        if (generaComision) {
-          // Calcular comisión por cada estudio
-          consulta.detalle_consultas?.forEach(detalle => {
-            const estudioNombre = detalle.sub_estudios?.estudios?.nombre || '';
-            const porcentaje = detalle.sub_estudios?.estudios?.porcentaje_comision || 0;
-            
-            if (porcentaje > 0) {
-              const comision = detalle.precio * (porcentaje / 100);
-              medico.comisiones_por_estudio[estudioNombre] = 
-                (medico.comisiones_por_estudio[estudioNombre] || 0) + comision;
-              medico.total_comision += comision;
-            }
-          });
+        // Agregar a la categoría del estudio (dinámico)
+        if (!medico.comisiones_por_estudio[estudioNombre]) {
+          medico.comisiones_por_estudio[estudioNombre] = 0;
         }
+        medico.comisiones_por_estudio[estudioNombre] += comisionTotal;
 
-        if (generaComision) {
-          // Calcular comisión por cada estudio
-          consulta.detalle_consultas?.forEach(detalle => {
-            const estudioNombre = detalle.sub_estudios?.estudios?.nombre || '';
-            const porcentaje = detalle.sub_estudios?.estudios?.porcentaje_comision || 0;
-            
-            if (porcentaje > 0) {
-              const comision = detalle.precio * (porcentaje / 100);
-              medico.comisiones_por_estudio[estudioNombre] = 
-                (medico.comisiones_por_estudio[estudioNombre] || 0) + comision;
-              medico.total_comision += comision;
-            }
-          });
-        }
+        medico.total_comision += comisionTotal;
 
         medico.pacientes.push({
           nombre: consulta.pacientes?.nombre,
           fecha: consulta.fecha,
-          tipo_cobro: consulta.tipo_cobro,
-          forma_pago: consulta.forma_pago,
-          genera_comision: generaComision,
           estudios: consulta.detalle_consultas
         });
       });
 
-      setMedicos(
-        Array.from(medicoMap.values())
-          .filter(m => m.total_comision > 0) // ✅ Solo mostrar médicos con comisión
-          .sort((a, b) => b.total_comision - a.total_comision)
-      );
+      setMedicos(Array.from(medicoMap.values()).sort((a, b) => 
+        b.total_comision - a.total_comision
+      ));
     } catch (error) {
       console.error('Error al calcular comisiones:', error);
       alert('Error al calcular comisiones');
@@ -187,151 +143,169 @@ export const ComisionesPage: React.FC<ComisionesPageProps> = ({ onBack }) => {
       return;
     }
 
-    // Usar ExcelJS para estilos profesionales
-    const ExcelJS = await import('exceljs');
+    const ExcelJS = (await import('exceljs')).default;
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Comisiones Médicas');
+    const sheet = workbook.addWorksheet('Comisiones');
 
-    // FILA 1: TÍTULO Y FECHA
-    worksheet.mergeCells('A1:' + String.fromCharCode(65 + estudiosConComision.length + 1) + '1');
-    const titleCell = worksheet.getCell('A1');
-    titleCell.value = 'COMISIONES MÉDICAS - CONRAD CENTRAL';
-    titleCell.font = { name: 'Calibri', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
-    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
-    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    worksheet.getRow(1).height = 30;
-
-    // Agregar fecha en celda aparte
-    const lastCol = String.fromCharCode(65 + estudiosConComision.length + 1);
-    worksheet.mergeCells(`A2:${lastCol}2`);
-    const dateCell = worksheet.getCell('A2');
-    dateCell.value = `Período: ${format(new Date(fechaInicio), 'dd/MM/yyyy')} - ${format(new Date(fechaFin), 'dd/MM/yyyy')}`;
-    dateCell.font = { name: 'Calibri', size: 11, italic: true };
-    dateCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    dateCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE7E6E6' } };
-    worksheet.getRow(2).height = 20;
-
-    // FILA 3: HEADERS
-    const headers = ['Nombre del Médico/Establecimiento'];
-    estudiosConComision.forEach(est => {
-      headers.push(`Comisión ${est.nombre}`);
-    });
-    headers.push('TOTAL');
-
-    worksheet.getRow(3).values = headers;
-    worksheet.getRow(3).height = 25;
-
-    headers.forEach((_, idx) => {
-      const cell = worksheet.getCell(3, idx + 1);
-      cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
-      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-      cell.border = {
-        top: { style: 'thin' },
-        bottom: { style: 'thin' },
-        left: { style: 'thin' },
-        right: { style: 'thin' }
-      };
-    });
-
-    // DATOS
-    let filaActual = 4;
-    medicosSeleccionados.forEach((medico, idx) => {
-      const fila: (string | number)[] = [medico.medico_nombre];
-      
-      estudiosConComision.forEach(est => {
-        fila.push(medico.comisiones_por_estudio[est.nombre] || 0);
-      });
-      
-      fila.push(medico.total_comision);
-
-      worksheet.getRow(filaActual).values = fila;
-
-      // Estilos para cada celda
-      fila.forEach((valor, colIdx) => {
-        const cell = worksheet.getCell(filaActual, colIdx + 1);
-        
-        if (colIdx === 0) {
-          // Nombre del médico
-          cell.font = { name: 'Arial', size: 10, bold: true };
-          cell.alignment = { horizontal: 'left', vertical: 'middle' };
-        } else if (colIdx === fila.length - 1) {
-          // Columna TOTAL
-          cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF0070C0' } };
-          cell.alignment = { horizontal: 'right', vertical: 'middle' };
-          cell.numFmt = '"Q "#,##0.00';
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBE5F1' } };
-        } else {
-          // Columnas de comisiones
-          cell.font = { name: 'Arial', size: 10 };
-          cell.alignment = { horizontal: 'right', vertical: 'middle' };
-          cell.numFmt = '"Q "#,##0.00';
+    // Obtener todos los estudios únicos (dinámico)
+    const estudiosUnicos = new Set<string>();
+    medicosSeleccionados.forEach(m => {
+      Object.keys(m.comisiones_por_estudio).forEach(estudio => {
+        if (m.comisiones_por_estudio[estudio] > 0) {
+          estudiosUnicos.add(estudio);
         }
-
-        cell.border = {
-          top: { style: 'thin' },
-          bottom: { style: 'thin' },
-          left: { style: 'thin' },
-          right: { style: 'thin' }
-        };
       });
-
-      filaActual++;
     });
+    const estudiosArray = Array.from(estudiosUnicos).sort();
 
-    // FILA TOTALES
-    const filaTotales = filaActual;
-    worksheet.getCell(filaTotales, 1).value = 'TOTAL GENERAL';
-    worksheet.getCell(filaTotales, 1).font = { name: 'Arial', size: 11, bold: true };
-    worksheet.getCell(filaTotales, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
-    worksheet.getCell(filaTotales, 1).font.color = { argb: 'FFFFFFFF' };
-    worksheet.getCell(filaTotales, 1).alignment = { horizontal: 'center', vertical: 'middle' };
+    // Título
+    sheet.mergeCells('A1:' + String.fromCharCode(65 + estudiosArray.length + 1) + '1');
+    const titleCell = sheet.getCell('A1');
+    titleCell.value = 'REPORTE DE COMISIONES MÉDICAS';
+    titleCell.font = { name: 'Calibri', size: 16, bold: true, color: { argb: 'FF1E40AF' } };
+    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    sheet.getRow(1).height = 30;
 
-    estudiosConComision.forEach((est, idx) => {
-      const total = medicosSeleccionados.reduce((sum, m) => sum + (m.comisiones_por_estudio[est.nombre] || 0), 0);
-      const cell = worksheet.getCell(filaTotales, idx + 2);
-      cell.value = total;
-      cell.numFmt = '"Q "#,##0.00';
-      cell.font = { name: 'Arial', size: 10, bold: true };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
-      cell.alignment = { horizontal: 'right', vertical: 'middle' };
+    // Período
+    sheet.mergeCells('A2:' + String.fromCharCode(65 + estudiosArray.length + 1) + '2');
+    const periodCell = sheet.getCell('A2');
+    periodCell.value = `Período: ${format(new Date(fechaInicio), 'dd/MM/yyyy')} - ${format(new Date(fechaFin), 'dd/MM/yyyy')}`;
+    periodCell.font = { name: 'Calibri', size: 12, bold: true };
+    periodCell.alignment = { horizontal: 'center' };
+    sheet.getRow(2).height = 20;
+
+    sheet.getRow(3).height = 5;
+
+    // Headers
+    sheet.getRow(4).height = 25;
+    const headers = ['Médico/Establecimiento', ...estudiosArray, 'TOTAL'];
+    headers.forEach((header, idx) => {
+      const cell = sheet.getCell(4, idx + 1);
+      cell.value = header;
+      cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF4F46E5' }
+      };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
       cell.border = {
-        top: { style: 'medium' },
-        bottom: { style: 'medium' },
-        left: { style: 'thin' },
-        right: { style: 'thin' }
+        top: { style: 'thin', color: { argb: 'FF4F46E5' } },
+        bottom: { style: 'thin', color: { argb: 'FF4F46E5' } },
+        left: { style: 'thin', color: { argb: 'FF4F46E5' } },
+        right: { style: 'thin', color: { argb: 'FF4F46E5' } }
       };
     });
 
-    const totalCell = worksheet.getCell(filaTotales, estudiosConComision.length + 2);
-    totalCell.value = totalComisionesSeleccionadas;
-    totalCell.numFmt = '"Q "#,##0.00';
-    totalCell.font = { name: 'Arial', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
-    totalCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0070C0' } };
-    totalCell.alignment = { horizontal: 'right', vertical: 'middle' };
-    totalCell.border = {
-      top: { style: 'medium' },
-      bottom: { style: 'medium' },
-      left: { style: 'thin' },
-      right: { style: 'medium' }
+    // Datos
+    let row = 5;
+    let totalGeneral = 0;
+    const totalesPorEstudio: { [key: string]: number } = {};
+
+    medicosSeleccionados.forEach((medico, idx) => {
+      sheet.getRow(row).height = 22;
+      
+      // Nombre del médico
+      const nombreCell = sheet.getCell(row, 1);
+      nombreCell.value = medico.medico_nombre;
+      nombreCell.font = { name: 'Calibri', size: 11 };
+      nombreCell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: idx % 2 === 0 ? 'FFFFFFFF' : 'FFF3F4F6' }
+      };
+      nombreCell.alignment = { vertical: 'middle' };
+
+      // Comisiones por estudio (dinámico)
+      estudiosArray.forEach((estudio, eIdx) => {
+        const monto = medico.comisiones_por_estudio[estudio] || 0;
+        const cell = sheet.getCell(row, eIdx + 2);
+        cell.value = monto;
+        cell.numFmt = '"Q"#,##0.00';
+        cell.font = { name: 'Calibri', size: 11 };
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: idx % 2 === 0 ? 'FFFFFFFF' : 'FFF3F4F6' }
+        };
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+
+        // Sumar al total del estudio
+        if (!totalesPorEstudio[estudio]) totalesPorEstudio[estudio] = 0;
+        totalesPorEstudio[estudio] += monto;
+      });
+
+      // Total del médico
+      const totalCell = sheet.getCell(row, estudiosArray.length + 2);
+      totalCell.value = medico.total_comision;
+      totalCell.numFmt = '"Q"#,##0.00';
+      totalCell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF059669' } };
+      totalCell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: idx % 2 === 0 ? 'FFFFFFFF' : 'FFF3F4F6' }
+      };
+      totalCell.alignment = { horizontal: 'right', vertical: 'middle' };
+
+      totalGeneral += medico.total_comision;
+      row++;
+    });
+
+    // Fila de totales
+    row++;
+    sheet.getRow(row).height = 28;
+    
+    const totalLabelCell = sheet.getCell(row, 1);
+    totalLabelCell.value = 'TOTALES';
+    totalLabelCell.font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+    totalLabelCell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF1E40AF' }
     };
+    totalLabelCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
-    // ANCHO DE COLUMNAS
-    worksheet.getColumn(1).width = 40; // Nombre
-    for (let i = 2; i <= estudiosConComision.length + 1; i++) {
-      worksheet.getColumn(i).width = 18; // Comisiones
-    }
-    worksheet.getColumn(estudiosConComision.length + 2).width = 18; // Total
+    // Totales por estudio
+    estudiosArray.forEach((estudio, idx) => {
+      const cell = sheet.getCell(row, idx + 2);
+      cell.value = totalesPorEstudio[estudio];
+      cell.numFmt = '"Q"#,##0.00';
+      cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF1E40AF' }
+      };
+      cell.alignment = { horizontal: 'right', vertical: 'middle' };
+    });
 
-    // Generar archivo
+    // Total general
+    const totalGeneralCell = sheet.getCell(row, estudiosArray.length + 2);
+    totalGeneralCell.value = totalGeneral;
+    totalGeneralCell.numFmt = '"Q"#,##0.00';
+    totalGeneralCell.font = { name: 'Calibri', size: 13, bold: true, color: { argb: 'FFFFFFFF' } };
+    totalGeneralCell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF059669' }
+    };
+    totalGeneralCell.alignment = { horizontal: 'right', vertical: 'middle' };
+
+    // Anchos de columna
+    sheet.getColumn(1).width = 35;
+    estudiosArray.forEach((_, idx) => {
+      sheet.getColumn(idx + 2).width = 18;
+    });
+    sheet.getColumn(estudiosArray.length + 2).width = 18;
+
+    // Descargar
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Comisiones_Medicas_${format(new Date(fechaInicio), 'yyyy-MM')}.xlsx`;
-    link.click();
-    window.URL.revokeObjectURL(url);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Comisiones_${format(new Date(fechaInicio), 'yyyy-MM')}_CONRAD.xlsx`;
+    a.click();
   };
 
   const totalComisionesSeleccionadas = medicos
@@ -351,7 +325,7 @@ export const ComisionesPage: React.FC<ComisionesPageProps> = ({ onBack }) => {
             Volver al Dashboard
           </button>
           <h1 className="text-3xl font-bold">Comisiones Médicas</h1>
-          <p className="text-purple-100 mt-2">Cálculo dinámico de comisiones por referencias</p>
+          <p className="text-purple-100 mt-2">Cálculo de comisiones por referencias</p>
         </div>
       </div>
 
@@ -399,54 +373,6 @@ export const ComisionesPage: React.FC<ComisionesPageProps> = ({ onBack }) => {
                 <Download size={18} />
                 Exportar Excel
               </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Info sobre estudios con comisión */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <h3 className="font-semibold text-blue-900 mb-2">📊 Estudios con Comisión Configurada:</h3>
-          <div className="flex flex-wrap gap-2">
-            {estudiosConComision.map(est => (
-              <span key={est.id} className="bg-white px-3 py-1 rounded-full text-sm border border-blue-300">
-                {est.nombre}: <strong>{est.porcentaje_comision}%</strong>
-              </span>
-            ))}
-          </div>
-          <p className="text-sm text-blue-700 mt-2">
-            💡 Configura porcentajes en <strong>Gestión de Productos</strong>
-          </p>
-        </div>
-
-        {/* Info sobre tipos de cobro */}
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-          <h3 className="font-semibold text-green-900 mb-3">💰 Reglas de Comisión:</h3>
-          
-          <div className="mb-3">
-            <p className="text-sm font-semibold text-green-800 mb-2">✅ GENERA COMISIÓN:</p>
-            <div className="flex flex-wrap gap-2 ml-4">
-              <span className="bg-green-100 px-3 py-1 rounded-lg text-sm font-medium text-green-800 border border-green-300">
-                Tipo: NORMAL o ESPECIAL
-              </span>
-              <span className="text-sm text-green-700">+</span>
-              <span className="bg-green-100 px-3 py-1 rounded-lg text-sm font-medium text-green-800 border border-green-300">
-                Forma de pago: CUALQUIERA excepto Estado de Cuenta
-              </span>
-            </div>
-          </div>
-
-          <div>
-            <p className="text-sm font-semibold text-gray-800 mb-2">❌ NO GENERA COMISIÓN:</p>
-            <div className="flex flex-wrap gap-2 ml-4">
-              <span className="bg-gray-100 px-3 py-1 rounded-lg text-sm font-medium text-gray-600 border border-gray-300">
-                Tipo: SOCIAL
-              </span>
-              <span className="bg-gray-100 px-3 py-1 rounded-lg text-sm font-medium text-gray-600 border border-gray-300">
-                Tipo: PERSONALIZADO
-              </span>
-              <span className="bg-red-100 px-3 py-1 rounded-lg text-sm font-medium text-red-700 border border-red-300">
-                Forma de pago: ESTADO DE CUENTA
-              </span>
             </div>
           </div>
         </div>
@@ -537,42 +463,41 @@ export const ComisionesPage: React.FC<ComisionesPageProps> = ({ onBack }) => {
                 {/* Detalle expandido */}
                 {medicoExpandido === medico.medico_id && (
                   <div className="mt-4 pl-9 space-y-3">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                      {estudiosConComision.map(est => {
-                        const comision = medico.comisiones_por_estudio[est.nombre] || 0;
-                        if (comision === 0) return null;
-                        
-                        return (
-                          <div key={est.id} className="bg-gradient-to-br from-purple-50 to-blue-50 p-3 rounded border border-purple-200">
-                            <p className="text-gray-700 font-medium">{est.nombre}</p>
-                            <p className="font-bold text-purple-700">Q {comision.toFixed(2)}</p>
-                            <p className="text-xs text-gray-500">{est.porcentaje_comision}%</p>
-                          </div>
-                        );
-                      })}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
+                      {Object.entries(medico.comisiones_por_estudio)
+                        .filter(([_, monto]) => monto > 0)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([estudio, monto], idx) => {
+                          const colores = [
+                            'bg-blue-50 text-blue-700',
+                            'bg-green-50 text-green-700',
+                            'bg-purple-50 text-purple-700',
+                            'bg-yellow-50 text-yellow-700',
+                            'bg-orange-50 text-orange-700',
+                            'bg-pink-50 text-pink-700',
+                            'bg-indigo-50 text-indigo-700',
+                            'bg-red-50 text-red-700'
+                          ];
+                          const colorClass = colores[idx % colores.length];
+                          
+                          return (
+                            <div key={estudio} className={`${colorClass.split(' ')[0]} p-3 rounded`}>
+                              <p className="text-gray-600 text-xs truncate" title={estudio}>{estudio}</p>
+                              <p className={`font-bold ${colorClass.split(' ')[1]}`}>
+                                Q {monto.toFixed(2)}
+                              </p>
+                            </div>
+                          );
+                        })}
                     </div>
 
                     <div className="mt-4">
                       <h4 className="font-semibold text-gray-700 mb-2">Pacientes:</h4>
                       <div className="bg-gray-50 rounded p-4 max-h-60 overflow-y-auto">
                         {medico.pacientes.map((p, idx) => (
-                          <div key={idx} className="text-sm py-2 border-b last:border-0 flex justify-between items-center">
-                            <div>
-                              <p className="font-medium">{p.nombre}</p>
-                              <p className="text-gray-600">{p.fecha}</p>
-                            </div>
-                            {p.genera_comision ? (
-                              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium">
-                                ✓ Con comisión
-                              </span>
-                            ) : (
-                              <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded font-medium">
-                                {p.tipo_cobro === 'social' ? '❌ Social' : 
-                                 p.tipo_cobro === 'personalizado' ? '❌ Personalizado' :
-                                 p.forma_pago === 'estado_cuenta' ? '❌ Estado de Cuenta' :
-                                 '❌ Sin comisión'}
-                              </span>
-                            )}
+                          <div key={idx} className="text-sm py-2 border-b last:border-0">
+                            <p className="font-medium">{p.nombre}</p>
+                            <p className="text-gray-600">{p.fecha}</p>
                           </div>
                         ))}
                       </div>
