@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, Edit2, Search, Calendar } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Search, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface GastosPageProps {
   onBack: () => void;
@@ -21,6 +22,12 @@ interface Gasto {
   };
 }
 
+interface GastosPorDia {
+  fecha: string;
+  gastos: Gasto[];
+  total: number;
+}
+
 export const GastosPage: React.FC<GastosPageProps> = ({ onBack }) => {
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [categorias, setCategorias] = useState<any[]>([]);
@@ -29,6 +36,7 @@ export const GastosPage: React.FC<GastosPageProps> = ({ onBack }) => {
   const [busqueda, setBusqueda] = useState('');
   const [mes, setMes] = useState(new Date().getMonth() + 1);
   const [anio, setAnio] = useState(new Date().getFullYear());
+  const [diasExpandidos, setDiasExpandidos] = useState<Set<string>>(new Set());
 
   // Form state
   const [formData, setFormData] = useState({
@@ -142,10 +150,49 @@ export const GastosPage: React.FC<GastosPageProps> = ({ onBack }) => {
     });
   };
 
+  const toggleDia = (fecha: string) => {
+    const newSet = new Set(diasExpandidos);
+    if (newSet.has(fecha)) {
+      newSet.delete(fecha);
+    } else {
+      newSet.add(fecha);
+    }
+    setDiasExpandidos(newSet);
+  };
+
+  const expandirTodos = () => {
+    const todasLasFechas = new Set(gastosPorDia.map(d => d.fecha));
+    setDiasExpandidos(todasLasFechas);
+  };
+
+  const contraerTodos = () => {
+    setDiasExpandidos(new Set());
+  };
+
+  // Filtrar gastos
   const gastosFiltrados = gastos.filter(g =>
     g.concepto.toLowerCase().includes(busqueda.toLowerCase()) ||
     g.proveedor?.toLowerCase().includes(busqueda.toLowerCase())
   );
+
+  // Agrupar gastos por día
+  const gastosPorDia: GastosPorDia[] = gastosFiltrados.reduce((acc: GastosPorDia[], gasto) => {
+    const fecha = gasto.fecha;
+    const diaExistente = acc.find(d => d.fecha === fecha);
+    
+    if (diaExistente) {
+      diaExistente.gastos.push(gasto);
+      diaExistente.total += gasto.monto;
+    } else {
+      acc.push({
+        fecha,
+        gastos: [gasto],
+        total: gasto.monto
+      });
+    }
+    
+    return acc;
+  }, []);
 
   const totalGastos = gastosFiltrados.reduce((sum, g) => sum + g.monto, 0);
 
@@ -214,76 +261,131 @@ export const GastosPage: React.FC<GastosPageProps> = ({ onBack }) => {
           </div>
         </div>
 
-        {/* Total */}
+        {/* Total y controles de expansión */}
         <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <div className="text-center">
-            <p className="text-gray-600 mb-2">Total Gastos del Período</p>
-            <p className="text-4xl font-bold text-red-600">
-              Q {totalGastos.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-            </p>
+          <div className="flex justify-between items-center">
+            <div className="text-center flex-1">
+              <p className="text-gray-600 mb-2">Total Gastos del Período</p>
+              <p className="text-4xl font-bold text-red-600">
+                Q {totalGastos.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-sm text-gray-500 mt-2">
+                {gastosFiltrados.length} {gastosFiltrados.length === 1 ? 'gasto' : 'gastos'} en {gastosPorDia.length} {gastosPorDia.length === 1 ? 'día' : 'días'}
+              </p>
+            </div>
+            {gastosPorDia.length > 0 && (
+              <div className="flex gap-2">
+                <button
+                  onClick={expandirTodos}
+                  className="text-sm text-blue-600 hover:text-blue-800 px-3 py-1 rounded border border-blue-600 hover:bg-blue-50"
+                >
+                  Expandir todos
+                </button>
+                <button
+                  onClick={contraerTodos}
+                  className="text-sm text-gray-600 hover:text-gray-800 px-3 py-1 rounded border border-gray-400 hover:bg-gray-50"
+                >
+                  Contraer todos
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Lista de Gastos */}
+        {/* Lista de Gastos Agrupados por Día */}
         {loading ? (
           <div className="text-center py-12">
             <p className="text-gray-600">Cargando...</p>
           </div>
-        ) : gastosFiltrados.length === 0 ? (
+        ) : gastosPorDia.length === 0 ? (
           <div className="bg-white rounded-lg shadow p-12 text-center">
             <p className="text-gray-600">No hay gastos registrados en este período</p>
           </div>
         ) : (
           <div className="space-y-4">
-            {gastosFiltrados.map((gasto) => (
-              <div key={gasto.id} className="bg-white rounded-lg shadow hover:shadow-lg transition p-6">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-bold text-lg">{gasto.concepto}</h3>
-                      <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm">
-                        {gasto.categorias_gastos?.nombre}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
-                      <div>
-                        <p className="font-semibold">Fecha</p>
-                        <p>{format(new Date(gasto.fecha), 'dd/MM/yyyy')}</p>
-                      </div>
-                      {gasto.proveedor && (
+            {gastosPorDia.map((dia) => {
+              const estaExpandido = diasExpandidos.has(dia.fecha);
+              const fechaFormateada = format(new Date(dia.fecha + 'T00:00:00'), "EEEE, dd 'de' MMMM 'de' yyyy", { locale: es });
+              
+              return (
+                <div key={dia.fecha} className="bg-white rounded-lg shadow overflow-hidden">
+                  {/* Cabecera del Día */}
+                  <div
+                    onClick={() => toggleDia(dia.fecha)}
+                    className="bg-gradient-to-r from-red-50 to-red-100 p-4 cursor-pointer hover:from-red-100 hover:to-red-150 transition"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        {estaExpandido ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                         <div>
-                          <p className="font-semibold">Proveedor</p>
-                          <p>{gasto.proveedor}</p>
+                          <h3 className="font-bold text-lg capitalize">{fechaFormateada}</h3>
+                          <p className="text-sm text-gray-600">
+                            {dia.gastos.length} {dia.gastos.length === 1 ? 'gasto' : 'gastos'}
+                          </p>
                         </div>
-                      )}
-                      <div>
-                        <p className="font-semibold">Forma de Pago</p>
-                        <p className="capitalize">{gasto.forma_pago}</p>
                       </div>
-                      {gasto.numero_factura && (
-                        <div>
-                          <p className="font-semibold">Factura</p>
-                          <p>{gasto.numero_factura}</p>
-                        </div>
-                      )}
+                      <div className="text-right">
+                        <p className="text-sm text-gray-600">Total del día</p>
+                        <p className="text-2xl font-bold text-red-600">
+                          Q {dia.total.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-red-600">
-                        Q {gasto.monto.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-                      </p>
+
+                  {/* Lista de Gastos del Día */}
+                  {estaExpandido && (
+                    <div className="divide-y divide-gray-200">
+                      {dia.gastos.map((gasto) => (
+                        <div key={gasto.id} className="p-4 hover:bg-gray-50 transition">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <h4 className="font-bold text-lg">{gasto.concepto}</h4>
+                                <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm">
+                                  {gasto.categorias_gastos?.nombre}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm text-gray-600">
+                                {gasto.proveedor && (
+                                  <div>
+                                    <p className="font-semibold">Proveedor</p>
+                                    <p>{gasto.proveedor}</p>
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="font-semibold">Forma de Pago</p>
+                                  <p className="capitalize">{gasto.forma_pago}</p>
+                                </div>
+                                {gasto.numero_factura && (
+                                  <div>
+                                    <p className="font-semibold">Factura</p>
+                                    <p>{gasto.numero_factura}</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="text-right">
+                                <p className="text-2xl font-bold text-red-600">
+                                  Q {gasto.monto.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => eliminarGasto(gasto.id)}
+                                className="text-red-600 hover:text-red-800"
+                              >
+                                <Trash2 size={20} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <button
-                      onClick={() => eliminarGasto(gasto.id)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <Trash2 size={20} />
-                    </button>
-                  </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -22,7 +22,15 @@ interface CuadreDiarioPageProps {
 }
 
 export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) => {
-  const [fecha, setFecha] = useState(format(new Date(), 'yyyy-MM-dd'));
+  // Función para obtener fecha actual en Guatemala (UTC-6)
+  const getFechaGuatemala = () => {
+    const ahora = new Date();
+    // Ajustar a hora de Guatemala (UTC-6)
+    const guatemalaTime = new Date(ahora.getTime() - (6 * 60 * 60 * 1000));
+    return guatemalaTime.toISOString().split('T')[0];
+  };
+
+  const [fecha, setFecha] = useState(getFechaGuatemala());
   const [cuadre, setCuadre] = useState<CuadreDiario | null>(null);
   const [detalles, setDetalles] = useState<any[]>([]);
   const [consultasAnuladas, setConsultasAnuladas] = useState<any[]>([]);
@@ -192,8 +200,11 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
   const cargarGastos = async () => {
     try {
       const { data, error } = await supabase
-        .from('gastos_diarios')
-        .select('*')
+        .from('gastos')
+        .select(`
+          *,
+          categorias_gastos(nombre)
+        `)
         .eq('fecha', fecha)
         .order('created_at', { ascending: false });
       
@@ -211,12 +222,34 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
     }
 
     try {
+      // Buscar o crear categoría "Gastos Operativos"
+      let { data: categoria, error: catError } = await supabase
+        .from('categorias_gastos')
+        .select('id')
+        .eq('nombre', 'Gastos Operativos')
+        .single();
+
+      if (catError || !categoria) {
+        // Crear la categoría si no existe
+        const { data: nuevaCategoria, error: nuevaCatError } = await supabase
+          .from('categorias_gastos')
+          .insert([{ nombre: 'Gastos Operativos', descripcion: 'Gastos diarios operacionales' }])
+          .select()
+          .single();
+
+        if (nuevaCatError) throw nuevaCatError;
+        categoria = nuevaCategoria;
+      }
+
+      // Insertar gasto
       const { error } = await supabase
-        .from('gastos_diarios')
+        .from('gastos')
         .insert([{
           fecha,
+          categoria_id: categoria.id,
           concepto: conceptoGasto,
-          monto: parseFloat(montoGasto)
+          monto: parseFloat(montoGasto),
+          forma_pago: 'efectivo' // Por defecto
         }]);
       
       if (error) throw error;
@@ -225,7 +258,7 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
       setMontoGasto('');
       setShowModalGasto(false);
       cargarGastos();
-      alert('Gasto agregado exitosamente');
+      alert('✅ Gasto agregado exitosamente');
     } catch (error) {
       console.error('Error al agregar gasto:', error);
       alert('Error al agregar gasto');
@@ -237,12 +270,13 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
     
     try {
       const { error } = await supabase
-        .from('gastos_diarios')
+        .from('gastos')
         .delete()
         .eq('id', id);
       
       if (error) throw error;
       cargarGastos();
+      alert('Gasto eliminado');
     } catch (error) {
       console.error('Error al eliminar gasto:', error);
       alert('Error al eliminar gasto');
@@ -686,6 +720,11 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
                       <div>
                         <div className="font-medium">{gasto.concepto}</div>
                         <div className="text-sm text-gray-600">
+                          {gasto.categorias_gastos?.nombre && (
+                            <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs mr-2">
+                              {gasto.categorias_gastos.nombre}
+                            </span>
+                          )}
                           {(() => {
                             const fecha = new Date(gasto.created_at);
                             // Convertir a hora Guatemala (UTC-6)

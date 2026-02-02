@@ -7,7 +7,8 @@ import {
   Calendar,
   FileText,
   Users,
-  Download 
+  Download,
+  Clock
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { format } from 'date-fns';
@@ -15,12 +16,13 @@ import { GastosPage } from './GastosPage';
 import { IngresosPage } from './IngresosPage';
 import { ProveedoresContabilidadPage } from './ProveedoresContabilidadPage';
 import { ReportesFinancierosPage } from './ReportesFinancierosPage';
+import { ComisionesPagarPage } from './ComisionesPagarPage';
 
 interface ContabilidadPageProps {
   onBack: () => void;
 }
 
-type Vista = 'dashboard' | 'ingresos' | 'gastos' | 'proveedores' | 'reportes';
+type Vista = 'dashboard' | 'ingresos' | 'gastos' | 'proveedores' | 'reportes' | 'comisiones';
 
 export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) => {
   const [mes, setMes] = useState(new Date().getMonth() + 1);
@@ -30,9 +32,12 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
   const [totales, setTotales] = useState({
     ingresos: 0,
     gastos: 0,
+    gastosOperativos: 0,
+    comisionesPagadas: 0,
     utilidad: 0,
     ingresosConsultas: 0,
-    ingresosAdicionales: 0
+    ingresosAdicionales: 0,
+    comisionesPendientes: 0
   });
 
   const [vistaActual, setVistaActual] = useState<Vista>('dashboard');
@@ -49,20 +54,25 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
   const cargarDatos = async () => {
     setLoading(true);
     try {
-      // Calcular primer y último día del mes
-      const primerDia = new Date(anio, mes - 1, 1).toISOString().split('T')[0];
-      const ultimoDia = new Date(anio, mes, 0).toISOString().split('T')[0];
+      // Calcular primer y último día del mes SIN problemas de timezone
+      const primerDia = `${anio}-${String(mes).padStart(2, '0')}-01`;
+      const ultimoDia = `${anio}-${String(mes).padStart(2, '0')}-${new Date(anio, mes, 0).getDate()}`;
 
-      // 1. Ingresos por consultas
+      console.log('📅 Cargando datos:', { primerDia, ultimoDia });
+
+      // 1. Ingresos por consultas (INCLUYENDO servicios móviles)
+      // Servicios móviles SÍ son ingresos, solo NO generan comisión
       const { data: consultas } = await supabase
         .from('consultas')
         .select(`
+          fecha,
           detalle_consultas(precio)
         `)
         .gte('fecha', primerDia)
         .lte('fecha', ultimoDia)
-        .or('anulado.is.null,anulado.eq.false')
-        .or('es_servicio_movil.is.null,es_servicio_movil.eq.false');
+        .or('anulado.is.null,anulado.eq.false'); // Solo excluir anuladas
+
+      console.log('💰 Consultas encontradas:', consultas?.length);
 
       const ingresosConsultas = consultas?.reduce((sum, c: any) => {
         return sum + (c.detalle_consultas?.reduce((s: number, d: any) => s + d.precio, 0) || 0);
@@ -77,24 +87,60 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
 
       const ingresosAdicionales = ingresosAd?.reduce((sum, i) => sum + i.monto, 0) || 0;
 
-      // 3. Gastos
+      // 3. Gastos (incluyendo comisiones pagadas)
       const { data: gastosData } = await supabase
         .from('gastos')
-        .select('monto')
+        .select('monto, fecha')
         .gte('fecha', primerDia)
         .lte('fecha', ultimoDia);
 
-      const totalGastos = gastosData?.reduce((sum, g) => sum + g.monto, 0) || 0;
+      console.log('📉 Gastos encontrados:', gastosData?.length);
+
+      const gastosOperativos = gastosData?.reduce((sum, g) => sum + g.monto, 0) || 0;
+
+      // Comisiones PAGADAS en este período (por fecha de pago, no por período de comisión)
+      const { data: comisionesPagadasData } = await supabase
+        .from('comisiones_por_pagar')
+        .select('total_comision')
+        .gte('fecha_pago', primerDia)
+        .lte('fecha_pago', ultimoDia)
+        .eq('estado', 'pagado');
+
+      const comisionesPagadas = comisionesPagadasData?.reduce((sum, c) => sum + c.total_comision, 0) || 0;
+
+      const totalGastos = gastosOperativos + comisionesPagadas;
+
+      // 4. Comisiones pendientes
+      const { data: comisionesData } = await supabase
+        .from('comisiones_por_pagar')
+        .select('total_comision')
+        .gte('periodo_inicio', primerDia)
+        .lte('periodo_fin', ultimoDia)
+        .eq('estado', 'pendiente');
+
+      const comisionesPendientes = comisionesData?.reduce((sum, c) => sum + c.total_comision, 0) || 0;
 
       const totalIngresos = ingresosConsultas + ingresosAdicionales;
       const utilidad = totalIngresos - totalGastos;
 
+      console.log('📊 Totales calculados:', {
+        ingresosConsultas,
+        ingresosAdicionales,
+        totalIngresos,
+        totalGastos,
+        comisionesPendientes,
+        utilidad
+      });
+
       setTotales({
         ingresos: totalIngresos,
         gastos: totalGastos,
+        gastosOperativos: gastosOperativos,
+        comisionesPagadas: comisionesPagadas,
         utilidad: utilidad,
         ingresosConsultas: ingresosConsultas,
-        ingresosAdicionales: ingresosAdicionales
+        ingresosAdicionales: ingresosAdicionales,
+        comisionesPendientes: comisionesPendientes
       });
 
     } catch (error) {
@@ -118,6 +164,10 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
 
   if (vistaActual === 'reportes') {
     return <ReportesFinancierosPage onBack={() => setVistaActual('dashboard')} />;
+  }
+
+  if (vistaActual === 'comisiones') {
+    return <ComisionesPagarPage onBack={() => setVistaActual('dashboard')} />;
   }
 
   // Vista Dashboard
@@ -178,7 +228,7 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
         </div>
 
         {/* Resumen Cards */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
+        <div className="grid md:grid-cols-4 gap-6 mb-8">
           {/* Ingresos */}
           <div className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
             <div className="flex items-center justify-between mb-4">
@@ -198,7 +248,7 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
 
           {/* Gastos */}
           <div className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="text-gray-600 text-sm">Gastos del Mes</p>
                 <p className="text-3xl font-bold text-red-600">
@@ -206,6 +256,23 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
                 </p>
               </div>
               <TrendingDown className="text-red-600" size={40} />
+            </div>
+            <div className="text-xs text-gray-500 space-y-1">
+              <p>Operativos: Q {totales.gastosOperativos.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</p>
+              <p>Comisiones: Q {totales.comisionesPagadas.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</p>
+            </div>
+          </div>
+
+          {/* Comisiones Pendientes */}
+          <div className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Comisiones Pendientes</p>
+                <p className="text-3xl font-bold text-purple-600">
+                  Q {totales.comisionesPendientes.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <Clock className="text-purple-600" size={40} />
             </div>
           </div>
 
@@ -229,7 +296,7 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
         </div>
 
         {/* Accesos Rápidos */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-4">
           <button 
             onClick={() => setVistaActual('ingresos')}
             className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-all hover:-translate-y-1"
@@ -249,6 +316,15 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
           </button>
 
           <button 
+            onClick={() => setVistaActual('comisiones')}
+            className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-all hover:-translate-y-1"
+          >
+            <Clock className="text-purple-600 mb-3" size={32} />
+            <h3 className="font-bold text-lg mb-1">Comisiones</h3>
+            <p className="text-sm text-gray-600">Cuentas por pagar</p>
+          </button>
+
+          <button 
             onClick={() => setVistaActual('reportes')}
             className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-all hover:-translate-y-1"
           >
@@ -261,7 +337,7 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
             onClick={() => setVistaActual('proveedores')}
             className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-all hover:-translate-y-1"
           >
-            <Users className="text-purple-600 mb-3" size={32} />
+            <Users className="text-orange-600 mb-3" size={32} />
             <h3 className="font-bold text-lg mb-1">Proveedores</h3>
             <p className="text-sm text-gray-600">Catálogo</p>
           </button>
@@ -274,6 +350,7 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
             <li>• Los ingresos por consultas se calculan automáticamente del sistema</li>
             <li>• Puedes registrar ingresos adicionales (alquileres, otros servicios)</li>
             <li>• Todos los gastos deben registrarse manualmente</li>
+            <li>• Las comisiones pendientes son obligaciones de pago a médicos referentes</li>
             <li>• Los reportes se generan en formato Excel</li>
           </ul>
         </div>
