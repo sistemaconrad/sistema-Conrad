@@ -166,10 +166,15 @@ export const ComisionesPage: React.FC<ComisionesPageProps> = ({ onBack }) => {
     titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
     sheet.getRow(1).height = 30;
 
-    // Período
+    // Período - Formatear fechas sin cambio de zona horaria
+    const formatearFechaLocal = (fechaString: string) => {
+      const [year, month, day] = fechaString.split('-');
+      return `${day}/${month}/${year}`;
+    };
+    
     sheet.mergeCells('A2:' + String.fromCharCode(65 + estudiosArray.length + 1) + '2');
     const periodCell = sheet.getCell('A2');
-    periodCell.value = `Período: ${format(new Date(fechaInicio), 'dd/MM/yyyy')} - ${format(new Date(fechaFin), 'dd/MM/yyyy')}`;
+    periodCell.value = `Período: ${formatearFechaLocal(fechaInicio)} - ${formatearFechaLocal(fechaFin)}`;
     periodCell.font = { name: 'Calibri', size: 12, bold: true };
     periodCell.alignment = { horizontal: 'center' };
     sheet.getRow(2).height = 20;
@@ -304,7 +309,9 @@ export const ComisionesPage: React.FC<ComisionesPageProps> = ({ onBack }) => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Comisiones_${format(new Date(fechaInicio), 'yyyy-MM')}_CONRAD.xlsx`;
+    // Usar split para evitar problemas de zona horaria
+    const [year, month] = fechaInicio.split('-');
+    a.download = `Comisiones_${year}-${month}_CONRAD.xlsx`;
     a.click();
   };
 
