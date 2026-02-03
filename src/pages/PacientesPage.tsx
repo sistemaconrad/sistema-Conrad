@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Edit2, Trash2, Calendar, Printer, Plus, FileText, X } from 'lucide-react';
+import { ArrowLeft, Edit2, Trash2, Calendar, Printer, Plus, FileText, X, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { format } from 'date-fns';
 import { EditarPacienteModal } from '../components/EditarPacienteModal';
@@ -13,8 +13,9 @@ interface PacientesPageProps {
 export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
   const [fecha, setFecha] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [consultas, setConsultas] = useState<any[]>([]);
+  const [consultasAnuladas, setConsultasAnuladas] = useState<any[]>([]);
   const [filtroBusqueda, setFiltroBusqueda] = useState('');
-  const [pestanaActiva, setPestanaActiva] = useState<'todos' | 'regulares' | 'moviles'>('regulares');
+  const [pestanaActiva, setPestanaActiva] = useState<'todos' | 'regulares' | 'moviles' | 'anuladas'>('regulares');
   const [loading, setLoading] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAgregarEstudioModal, setShowAgregarEstudioModal] = useState(false);
@@ -46,7 +47,13 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
         .order('numero_paciente', { ascending: true }); // Ordenar por número de paciente ascendente
 
       if (error) throw error;
-      setConsultas(data || []);
+      
+      // Separar consultas activas de anuladas
+      const activas = (data || []).filter(c => !c.anulado);
+      const anuladas = (data || []).filter(c => c.anulado);
+      
+      setConsultas(activas);
+      setConsultasAnuladas(anuladas);
     } catch (error) {
       console.error('Error al cargar consultas:', error);
       alert('Error al cargar consultas');
@@ -423,11 +430,12 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
     try {
       setLoading(true);
       
-      // Obtener todas las consultas del día ordenadas por created_at (orden de llegada)
+      // Obtener todas las consultas activas del día ordenadas por created_at (orden de llegada)
       const { data: consultasOrdenadas, error: errorConsultar } = await supabase
         .from('consultas')
         .select('id, created_at')
         .eq('fecha', fecha)
+        .or('anulado.is.null,anulado.eq.false')
         .order('created_at', { ascending: true });
 
       if (errorConsultar) throw errorConsultar;
@@ -456,6 +464,286 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Función para renderizar una consulta (activa o anulada)
+  const renderConsulta = (consulta: any, index: number) => {
+    const total = consulta.detalle_consultas.reduce((sum: number, d: any) => sum + d.precio, 0);
+    
+    return (
+      <div key={consulta.id} className={`card hover:shadow-lg transition-shadow ${consulta.anulado ? 'border-4 border-red-500 bg-red-50' : ''}`}>
+        {consulta.anulado && (
+          <div className="bg-red-600 text-white px-4 py-2 mb-4 rounded font-bold flex justify-between">
+            <span>🚫 ANULADA</span>
+            <button
+              onClick={() => alert(`Usuario: ${consulta.usuario_anulo}\nFecha: ${format(new Date(consulta.fecha_anulacion), 'dd/MM/yyyy HH:mm')}\nMotivo: ${consulta.motivo_anulacion}`)}
+              className="text-xs bg-white text-red-600 px-2 py-1 rounded"
+            >
+              Ver Información
+            </button>
+          </div>
+        )}
+        <div className="flex justify-between items-start mb-4">
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <h3 className={`text-lg font-bold ${consulta.anulado ? 'text-red-700 line-through' : consulta.es_servicio_movil ? 'text-purple-700' : 'text-blue-700'}`}>
+                {consulta.anulado 
+                  ? '#ANULADO' 
+                  : consulta.es_servicio_movil 
+                    ? '📱 MÓVIL'
+                    : `#${consulta.numero_paciente || (index + 1)}`
+                } - {consulta.pacientes.nombre}
+              </h3>
+              {consulta.es_servicio_movil && (
+                <span className="bg-purple-100 text-purple-700 text-xs font-bold px-3 py-1 rounded-full border border-purple-300">
+                  Sin número
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-gray-600">
+              Edad: {consulta.pacientes.edad} años | Tel: {consulta.pacientes.telefono}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Hora: {format(new Date(consulta.created_at), 'HH:mm')}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {!consulta.anulado && (
+              <>
+                <button
+                  onClick={() => abrirAgregarEstudio(consulta)}
+                  className="p-2 text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                  title="Agregar estudios"
+                >
+                  <Plus size={18} />
+                </button>
+                {/* Botón para imprimir SOLO adicionales */}
+                {consulta.detalle_consultas.some((d: any) => d.es_adicional) && (
+                  <button
+                    onClick={() => reimprimirSoloAdicionales(consulta)}
+                    className="p-2 text-orange-600 hover:bg-orange-50 rounded transition-colors"
+                    title="Imprimir solo adicionales"
+                  >
+                    <FileText size={18} />
+                  </button>
+                )}
+                <button
+                  onClick={() => reimprimirRecibo(consulta)}
+                  className="p-2 text-green-600 hover:bg-green-50 rounded transition-colors"
+                  title="Reimprimir recibo completo"
+                >
+                  <Printer size={18} />
+                </button>
+                <button
+                  onClick={() => abrirEditarPaciente(consulta)}
+                  className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                  title="Editar paciente"
+                >
+                  <Edit2 size={18} />
+                </button>
+                <button
+                  onClick={() => eliminarConsulta(consulta.id, consulta.numero_paciente)}
+                  className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                  title="Anular consulta"
+                >
+                  <Trash2 size={18} />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4 border-t pt-4">
+          <div>
+            <p className="text-sm font-semibold text-gray-700 mb-2">Información Médica</p>
+            <p className="text-sm">
+              <strong>Médico:</strong>{' '}
+              {consulta.sin_informacion_medico ? 'Sin información' : (consulta.medicos?.nombre || 'N/A')}
+            </p>
+            <p className="text-sm">
+              <strong>Tipo de Cobro:</strong>{' '}
+              <span className={`inline-block px-2 py-1 rounded text-xs ${
+                consulta.tipo_cobro === 'normal' ? 'bg-blue-100 text-blue-700' :
+                consulta.tipo_cobro === 'social' ? 'bg-green-100 text-green-700' :
+                'bg-orange-100 text-orange-700'
+              }`}>
+                {getTipoCobro(consulta.tipo_cobro)}
+              </span>
+            </p>
+            {consulta.justificacion_especial && (
+              <p className="text-xs text-gray-600 mt-2 bg-yellow-50 p-2 rounded">
+                <strong>Justificación:</strong> {consulta.justificacion_especial}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <p className="text-sm font-semibold text-gray-700 mb-2">Estudios Realizados</p>
+            <ul className="text-sm space-y-2">
+              {consulta.detalle_consultas.map((detalle: any) => (
+                <li key={detalle.id} className="p-2 bg-gray-50 rounded hover:bg-gray-100">
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="flex-1">• {detalle.sub_estudios.nombre}</span>
+                    <span className="font-medium">Q {detalle.precio.toFixed(2)}</span>
+                    {!consulta.anulado && (
+                      <button
+                        onClick={() => eliminarEstudio(consulta.id, detalle.id, detalle.precio)}
+                        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Eliminar estudio"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                  {/* Mostrar factura individual si el estudio la tiene */}
+                  {detalle.numero_factura && (
+                    <div className="text-xs text-gray-600 mt-1 ml-4">
+                      <span className="bg-blue-100 px-2 py-1 rounded">
+                        Factura: {detalle.numero_factura} {detalle.nit && `| NIT: ${detalle.nit}`}
+                      </span>
+                    </div>
+                  )}
+                  {detalle.numero_voucher && (
+                    <div className="text-xs text-gray-600 mt-1 ml-4">
+                      <span className="bg-green-100 px-2 py-1 rounded">
+                        Voucher: {detalle.numero_voucher}
+                      </span>
+                    </div>
+                  )}
+                  {detalle.numero_transferencia && (
+                    <div className="text-xs text-gray-600 mt-1 ml-4">
+                      <span className="bg-purple-100 px-2 py-1 rounded">
+                        Transferencia: {detalle.numero_transferencia}
+                      </span>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        <div className="border-t mt-4 pt-4">
+          <div className="flex justify-between items-center mb-3">
+            <div className="text-sm flex items-center gap-3 flex-wrap">
+              <span className="font-semibold">Forma de Pago:</span> 
+              <span>{getFormaPago(consulta.forma_pago)}</span>
+              {!consulta.anulado && (
+                <button
+                  onClick={() => abrirEditarFormaPago(consulta)}
+                  className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                  title="Editar forma de pago"
+                >
+                  <Edit2 size={14} />
+                </button>
+              )}
+              
+              {/* Solo mostrar NIT si requiere_factura está activado */}
+              {consulta.requiere_factura && (
+                <span>
+                  | <strong>NIT:</strong> {consulta.nit || 'C/F'}
+                </span>
+              )}
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-bold text-blue-700">Q {total.toFixed(2)}</p>
+            </div>
+          </div>
+
+          {/* Botones para agregar info pendiente */}
+          {!consulta.anulado && (
+            <div className="flex gap-2 flex-wrap">
+              {/* Voucher tarjeta pendiente */}
+              {consulta.forma_pago === 'tarjeta' && !consulta.numero_voucher && (
+                <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-300 rounded px-3 py-2">
+                  <span className="text-yellow-700 font-semibold text-sm">
+                    ⚠️ Voucher Pendiente
+                  </span>
+                  <button
+                    onClick={() => abrirEditarVoucher(consulta)}
+                    className="px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600 font-semibold"
+                  >
+                    Agregar Voucher
+                  </button>
+                </div>
+              )}
+
+              {/* Número transferencia pendiente */}
+              {consulta.forma_pago === 'transferencia' && !consulta.numero_transferencia && (
+                <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-300 rounded px-3 py-2">
+                  <span className="text-yellow-700 font-semibold text-sm">
+                    ⚠️ No. Transferencia Pendiente
+                  </span>
+                  <button
+                    onClick={() => abrirEditarVoucher(consulta)}
+                    className="px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600 font-semibold"
+                  >
+                    Agregar Número
+                  </button>
+                </div>
+              )}
+
+              {/* Factura pendiente */}
+              {consulta.forma_pago === 'efectivo_facturado' && !consulta.numero_factura && (
+                <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-300 rounded px-3 py-2">
+                  <span className="text-yellow-700 font-semibold text-sm">
+                    ⚠️ No. Factura Pendiente
+                  </span>
+                  <button
+                    onClick={() => abrirEditarVoucher(consulta)}
+                    className="px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600 font-semibold"
+                  >
+                    Agregar Factura
+                  </button>
+                </div>
+              )}
+
+              {/* Voucher agregado */}
+              {consulta.numero_voucher && (
+                <div className="flex items-center gap-2 text-sm bg-green-50 border border-green-300 rounded px-3 py-2">
+                  <span><strong>Voucher:</strong> {consulta.numero_voucher}</span>
+                  <button
+                    onClick={() => abrirEditarVoucher(consulta)}
+                    className="p-1 text-green-700 hover:bg-green-200 rounded transition-colors"
+                    title="Editar voucher"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                </div>
+              )}
+
+              {/* Transferencia agregada */}
+              {consulta.numero_transferencia && (
+                <div className="flex items-center gap-2 text-sm bg-green-50 border border-green-300 rounded px-3 py-2">
+                  <span><strong>Transferencia:</strong> {consulta.numero_transferencia}</span>
+                  <button
+                    onClick={() => abrirEditarVoucher(consulta)}
+                    className="p-1 text-green-700 hover:bg-green-200 rounded transition-colors"
+                    title="Editar número de transferencia"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                </div>
+              )}
+
+              {/* Número factura */}
+              {consulta.numero_factura && (
+                <div className="flex items-center gap-2 text-sm bg-blue-50 border border-blue-300 rounded px-3 py-2">
+                  <span><strong>No. Factura:</strong> {consulta.numero_factura}</span>
+                  <button
+                    onClick={() => abrirEditarVoucher(consulta)}
+                    className="p-1 text-blue-700 hover:bg-blue-200 rounded transition-colors"
+                    title="Editar factura y NIT"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -521,6 +809,9 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
             }`}
           >
             👥 Pacientes Regulares
+            <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+              {consultas.filter(c => !c.es_servicio_movil).length}
+            </span>
           </button>
           <button
             onClick={() => setPestanaActiva('moviles')}
@@ -531,6 +822,9 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
             }`}
           >
             📱 Servicios Móviles
+            <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+              {consultas.filter(c => c.es_servicio_movil).length}
+            </span>
           </button>
           <button
             onClick={() => setPestanaActiva('todos')}
@@ -541,6 +835,22 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
             }`}
           >
             📋 Todos
+            <span className="ml-2 text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
+              {consultas.length}
+            </span>
+          </button>
+          <button
+            onClick={() => setPestanaActiva('anuladas')}
+            className={`px-6 py-3 font-medium transition-colors ${
+              pestanaActiva === 'anuladas'
+                ? 'border-b-2 border-red-600 text-red-600'
+                : 'text-gray-500 hover:text-red-600'
+            }`}
+          >
+            🚫 Anuladas
+            <span className="ml-2 text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full">
+              {consultasAnuladas.length}
+            </span>
           </button>
         </div>
 
@@ -551,23 +861,9 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
           </div>
         ) : (
           <>
-            {consultas
-              .filter(c => {
-                // Filtrar por pestaña
-                if (pestanaActiva === 'regulares' && c.es_servicio_movil === true) return false;
-                if (pestanaActiva === 'moviles' && c.es_servicio_movil !== true) return false;
-                // Filtrar por nombre
-                return c.pacientes.nombre.toLowerCase().includes(filtroBusqueda.toLowerCase());
-              })
-              .length === 0 ? (
-              <div className="card text-center py-12">
-                <p className="text-lg text-gray-600">No hay consultas para esta fecha</p>
-                <p className="text-sm text-gray-500 mt-2">
-                  Selecciona otra fecha o registra una nueva consulta
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
+            {/* Mostrar consultas activas */}
+            {pestanaActiva !== 'anuladas' && (
+              <>
                 {consultas
                   .filter(c => {
                     // Filtrar por pestaña
@@ -576,279 +872,64 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
                     // Filtrar por nombre
                     return c.pacientes.nombre.toLowerCase().includes(filtroBusqueda.toLowerCase());
                   })
-                  .map((consulta, index) => {
-                  const total = consulta.detalle_consultas.reduce((sum: number, d: any) => sum + d.precio, 0);
-                  
-                  return (
-                    <div key={consulta.id} className={`card hover:shadow-lg transition-shadow ${consulta.anulado ? 'border-4 border-red-500 bg-red-50' : ''}`}>
-                      {consulta.anulado && (
-                        <div className="bg-red-600 text-white px-4 py-2 mb-4 rounded font-bold flex justify-between">
-                          <span>🚫 ANULADA</span>
-                          <button
-                            onClick={() => alert(`Usuario: ${consulta.usuario_anulo}\nFecha: ${format(new Date(consulta.fecha_anulacion), 'dd/MM/yyyy HH:mm')}\nMotivo: ${consulta.motivo_anulacion}`)}
-                            className="text-xs bg-white text-red-600 px-2 py-1 rounded"
-                          >
-                            Info
-                          </button>
-                        </div>
-                      )}
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h3 className={`text-lg font-bold ${consulta.anulado ? 'text-red-700 line-through' : consulta.es_servicio_movil ? 'text-purple-700' : 'text-blue-700'}`}>
-                              {consulta.anulado 
-                                ? '#ANULADO' 
-                                : consulta.es_servicio_movil 
-                                  ? '📱 MÓVIL'
-                                  : `#${consulta.numero_paciente || (index + 1)}`
-                              } - {consulta.pacientes.nombre}
-                            </h3>
-                            {consulta.es_servicio_movil && (
-                              <span className="bg-purple-100 text-purple-700 text-xs font-bold px-3 py-1 rounded-full border border-purple-300">
-                                Sin número
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-600">
-                            Edad: {consulta.pacientes.edad} años | Tel: {consulta.pacientes.telefono}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Hora: {format(new Date(consulta.created_at), 'HH:mm')}
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          {!consulta.anulado && (
-                            <>
-                              <button
-                                onClick={() => abrirAgregarEstudio(consulta)}
-                                className="p-2 text-purple-600 hover:bg-purple-50 rounded transition-colors"
-                            title="Agregar estudios"
-                          >
-                            <Plus size={18} />
-                          </button>
-                          {/* Botón para imprimir SOLO adicionales */}
-                          {consulta.detalle_consultas.some((d: any) => d.es_adicional) && (
-                            <button
-                              onClick={() => reimprimirSoloAdicionales(consulta)}
-                              className="p-2 text-orange-600 hover:bg-orange-50 rounded transition-colors"
-                              title="Imprimir solo adicionales"
-                            >
-                              <FileText size={18} />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => reimprimirRecibo(consulta)}
-                            className="p-2 text-green-600 hover:bg-green-50 rounded transition-colors"
-                            title="Reimprimir recibo completo"
-                          >
-                            <Printer size={18} />
-                          </button>
-                          <button
-                            onClick={() => abrirEditarPaciente(consulta)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                            title="Editar paciente"
-                          >
-                            <Edit2 size={18} />
-                          </button>
-                          <button
-                            onClick={() => eliminarConsulta(consulta.id, consulta.numero_paciente)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Anular consulta"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
+                  .length === 0 ? (
+                  <div className="card text-center py-12">
+                    <p className="text-lg text-gray-600">No hay consultas para esta fecha</p>
+                    <p className="text-sm text-gray-500 mt-2">
+                      Selecciona otra fecha o registra una nueva consulta
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {consultas
+                      .filter(c => {
+                        // Filtrar por pestaña
+                        if (pestanaActiva === 'regulares' && c.es_servicio_movil === true) return false;
+                        if (pestanaActiva === 'moviles' && c.es_servicio_movil !== true) return false;
+                        // Filtrar por nombre
+                        return c.pacientes.nombre.toLowerCase().includes(filtroBusqueda.toLowerCase());
+                      })
+                      .map((consulta, index) => renderConsulta(consulta, index))
+                    }
+                  </div>
+                )}
+              </>
+            )}
 
-                      <div className="grid md:grid-cols-2 gap-4 border-t pt-4">
+            {/* Mostrar consultas anuladas */}
+            {pestanaActiva === 'anuladas' && (
+              <>
+                {consultasAnuladas.length === 0 ? (
+                  <div className="card text-center py-12 bg-green-50 border-2 border-green-200">
+                    <div className="text-5xl mb-4">✅</div>
+                    <p className="text-lg font-semibold text-green-700">No hay consultas anuladas</p>
+                    <p className="text-sm text-green-600 mt-2">
+                      ¡Excelente! Todas las consultas del día están activas
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="card bg-red-50 border-2 border-red-200 mb-4">
+                      <div className="flex items-center gap-3">
+                        <AlertCircle className="text-red-600" size={24} />
                         <div>
-                          <p className="text-sm font-semibold text-gray-700 mb-2">Información Médica</p>
-                          <p className="text-sm">
-                            <strong>Médico:</strong>{' '}
-                            {consulta.sin_informacion_medico ? 'Sin información' : (consulta.medicos?.nombre || 'N/A')}
+                          <h3 className="font-bold text-red-700">Consultas Anuladas</h3>
+                          <p className="text-sm text-red-600">
+                            Total: {consultasAnuladas.length} consulta{consultasAnuladas.length !== 1 ? 's' : ''} anulada{consultasAnuladas.length !== 1 ? 's' : ''}
                           </p>
-                          <p className="text-sm">
-                            <strong>Tipo de Cobro:</strong>{' '}
-                            <span className={`inline-block px-2 py-1 rounded text-xs ${
-                              consulta.tipo_cobro === 'normal' ? 'bg-blue-100 text-blue-700' :
-                              consulta.tipo_cobro === 'social' ? 'bg-green-100 text-green-700' :
-                              'bg-orange-100 text-orange-700'
-                            }`}>
-                              {getTipoCobro(consulta.tipo_cobro)}
-                            </span>
-                          </p>
-                          {consulta.justificacion_especial && (
-                            <p className="text-xs text-gray-600 mt-2 bg-yellow-50 p-2 rounded">
-                              <strong>Justificación:</strong> {consulta.justificacion_especial}
-                            </p>
-                          )}
-                        </div>
-
-                        <div>
-                          <p className="text-sm font-semibold text-gray-700 mb-2">Estudios Realizados</p>
-                          <ul className="text-sm space-y-2">
-                            {consulta.detalle_consultas.map((detalle: any) => (
-                              <li key={detalle.id} className="p-2 bg-gray-50 rounded hover:bg-gray-100">
-                                <div className="flex justify-between items-center gap-2">
-                                  <span className="flex-1">• {detalle.sub_estudios.nombre}</span>
-                                  <span className="font-medium">Q {detalle.precio.toFixed(2)}</span>
-                                  <button
-                                    onClick={() => eliminarEstudio(consulta.id, detalle.id, detalle.precio)}
-                                    className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                    title="Eliminar estudio"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </div>
-                                {/* Mostrar factura individual si el estudio la tiene */}
-                                {detalle.numero_factura && (
-                                  <div className="text-xs text-gray-600 mt-1 ml-4">
-                                    <span className="bg-blue-100 px-2 py-1 rounded">
-                                      Factura: {detalle.numero_factura} {detalle.nit && `| NIT: ${detalle.nit}`}
-                                    </span>
-                                  </div>
-                                )}
-                                {detalle.numero_voucher && (
-                                  <div className="text-xs text-gray-600 mt-1 ml-4">
-                                    <span className="bg-green-100 px-2 py-1 rounded">
-                                      Voucher: {detalle.numero_voucher}
-                                    </span>
-                                  </div>
-                                )}
-                                {detalle.numero_transferencia && (
-                                  <div className="text-xs text-gray-600 mt-1 ml-4">
-                                    <span className="bg-purple-100 px-2 py-1 rounded">
-                                      Transferencia: {detalle.numero_transferencia}
-                                    </span>
-                                  </div>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-
-                      <div className="border-t mt-4 pt-4">
-                        <div className="flex justify-between items-center mb-3">
-                          <div className="text-sm flex items-center gap-3 flex-wrap">
-                            <span className="font-semibold">Forma de Pago:</span> 
-                            <span>{getFormaPago(consulta.forma_pago)}</span>
-                            <button
-                              onClick={() => abrirEditarFormaPago(consulta)}
-                              className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                              title="Editar forma de pago"
-                            >
-                              <Edit2 size={14} />
-                            </button>
-                            
-                            {/* Solo mostrar NIT si requiere_factura está activado */}
-                            {consulta.requiere_factura && (
-                              <span>
-                                | <strong>NIT:</strong> {consulta.nit || 'C/F'}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <p className="text-2xl font-bold text-blue-700">Q {total.toFixed(2)}</p>
-                          </div>
-                        </div>
-
-                        {/* Botones para agregar info pendiente */}
-                        <div className="flex gap-2 flex-wrap">
-                          {/* Voucher tarjeta pendiente */}
-                          {consulta.forma_pago === 'tarjeta' && !consulta.numero_voucher && (
-                            <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-300 rounded px-3 py-2">
-                              <span className="text-yellow-700 font-semibold text-sm">
-                                ⚠️ Voucher Pendiente
-                              </span>
-                              <button
-                                onClick={() => abrirEditarVoucher(consulta)}
-                                className="px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600 font-semibold"
-                              >
-                                Agregar Voucher
-                              </button>
-                            </div>
-                          )}
-
-                          {/* Número transferencia pendiente */}
-                          {consulta.forma_pago === 'transferencia' && !consulta.numero_transferencia && (
-                            <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-300 rounded px-3 py-2">
-                              <span className="text-yellow-700 font-semibold text-sm">
-                                ⚠️ No. Transferencia Pendiente
-                              </span>
-                              <button
-                                onClick={() => abrirEditarVoucher(consulta)}
-                                className="px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600 font-semibold"
-                              >
-                                Agregar Número
-                              </button>
-                            </div>
-                          )}
-
-                          {/* Factura pendiente */}
-                          {consulta.forma_pago === 'efectivo_facturado' && !consulta.numero_factura && (
-                            <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-300 rounded px-3 py-2">
-                              <span className="text-yellow-700 font-semibold text-sm">
-                                ⚠️ No. Factura Pendiente
-                              </span>
-                              <button
-                                onClick={() => abrirEditarVoucher(consulta)}
-                                className="px-3 py-1 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600 font-semibold"
-                              >
-                                Agregar Factura
-                              </button>
-                            </div>
-                          )}
-
-                          {/* Voucher agregado */}
-                          {consulta.numero_voucher && (
-                            <div className="flex items-center gap-2 text-sm bg-green-50 border border-green-300 rounded px-3 py-2">
-                              <span><strong>Voucher:</strong> {consulta.numero_voucher}</span>
-                              <button
-                                onClick={() => abrirEditarVoucher(consulta)}
-                                className="p-1 text-green-700 hover:bg-green-200 rounded transition-colors"
-                                title="Editar voucher"
-                              >
-                                <Edit2 size={14} />
-                              </button>
-                            </div>
-                          )}
-
-                          {/* Transferencia agregada */}
-                          {consulta.numero_transferencia && (
-                            <div className="flex items-center gap-2 text-sm bg-green-50 border border-green-300 rounded px-3 py-2">
-                              <span><strong>Transferencia:</strong> {consulta.numero_transferencia}</span>
-                              <button
-                                onClick={() => abrirEditarVoucher(consulta)}
-                                className="p-1 text-green-700 hover:bg-green-200 rounded transition-colors"
-                                title="Editar número de transferencia"
-                              >
-                                <Edit2 size={14} />
-                              </button>
-                            </div>
-                          )}
-
-                          {/* Número factura */}
-                          {consulta.numero_factura && (
-                            <div className="flex items-center gap-2 text-sm bg-blue-50 border border-blue-300 rounded px-3 py-2">
-                              <span><strong>No. Factura:</strong> {consulta.numero_factura}</span>
-                              <button
-                                onClick={() => abrirEditarVoucher(consulta)}
-                                className="p-1 text-blue-700 hover:bg-blue-200 rounded transition-colors"
-                                title="Editar factura y NIT"
-                              >
-                                <Edit2 size={14} />
-                              </button>
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+                    
+                    <div className="space-y-4">
+                      {consultasAnuladas
+                        .filter(c => c.pacientes.nombre.toLowerCase().includes(filtroBusqueda.toLowerCase()))
+                        .map((consulta, index) => renderConsulta(consulta, index))
+                      }
+                    </div>
+                  </>
+                )}
+              </>
             )}
           </>
         )}

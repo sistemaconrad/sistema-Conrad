@@ -25,6 +25,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const [precioInforme, setPrecioInforme] = useState(0);
   const [establecimientoMovil, setEstablecimientoMovil] = useState('');
 
+  // ✅ NUEVOS Estados para controlar guardado e impresión
+  const [consultaGuardada, setConsultaGuardada] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const [numeroPacienteGuardado, setNumeroPacienteGuardado] = useState<number | null>(null);
+
   // Estados del formulario principal
   const [tipoCobro, setTipoCobro] = useState<TipoCobro>('normal');
   const [justificacionEspecial, setJustificacionEspecial] = useState('');
@@ -263,7 +268,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     }
   };
 
-  // ✅ Limpiar todo - ACTUALIZADO para limpiar opciones de móviles
+  // ✅ Limpiar todo - ACTUALIZADO para limpiar opciones de móviles y estados de guardado
   const handleLimpiar = () => {
     if (confirm('¿Está seguro de que desea limpiar toda la información?')) {
       setPacienteActual(null);
@@ -287,11 +292,15 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       setNumeroFactura('');
       setNumeroTransferencia('');
       setNumeroVoucher('');
+      // ✅ Resetear estados de guardado
+      setConsultaGuardada(null);
+      setGuardando(false);
+      setNumeroPacienteGuardado(null);
     }
   };
 
-  // ✅ Imprimir - ACTUALIZADO para guardar opciones de móviles
-  const handleImprimir = async () => {
+  // ✅ NUEVA FUNCIÓN: Solo guardar (sin imprimir)
+  const handleGuardar = async () => {
     if (!pacienteActual) {
       alert('Debe crear un paciente primero usando el botón "Nuevo"');
       return;
@@ -309,6 +318,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     }
 
     // Validar justificación si se usa tarifa normal fuera de horario
+    const horarioNormal = esHorarioNormal();
     if (tipoCobro === 'normal' && !horarioNormal && !justificacionEspecial.trim()) {
       alert('Debe proporcionar una justificación para usar tarifa normal fuera del horario establecido');
       return;
@@ -326,7 +336,21 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       return;
     }
 
-    const totales = calcularTotales();
+    // Prevenir guardado duplicado
+    if (guardando) {
+      alert('⏳ Ya se está guardando, por favor espere...');
+      return;
+    }
+
+    if (consultaGuardada) {
+      const reimprimir = confirm('✅ Esta consulta ya fue guardada.\n\n¿Desea reimprimir el recibo?');
+      if (reimprimir) {
+        handleImprimir();
+      }
+      return;
+    }
+
+    setGuardando(true);
 
     try {
       // Calcular el próximo número de paciente del día (solo para pacientes regulares)
@@ -392,7 +416,33 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
 
       if (detallesError) throw detallesError;
 
-      // Preparar datos para el recibo
+      // ✅ Guardar el ID de la consulta y el número de paciente
+      setConsultaGuardada(consultaData.id);
+      setNumeroPacienteGuardado(consultaData.numero_paciente);
+      
+      alert('✅ Consulta guardada exitosamente.\n\nAhora puede imprimir el recibo usando el botón "Imprimir".');
+      
+    } catch (error) {
+      console.error('Error al guardar consulta:', error);
+      alert('❌ Error al guardar consulta: ' + (error as any).message);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  // ✅ NUEVA FUNCIÓN: Solo imprimir (requiere haber guardado primero)
+  const handleImprimir = async () => {
+    if (!consultaGuardada) {
+      alert('⚠️ Debe guardar la consulta primero usando el botón "Guardar"');
+      return;
+    }
+
+    if (!pacienteActual) {
+      alert('❌ Error: No se encontró información del paciente');
+      return;
+    }
+
+    try {
       const fechaHora = new Date();
       const tieneMedico = medicoActual !== null;
       const esReferente = tieneMedico && !sinInfoMedico;
@@ -421,8 +471,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         }
       }
 
+      const totales = calcularTotales();
+
       const datosRecibo = {
-        numeroPaciente: consultaData.numero_paciente,
+        numeroPaciente: numeroPacienteGuardado,
         paciente: {
           nombre: pacienteActual.nombre,
           edad: pacienteActual.edad,
@@ -446,48 +498,25 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         'Cancelar = Orden para Médico (sin precios)'
       );
 
-      try {
-        if (tipoRecibo) {
-          const htmlCompleto = generarReciboCompleto(datosRecibo);
-          abrirRecibo(htmlCompleto, 'Recibo Completo');
-        } else {
-          const htmlMedico = generarReciboMedico(datosRecibo);
-          abrirRecibo(htmlMedico, 'Orden Médico');
-        }
-      } catch (errorImpresion) {
-        console.error('Error al imprimir:', errorImpresion);
-        alert('Advertencia: La consulta se guardó pero hubo un problema al abrir la impresión. Puede reimprimir desde Pacientes.');
-        return;
+      if (tipoRecibo) {
+        const htmlCompleto = generarReciboCompleto(datosRecibo);
+        abrirRecibo(htmlCompleto, 'Recibo Completo');
+      } else {
+        const htmlMedico = generarReciboMedico(datosRecibo);
+        abrirRecibo(htmlMedico, 'Orden Médico');
       }
-      
-      alert('✅ Consulta guardada exitosamente');
-      
-      // ✅ Limpiar formulario incluyendo opciones de móviles
-      setPacienteActual(null);
-      setMedicoActual(null);
-      setSinInfoMedico(false);
-      setEsServicioMovil(false);
-      setIncluyePlacas(false);
-      setPrecioPlacas(0);
-      setIncluyeInforme(false);
-      setPrecioInforme(0);
-      setEstablecimientoMovil('');
-      setTipoCobro('normal');
-      setJustificacionEspecial('');
-      setShowJustificacion(false);
-      setEstudioSeleccionado('');
-      setSubEstudioSeleccionado('');
-      setDescripcion([]);
-      setRequiereFactura(false);
-      setNit('');
-      setFormaPago('efectivo');
-      setNumeroFactura('');
-      setNumeroTransferencia('');
-      setNumeroVoucher('');
+
+      // Preguntar si desea crear una nueva consulta
+      setTimeout(() => {
+        const nuevaConsulta = confirm('✅ Recibo impreso.\n\n¿Desea crear una nueva consulta?');
+        if (nuevaConsulta) {
+          handleLimpiar();
+        }
+      }, 500);
       
     } catch (error) {
-      console.error('Error al guardar consulta:', error);
-      alert('Error al guardar consulta: ' + (error as any).message);
+      console.error('Error al imprimir:', error);
+      alert('❌ Error al imprimir el recibo: ' + (error as any).message);
     }
   };
 
@@ -587,6 +616,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                       📱 SERVICIO MÓVIL
                     </span>
                   )}
+                  {consultaGuardada && (
+                    <span className="ml-2 text-sm bg-green-500 text-white px-3 py-1 rounded-full">
+                      ✅ GUARDADO
+                    </span>
+                  )}
                 </h3>
                 <div className="grid md:grid-cols-2 gap-3 text-sm">
                   <div><strong>Nombre:</strong> {pacienteActual.nombre}</div>
@@ -640,7 +674,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                       setShowJustificacion(false);
                       setJustificacionEspecial('');
                     }}
-                    disabled={esServicioMovil}
+                    disabled={esServicioMovil || !!consultaGuardada}
                     className="mr-2"
                   />
                   Social {esServicioMovil && <span className="text-gray-400 text-xs ml-1">(No disponible para móviles)</span>}
@@ -656,7 +690,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                       }
                       setTipoCobro('normal');
                     }}
-                    disabled={esServicioMovil}
+                    disabled={esServicioMovil || !!consultaGuardada}
                     className="mr-2"
                   />
                   Normal {!horarioNormal && '(Requiere justificación)'} {esServicioMovil && <span className="text-gray-400 text-xs ml-1">(No disponible para móviles)</span>}
@@ -671,7 +705,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                       setShowJustificacion(false);
                       setJustificacionEspecial('');
                     }}
-                    disabled={horarioNormal && !esServicioMovil}
+                    disabled={(horarioNormal && !esServicioMovil) || !!consultaGuardada}
                     className="mr-2"
                   />
                   Especial {horarioNormal && !esServicioMovil && '(Solo fuera de horario)'}
@@ -686,6 +720,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                       setTipoCobro('personalizado');
                       setShowJustificacion(!esServicioMovil); // No pedir justificación para móviles
                     }}
+                    disabled={!!consultaGuardada}
                     className="mr-2"
                   />
                   <span className="text-purple-600 font-medium">Personalizado</span>
@@ -710,6 +745,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                       : "Ej: Médico referente solicitó tarifa normal"}
                     rows={2}
                     required
+                    disabled={!!consultaGuardada}
                   />
                   <p className="text-xs text-gray-600 mt-1">
                     * Esta justificación quedará registrada en el sistema
@@ -748,6 +784,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                     onChange={(e) => setEstablecimientoMovil(e.target.value)}
                     placeholder="Ej: Hospital San Juan de Dios, Clínica Santa María"
                     required
+                    disabled={!!consultaGuardada}
                   />
                   <p className="text-xs text-orange-700 mt-1">
                     * Nombre del lugar donde se realizó el servicio móvil
@@ -766,6 +803,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                           if (!e.target.checked) setPrecioPlacas(0);
                         }}
                         className="w-5 h-5"
+                        disabled={!!consultaGuardada}
                       />
                       <span className="font-medium">📋 Incluir Placas</span>
                     </label>
@@ -781,6 +819,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                           onChange={(e) => setPrecioPlacas(parseFloat(e.target.value) || 0)}
                           className="w-24 px-2 py-1 border border-orange-300 rounded focus:ring-2 focus:ring-orange-500"
                           placeholder="0.00"
+                          disabled={!!consultaGuardada}
                         />
                       </div>
                     )}
@@ -797,6 +836,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                           if (!e.target.checked) setPrecioInforme(0);
                         }}
                         className="w-5 h-5"
+                        disabled={!!consultaGuardada}
                       />
                       <span className="font-medium">📄 Incluir Informe</span>
                     </label>
@@ -812,6 +852,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                           onChange={(e) => setPrecioInforme(parseFloat(e.target.value) || 0)}
                           className="w-24 px-2 py-1 border border-orange-300 rounded focus:ring-2 focus:ring-orange-500"
                           placeholder="0.00"
+                          disabled={!!consultaGuardada}
                         />
                       </div>
                     )}
@@ -839,6 +880,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                     setSubEstudioSeleccionado('');
                   }}
                   placeholder={esServicioMovil ? "Solo estudios RX disponibles" : "Seleccione estudio"}
+                  disabled={!!consultaGuardada}
                 />
                 
                 <Autocomplete
@@ -847,22 +889,28 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                   value={subEstudioSeleccionado}
                   onChange={setSubEstudioSeleccionado}
                   placeholder="Seleccione sub-estudio"
-                  disabled={!estudioSeleccionado}
+                  disabled={!estudioSeleccionado || !!consultaGuardada}
                 />
               </div>
 
               <button
                 onClick={agregarSubEstudio}
                 className="btn-primary mt-4 flex items-center gap-2 justify-center"
-                disabled={!subEstudioSeleccionado}
+                disabled={!subEstudioSeleccionado || !!consultaGuardada}
               >
                 <Plus size={18} />
                 Agregar {estudioSeleccionado && descripcion.length > 0 ? 'Otro' : 'a Descripción'}
               </button>
 
-              {estudioSeleccionado && descripcion.length > 0 && (
+              {estudioSeleccionado && descripcion.length > 0 && !consultaGuardada && (
                 <p className="text-sm text-green-600 mt-2 text-center">
                   ✓ Puedes seguir agregando más estudios del mismo tipo
+                </p>
+              )}
+
+              {consultaGuardada && (
+                <p className="text-sm text-yellow-600 mt-2 text-center">
+                  ⚠️ Consulta guardada - No se pueden agregar más estudios
                 </p>
               )}
             </div>
@@ -894,6 +942,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                                   setDescripcion(nuevaDescripcion);
                                 }}
                                 className="w-24 px-2 py-1 border border-purple-300 rounded focus:ring-2 focus:ring-purple-500"
+                                disabled={!!consultaGuardada}
                               />
                             </div>
                           ) : (
@@ -903,6 +952,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                         <button
                           onClick={() => eliminarDeDescripcion(index)}
                           className="text-red-600 hover:text-red-800"
+                          disabled={!!consultaGuardada}
                         >
                           <Trash2 size={18} />
                         </button>
@@ -930,6 +980,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                       checked={requiereFactura}
                       onChange={() => setRequiereFactura(true)}
                       className="mr-1"
+                      disabled={!!consultaGuardada}
                     />
                     Sí
                   </label>
@@ -943,6 +994,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                         setNit('');
                       }}
                       className="mr-1"
+                      disabled={!!consultaGuardada}
                     />
                     No
                   </label>
@@ -956,7 +1008,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                     value={nit}
                     onChange={(e) => setNit(e.target.value)}
                     placeholder="NIT (si aplica)"
-                    disabled={!requiereFactura}
+                    disabled={!requiereFactura || !!consultaGuardada}
                   />
                 </div>
 
@@ -970,6 +1022,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                       setNumeroTransferencia('');
                       setNumeroVoucher('');
                     }}
+                    disabled={!!consultaGuardada}
                   >
                     {requiereFactura ? (
                       <>
@@ -999,6 +1052,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                       onChange={(e) => setNumeroTransferencia(e.target.value)}
                       placeholder="Número de referencia"
                       required
+                      disabled={!!consultaGuardada}
                     />
                   </div>
                 )}
@@ -1016,6 +1070,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                       value={numeroVoucher}
                       onChange={(e) => setNumeroVoucher(e.target.value)}
                       placeholder="Número de voucher"
+                      disabled={!!consultaGuardada}
                     />
                     {!numeroVoucher && (
                       <p className="text-xs text-yellow-600 mt-1">⚠️ Sin voucher - pendiente de agregar</p>
@@ -1031,6 +1086,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                     value={numeroFactura}
                     onChange={(e) => setNumeroFactura(e.target.value)}
                     placeholder="Número de factura"
+                    disabled={!!consultaGuardada}
                   />
                 </div>
               </div>
@@ -1072,21 +1128,54 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               </div>
             </div>
 
-            {/* Botones de acción */}
+            {/* ✅ Botones de acción - ACTUALIZADOS */}
             <div className="space-y-3">
               <button
                 onClick={handleLimpiar}
                 className="btn-secondary w-full"
               >
-                Limpiar
+                🗑️ Limpiar
               </button>
+              
+              {/* ✅ Nuevo botón Guardar */}
+              <button
+                onClick={handleGuardar}
+                className={`w-full font-semibold py-3 px-4 rounded-lg transition-all ${
+                  guardando 
+                    ? 'bg-yellow-500 text-white cursor-wait' 
+                    : consultaGuardada 
+                    ? 'bg-green-600 text-white cursor-default' 
+                    : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl'
+                }`}
+                disabled={!pacienteActual || descripcion.length === 0 || guardando || !!consultaGuardada}
+              >
+                {guardando ? '⏳ Guardando...' : consultaGuardada ? '✅ Consulta Guardada' : '💾 Guardar Consulta'}
+              </button>
+              
+              {/* ✅ Botón Imprimir modificado */}
               <button
                 onClick={handleImprimir}
-                className="btn-primary w-full"
-                disabled={!pacienteActual || descripcion.length === 0}
+                className={`w-full font-semibold py-3 px-4 rounded-lg transition-all ${
+                  consultaGuardada
+                    ? 'bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-xl'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+                disabled={!consultaGuardada}
               >
-                Imprimir
+                🖨️ Imprimir Recibo
               </button>
+              
+              {!consultaGuardada && pacienteActual && descripcion.length > 0 && (
+                <p className="text-xs text-blue-600 text-center font-medium">
+                  ℹ️ Primero debe guardar la consulta
+                </p>
+              )}
+              
+              {consultaGuardada && (
+                <p className="text-xs text-green-600 text-center font-medium">
+                  ✅ Consulta guardada correctamente. Puede imprimir ahora.
+                </p>
+              )}
             </div>
           </div>
         </div>
