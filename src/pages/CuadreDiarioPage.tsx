@@ -38,6 +38,10 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
   const [agruparPorPaciente, setAgruparPorPaciente] = useState(false);
   const [pacientesExpandidos, setPacientesExpandidos] = useState<Set<string>>(new Set());
   
+  // ✅ NUEVO: Estados para cuadre de móviles
+  const [cuadreMoviles, setCuadreMoviles] = useState<CuadreDiario | null>(null);
+  const [detallesMoviles, setDetallesMoviles] = useState<any[]>([]);
+  
   // Estados para cuadre de caja
   const [efectivoContado, setEfectivoContado] = useState('');
   const [tarjetaContado, setTarjetaContado] = useState('');
@@ -102,6 +106,15 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
 
       if (errorConsultas) throw errorConsultas;
 
+      // ✅ MODIFICADO: Separar consultas regulares y móviles
+      const consultasRegulares = consultas?.filter(c => 
+        c.anulado !== true && c.es_servicio_movil !== true
+      ) || [];
+
+      const consultasMoviles = consultas?.filter(c => 
+        c.anulado !== true && c.es_servicio_movil === true
+      ) || [];
+
       // Obtener detalles de consultas
       const consultasIds = consultas?.map(c => c.id) || [];
       
@@ -112,7 +125,14 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
           total_ventas: 0,
           cuadres_forma_pago: []
         });
+        setCuadreMoviles({
+          fecha,
+          total_consultas: 0,
+          total_ventas: 0,
+          cuadres_forma_pago: []
+        });
         setDetalles([]);
+        setDetallesMoviles([]);
         setLoading(false);
         return;
       }
@@ -127,12 +147,11 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
 
       if (errorDetalles) throw errorDetalles;
 
-      // Calcular totales por forma de pago (SOLO consultas NO anuladas)
+      // ✅ MODIFICADO: Calcular totales por forma de pago para CONSULTAS REGULARES
       const cuadrePorForma: { [key: string]: CuadrePorFormaPago } = {};
-      const consultasActivas = consultas?.filter(c => c.anulado !== true) || []; // null o false = activa
-      const consultasAnuladas = consultas?.filter(c => c.anulado === true) || []; // solo true = anulada
+      const consultasAnuladas = consultas?.filter(c => c.anulado === true) || [];
       
-      consultasActivas.forEach(consulta => {
+      consultasRegulares.forEach(consulta => {
         const detallesConsulta = detallesData?.filter(d => d.consulta_id === consulta.id) || [];
         const totalConsulta = detallesConsulta.reduce((sum, d) => sum + d.precio, 0);
         const formaPago = consulta.forma_pago;
@@ -153,19 +172,57 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
 
       setCuadre({
         fecha,
-        total_consultas: consultasActivas.length, // Solo contar las NO anuladas
+        total_consultas: consultasRegulares.length,
         total_ventas: totalVentas,
         cuadres_forma_pago: Object.values(cuadrePorForma)
       });
 
-      // Guardar detalles con información de la consulta (SOLO NO anuladas)
+      // ✅ NUEVO: Calcular cuadre para SERVICIOS MÓVILES (separado)
+      const cuadreMovilesPorForma: { [key: string]: CuadrePorFormaPago } = {};
+      
+      consultasMoviles.forEach(consulta => {
+        const detallesConsulta = detallesData?.filter(d => d.consulta_id === consulta.id) || [];
+        
+        // Sumar estudios RX
+        const totalRX = detallesConsulta.reduce((sum, d) => sum + d.precio, 0);
+        
+        // Sumar extras
+        let totalExtras = 0;
+        if (consulta.movil_incluye_placas) totalExtras += consulta.movil_precio_placas || 0;
+        if (consulta.movil_incluye_informe) totalExtras += consulta.movil_precio_informe || 0;
+        
+        const totalConsulta = totalRX + totalExtras;
+        const formaPago = consulta.forma_pago;
+
+        if (!cuadreMovilesPorForma[formaPago]) {
+          cuadreMovilesPorForma[formaPago] = {
+            forma_pago: formaPago,
+            cantidad: 0,
+            total: 0
+          };
+        }
+
+        cuadreMovilesPorForma[formaPago].cantidad += 1;
+        cuadreMovilesPorForma[formaPago].total += totalConsulta;
+      });
+
+      const totalVentasMoviles = Object.values(cuadreMovilesPorForma).reduce((sum, c) => sum + c.total, 0);
+
+      setCuadreMoviles({
+        fecha,
+        total_consultas: consultasMoviles.length,
+        total_ventas: totalVentasMoviles,
+        cuadres_forma_pago: Object.values(cuadreMovilesPorForma)
+      });
+
+      // Guardar detalles con información de la consulta (SOLO consultas regulares NO anuladas)
       const detallesConInfo = detallesData
         ?.filter(d => {
-          const consulta = consultasActivas.find(c => c.id === d.consulta_id);
-          return !!consulta; // Solo incluir detalles de consultas NO anuladas
+          const consulta = consultasRegulares.find(c => c.id === d.consulta_id);
+          return !!consulta;
         })
         .map(d => {
-          const consulta = consultasActivas.find(c => c.id === d.consulta_id);
+          const consulta = consultasRegulares.find(c => c.id === d.consulta_id);
           return {
             ...d,
             paciente: consulta?.pacientes?.nombre,
@@ -178,6 +235,31 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
         }) || [];
       
       setDetalles(detallesConInfo);
+
+      // ✅ NUEVO: Guardar detalles de móviles por separado
+      const detallesMovilesConInfo = consultasMoviles.map(consulta => {
+        const detallesConsulta = detallesData?.filter(d => d.consulta_id === consulta.id) || [];
+        const totalRX = detallesConsulta.reduce((sum, d) => sum + d.precio, 0);
+        let totalExtras = 0;
+        if (consulta.movil_incluye_placas) totalExtras += consulta.movil_precio_placas || 0;
+        if (consulta.movil_incluye_informe) totalExtras += consulta.movil_precio_informe || 0;
+
+        return {
+          paciente: consulta.pacientes?.nombre,
+          establecimiento: consulta.movil_establecimiento,
+          estudios: detallesConsulta,
+          totalRX,
+          totalExtras,
+          total: totalRX + totalExtras,
+          forma_pago: consulta.forma_pago,
+          incluye_placas: consulta.movil_incluye_placas,
+          precio_placas: consulta.movil_precio_placas,
+          incluye_informe: consulta.movil_incluye_informe,
+          precio_informe: consulta.movil_precio_informe
+        };
+      });
+
+      setDetallesMoviles(detallesMovilesConInfo);
       
       // Guardar información de consultas anuladas
       setConsultasAnuladas(consultasAnuladas.map(c => ({
@@ -697,6 +779,90 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
                 </div>
               </div>
             </div>
+
+            {/* ✅ NUEVO: Cuadre Servicios Móviles */}
+            {cuadreMoviles && cuadreMoviles.total_consultas > 0 && (
+              <div className="card bg-orange-50 border-2 border-orange-300 mb-6">
+                <h3 className="text-lg font-semibold mb-4 text-orange-800">
+                  📱 Servicios Móviles (Separado)
+                </h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="bg-white p-4 rounded">
+                    <div className="flex justify-between text-lg">
+                      <span>Total Consultas Móviles:</span>
+                      <span className="font-bold text-orange-600">{cuadreMoviles.total_consultas}</span>
+                    </div>
+                    <div className="flex justify-between text-2xl border-t pt-3 mt-2">
+                      <span className="font-semibold">Total Ventas Móviles:</span>
+                      <span className="font-bold text-orange-700">
+                        Q {cuadreMoviles.total_ventas.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 rounded">
+                    <h4 className="font-semibold mb-2">Por Forma de Pago:</h4>
+                    <div className="space-y-2">
+                      {cuadreMoviles.cuadres_forma_pago.map(c => (
+                        <div key={c.forma_pago} className="flex justify-between p-2 bg-orange-50 rounded">
+                          <div>
+                            <div className="font-medium">{getFormaPagoNombre(c.forma_pago)}</div>
+                            <div className="text-sm text-gray-600">{c.cantidad} consulta(s)</div>
+                          </div>
+                          <div className="text-lg font-bold text-orange-600">
+                            Q {c.total.toFixed(2)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 text-sm text-orange-700 bg-orange-100 p-3 rounded">
+                  ℹ️ Los servicios móviles se muestran separados pero SÍ son parte de los ingresos totales del día
+                </div>
+
+                {/* Detalle de servicios móviles */}
+                {detallesMoviles.length > 0 && (
+                  <div className="mt-4 bg-white p-4 rounded">
+                    <h4 className="font-semibold mb-3">Detalle de Servicios Móviles:</h4>
+                    <div className="space-y-3">
+                      {detallesMoviles.map((detalle, idx) => (
+                        <div key={idx} className="border-l-4 border-orange-400 pl-3 py-2 bg-orange-50">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <div className="font-semibold">{detalle.paciente}</div>
+                              <div className="text-sm text-gray-600">🏥 {detalle.establecimiento}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-lg font-bold text-orange-700">Q {detalle.total.toFixed(2)}</div>
+                              <div className="text-xs text-gray-600">{getFormaPagoNombre(detalle.forma_pago)}</div>
+                            </div>
+                          </div>
+                          <div className="text-sm space-y-1">
+                            {detalle.estudios.map((est: any, i: number) => (
+                              <div key={i} className="text-gray-700">
+                                • {est.sub_estudios?.nombre} - Q {est.precio.toFixed(2)}
+                              </div>
+                            ))}
+                            {detalle.incluye_placas && (
+                              <div className="text-orange-700 font-semibold">
+                                + Placas - Q {detalle.precio_placas?.toFixed(2)}
+                              </div>
+                            )}
+                            {detalle.incluye_informe && (
+                              <div className="text-orange-700 font-semibold">
+                                + Informe - Q {detalle.precio_informe?.toFixed(2)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Gastos del Día */}
             <div className="card mb-6">

@@ -1,6 +1,7 @@
 /**
  * Generador de Reportes Excel - CONRAD CENTRAL
  * Con columnas dinámicas según estudios en la base de datos
+ * ✅ INCLUYE GENERADOR ESPECIAL PARA SERVICIOS MÓVILES
  */
 import ExcelJS from 'exceljs';
 import { supabase } from '../lib/supabase';
@@ -8,6 +9,12 @@ import { supabase } from '../lib/supabase';
 interface Consulta {
   fecha: string;
   created_at: string;
+  es_servicio_movil?: boolean;
+  movil_establecimiento?: string;
+  movil_incluye_placas?: boolean;
+  movil_precio_placas?: number;
+  movil_incluye_informe?: boolean;
+  movil_precio_informe?: number;
   pacientes: {
     nombre: string;
     edad: number;
@@ -44,6 +51,312 @@ interface Estudio {
   nombre: string;
 }
 
+// ✅ FUNCIÓN CORREGIDA PARA GENERAR REPORTE DE SERVICIOS MÓVILES
+export const generarReporteMoviles = async (
+  mes: number,
+  anio: number,
+  consultas: Consulta[]
+): Promise<void> => {
+  const workbook = new ExcelJS.Workbook();
+
+  // Agrupar consultas por día
+  const consultasPorDia: { [key: number]: Consulta[] } = {};
+  consultas.forEach(consulta => {
+    const fecha = new Date(consulta.fecha + 'T12:00:00');
+    const dia = fecha.getDate();
+    if (!consultasPorDia[dia]) consultasPorDia[dia] = [];
+    consultasPorDia[dia].push(consulta);
+  });
+
+  const diasConConsultas = Object.keys(consultasPorDia).map(Number).sort((a, b) => a - b);
+
+  let diasAGenerar: number[];
+  if (diasConConsultas.length === 0) {
+    const diasDelMes = new Date(anio, mes, 0).getDate();
+    diasAGenerar = Array.from({ length: diasDelMes }, (_, i) => i + 1);
+  } else {
+    diasAGenerar = diasConConsultas;
+  }
+
+  // Crear hoja por cada día
+  for (const dia of diasAGenerar) {
+    const consultasDia = consultasPorDia[dia] || [];
+    const nombreHoja = `${dia.toString().padStart(2, '0')}${mes.toString().padStart(2, '0')}${anio.toString().slice(-2)}`;
+    await crearHojaMoviles(workbook, nombreHoja, dia, mes, anio, consultasDia);
+  }
+
+  // Generar archivo y descargar
+  const nombreMes = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
+    'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'][mes - 1];
+  
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `SERVICIOS_MOVILES_${nombreMes}_${anio}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+};
+
+// ✅ FUNCIÓN CORREGIDA PARA CREAR HOJA DIARIA DE MÓVILES
+async function crearHojaMoviles(
+  workbook: ExcelJS.Workbook,
+  nombreHoja: string,
+  dia: number,
+  mes: number,
+  anio: number,
+  consultas: Consulta[]
+): Promise<void> {
+  const worksheet = workbook.addWorksheet(nombreHoja);
+  const fecha = `${dia.toString().padStart(2, '0')}/${mes.toString().padStart(2, '0')}/${anio}`;
+
+  // Configurar anchos de columna
+  worksheet.columns = [
+    { width: 4 },   // No.
+    { width: 30 },  // Establecimiento
+    { width: 25 },  // Paciente
+    { width: 10 },  // Edad
+    { width: 35 },  // Estudios RX (más ancho para múltiples estudios)
+    { width: 12 },  // Precio
+    { width: 20 },  // Extras
+    { width: 12 },  // Total
+    { width: 15 },  // Forma de Pago
+  ];
+
+  // FILA 1: TÍTULO
+  worksheet.mergeCells('B1:D1');
+  worksheet.mergeCells('E1:I1');
+  
+  const cellFecha = worksheet.getCell('B1');
+  cellFecha.value = `📱 SERVICIOS MÓVILES - FECHA: ${fecha}`;
+  cellFecha.font = { name: 'Calibri', size: 11, bold: true };
+  cellFecha.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFFFA500' } // Naranja
+  };
+  cellFecha.alignment = { horizontal: 'left', vertical: 'middle' };
+  cellFecha.border = {
+    top: { style: 'thin' },
+    bottom: { style: 'thin' },
+    left: { style: 'thin' },
+    right: { style: 'thin' }
+  };
+
+  const cellConrad = worksheet.getCell('E1');
+  cellConrad.value = 'CONRAD CENTRAL';
+  cellConrad.font = { name: 'Calibri', size: 14, bold: true };
+  cellConrad.alignment = { horizontal: 'center', vertical: 'middle' };
+  cellConrad.border = {
+    top: { style: 'thin' },
+    bottom: { style: 'thin' },
+    left: { style: 'thin' },
+    right: { style: 'thin' }
+  };
+
+  // FILA 2: HEADERS
+  const headers = [
+    '',
+    'ESTABLECIMIENTO',
+    'PACIENTE',
+    'EDAD',
+    'ESTUDIOS RX',
+    'PRECIO',
+    'EXTRAS',
+    'TOTAL',
+    'FORMA DE PAGO'
+  ];
+  
+  worksheet.getRow(2).values = headers;
+  worksheet.getRow(2).height = 25;
+  
+  headers.forEach((header, idx) => {
+    if (idx === 0) return;
+    const cell = worksheet.getCell(2, idx + 1);
+    cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFFF8C00' } // Naranja oscuro
+    };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = {
+      top: { style: 'thin' },
+      bottom: { style: 'thin' },
+      left: { style: 'thin' },
+      right: { style: 'thin' }
+    };
+  });
+
+  // ✅ CORREGIDO: FILAS 3+: DATOS - Ahora muestra TODAS las consultas
+  let filaActual = 3;
+  let numeroFila = 1;
+
+  // Log para debug
+  console.log(`📱 Procesando ${consultas.length} consultas móviles para el día ${dia}/${mes}/${anio}`);
+
+  consultas.forEach((consulta) => {
+    // ✅ CORREGIDO: Obtener TODOS los estudios RX y juntarlos
+    const estudiosRX = consulta.detalle_consultas
+      .filter(d => d.sub_estudios?.estudios?.nombre?.toUpperCase() === 'RX')
+      .map(d => d.sub_estudios?.nombre || '')
+      .join(', ');  // Unir con comas
+    
+    // ✅ CORREGIDO: Sumar TODOS los precios de estudios RX
+    const precioRX = consulta.detalle_consultas
+      .filter(d => d.sub_estudios?.estudios?.nombre?.toUpperCase() === 'RX')
+      .reduce((sum, det) => sum + det.precio, 0);
+
+    // Calcular extras
+    let extras = 0;
+    let extrasTexto = '';
+    const extrasArray: string[] = [];
+    
+    if (consulta.movil_incluye_placas && consulta.movil_precio_placas) {
+      extras += consulta.movil_precio_placas;
+      extrasArray.push(`Placas: Q${consulta.movil_precio_placas.toFixed(2)}`);
+    }
+    
+    if (consulta.movil_incluye_informe && consulta.movil_precio_informe) {
+      extras += consulta.movil_precio_informe;
+      extrasArray.push(`Informe: Q${consulta.movil_precio_informe.toFixed(2)}`);
+    }
+    
+    extrasTexto = extrasArray.length > 0 ? extrasArray.join(' + ') : '-';
+
+    const totalFinal = precioRX + extras;
+
+    // Formatear edad
+    const edadFormateada = consulta.pacientes.edad_valor && consulta.pacientes.edad_tipo
+      ? `${consulta.pacientes.edad_valor} ${consulta.pacientes.edad_tipo}`
+      : `${consulta.pacientes.edad} años`;
+
+    // Formatear establecimiento y paciente con valores por defecto seguros
+    const establecimiento = consulta.movil_establecimiento?.toUpperCase() || 'SIN ESPECIFICAR';
+    const nombrePaciente = consulta.pacientes?.nombre?.toUpperCase() || 'SIN NOMBRE';
+
+    // ✅ NUEVO: Mapear forma de pago
+    const formaPagoTexto = (() => {
+      switch (consulta.forma_pago) {
+        case 'efectivo':
+          return 'EFECTIVO';
+        case 'efectivo_facturado':
+          return 'DEPOSITADO';
+        case 'transferencia':
+          return 'DEPOSITADO';
+        case 'tarjeta':
+          return 'TARJETA';
+        case 'estado_cuenta':
+          return 'ESTADO DE CUENTA';
+        default:
+          return consulta.forma_pago?.toUpperCase() || 'SIN ESPECIFICAR';
+      }
+    })();
+
+    const valoresFila: any[] = [
+      numeroFila,
+      establecimiento,
+      nombrePaciente,
+      edadFormateada,
+      estudiosRX.toUpperCase() || 'SIN ESTUDIOS',
+      precioRX,
+      extrasTexto,
+      totalFinal,
+      formaPagoTexto  // ✅ NUEVO
+    ];
+
+    // Log para debug
+    console.log(`Fila ${numeroFila}: ${nombrePaciente} - ${establecimiento} - Estudios: ${estudiosRX} - Total: Q${totalFinal} - ${formaPagoTexto}`);
+
+    worksheet.getRow(filaActual).values = valoresFila;
+
+    // Aplicar formato a cada celda
+    valoresFila.forEach((valor, colIdx) => {
+      const cell = worksheet.getCell(filaActual, colIdx + 1);
+      
+      cell.font = { name: 'Arial', size: 10 };
+
+      if (colIdx === 0 || colIdx === 3) {
+        // No. y Edad centrados
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      } else if (colIdx === 5 || colIdx === 7) {
+        // Precio y Total alineados a la derecha
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+      } else {
+        // Resto alineados a la izquierda (incluye estudios y forma de pago)
+        cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+      }
+
+      if (typeof valor === 'number' && (colIdx === 5 || colIdx === 7)) {
+        cell.numFmt = '#,##0.00';
+      }
+
+      cell.border = {
+        top: { style: 'thin' },
+        bottom: { style: 'thin' },
+        left: { style: 'thin' },
+        right: { style: 'thin' }
+      };
+    });
+
+    filaActual++;
+    numeroFila++;
+  });
+
+  // TOTALES
+  const filaTotalesInicio = Math.max(filaActual + 2, 8);
+
+  const totalGenerado = consultas.reduce((sum, c) => {
+    const precioRX = c.detalle_consultas
+      .filter(d => d.sub_estudios?.estudios?.nombre?.toUpperCase() === 'RX')
+      .reduce((s, d) => s + d.precio, 0);
+    
+    const extras = (c.movil_incluye_placas ? (c.movil_precio_placas || 0) : 0) +
+                   (c.movil_incluye_informe ? (c.movil_precio_informe || 0) : 0);
+    
+    return sum + precioRX + extras;
+  }, 0);
+
+  console.log(`Total generado para el día: Q${totalGenerado.toFixed(2)}`);
+
+  const cellLabelTotal = worksheet.getCell(filaTotalesInicio, 7);
+  cellLabelTotal.value = 'TOTAL GENERADO:';
+  cellLabelTotal.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+  cellLabelTotal.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFFF8C00' }
+  };
+  cellLabelTotal.alignment = { horizontal: 'right', vertical: 'middle' };
+  cellLabelTotal.border = {
+    top: { style: 'thin' },
+    bottom: { style: 'thin' },
+    left: { style: 'thin' },
+    right: { style: 'thin' }
+  };
+
+  const cellValorTotal = worksheet.getCell(filaTotalesInicio, 8);
+  cellValorTotal.value = totalGenerado;
+  cellValorTotal.numFmt = '#,##0.00';
+  cellValorTotal.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+  cellValorTotal.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFFF8C00' }
+  };
+  cellValorTotal.alignment = { horizontal: 'right', vertical: 'middle' };
+  cellValorTotal.border = {
+    top: { style: 'thin' },
+    bottom: { style: 'thin' },
+    left: { style: 'thin' },
+    right: { style: 'thin' }
+  };
+}
+
+// ✅ FUNCIÓN ORIGINAL PARA REPORTES GENERALES (SIN CAMBIOS)
 export const generarReporteExcel = async (
   mes: number,
   anio: number,
@@ -125,7 +438,7 @@ async function crearHojaDiaria(
   const fecha = `${dia.toString().padStart(2, '0')}/${mes.toString().padStart(2, '0')}/${anio}`;
 
   // Calcular número total de columnas
-  const numColumnasFijas = 8; // Aumentado de 7 a 8 para incluir forma de pago
+  const numColumnasFijas = 8;
   const numColumnasEstudios = estudiosDisponibles.length;
   const numColumnasFinales = 2;
   const totalColumnas = numColumnasFijas + numColumnasEstudios + numColumnasFinales;
@@ -139,7 +452,7 @@ async function crearHojaDiaria(
     { width: 28 },
     { width: 20 },
     { width: 13 },
-    { width: 13 }, // Nueva columna para forma de pago
+    { width: 13 },
   ];
 
   estudiosDisponibles.forEach(() => {
@@ -234,31 +547,23 @@ async function crearHojaDiaria(
   let filaActual = 3;
 
   consultas.forEach((consulta, idx) => {
-    // DEBUG: Verificar forma de pago
-    if (idx < 5) {
-      console.log(`Consulta ${idx + 1}: forma_pago = "${consulta.forma_pago}"`);
-    }
-    
     // Agrupar TODOS los estudios en una sola línea
     const nombresEstudios = consulta.detalle_consultas
       .map(d => d.sub_estudios?.nombre || '')
       .join(', ');
     
     // Calcular si es horario inhábil
-    const fechaConsulta = new Date(consulta.created_at); // Usar created_at que tiene hora
-    const diaSemana = fechaConsulta.getDay(); // 0=Domingo, 6=Sábado
+    const fechaConsulta = new Date(consulta.created_at);
+    const diaSemana = fechaConsulta.getDay();
     const hora = fechaConsulta.getHours();
     
     let esInhabil = false;
     
     if (diaSemana === 0) {
-      // Domingo: TODO inhábil
       esInhabil = true;
     } else if (diaSemana === 6) {
-      // Sábado: inhábil después de 11 AM o antes de 7 AM
       esInhabil = hora < 7 || hora >= 11;
     } else {
-      // Lunes a viernes: inhábil después de 4 PM (16:00) o antes de 7 AM
       esInhabil = hora < 7 || hora >= 16;
     }
     
@@ -266,12 +571,6 @@ async function crearHojaDiaria(
 
     // Sumar TODOS los precios
     const precioTotal = consulta.detalle_consultas.reduce((sum, det) => sum + det.precio, 0);
-
-    // DEBUG
-    console.log(`=== CONSULTA ${idx + 1} ===`);
-    console.log('sin_informacion_medico:', consulta.sin_informacion_medico);
-    console.log('medicos:', consulta.medicos);
-    console.log('medico_recomendado:', consulta.medico_recomendado);
       
     let nombreMedico: string;
     
@@ -324,29 +623,26 @@ async function crearHojaDiaria(
       }
     })();
 
-    // Recolectar TODAS las facturas (consulta principal + estudios individuales)
+    // Recolectar TODAS las facturas
     const facturas: string[] = [];
     
-    // Factura de la consulta principal
     if (consulta.numero_factura) {
       facturas.push(consulta.numero_factura);
     }
     
-    // Facturas de estudios individuales
     consulta.detalle_consultas.forEach(det => {
       if (det.numero_factura) {
         facturas.push(det.numero_factura);
       }
     });
     
-    // Unir todas las facturas separadas por coma
     const todasLasFacturas = facturas.length > 0 ? facturas.join(', ') : '';
 
     const valoresFila: any[] = [
       idx + 1,
       consulta.pacientes.nombre.toUpperCase(),
       edadFormateada,
-      todasLasFacturas, // ✅ Todas las facturas concatenadas
+      todasLasFacturas,
       estudioTexto,
       nombreMedico.toUpperCase(),
       consulta.tipo_cobro === 'social' ? precioTotal : '',
@@ -355,13 +651,11 @@ async function crearHojaDiaria(
 
     // Distribuir precios en las columnas de estudios
     estudiosDisponibles.forEach(estudio => {
-      // Buscar si este paciente tiene este estudio
       const tieneEstudio = consulta.detalle_consultas.some(
         det => det.sub_estudios?.estudios?.id === estudio.id
       );
       
       if (tieneEstudio) {
-        // Sumar todos los precios de este estudio
         const precioEstudio = consulta.detalle_consultas
           .filter(det => det.sub_estudios?.estudios?.id === estudio.id)
           .reduce((sum, det) => sum + det.precio, 0);
@@ -395,7 +689,7 @@ async function crearHojaDiaria(
         cell.alignment = { horizontal: 'left', vertical: 'middle' };
       }
 
-      if (typeof valor === 'number' && colIdx >= 7) { // Cambiado de 6 a 7
+      if (typeof valor === 'number' && colIdx >= 7) {
         cell.numFmt = '#,##0.00';
       }
 
@@ -407,8 +701,8 @@ async function crearHojaDiaria(
       };
     });
 
-    filaActual++; // Incrementar por cada consulta
-  }); // Cierre del forEach de consultas
+    filaActual++;
+  });
 
   // TOTALES
   const filaTotalesInicio = Math.max(filaActual + 2, 8);
@@ -417,7 +711,6 @@ async function crearHojaDiaria(
     .filter(c => c.forma_pago === 'efectivo')
     .reduce((sum, c) => sum + c.detalle_consultas.reduce((s, d) => s + d.precio, 0), 0);
   
-  // DEPOSITADO incluye efectivo_facturado Y transferencia
   const totalDepositado = consultas
     .filter(c => c.forma_pago === 'efectivo_facturado' || c.forma_pago === 'transferencia')
     .reduce((sum, c) => sum + c.detalle_consultas.reduce((s, d) => s + d.precio, 0), 0);
@@ -444,7 +737,7 @@ async function crearHojaDiaria(
   totales.forEach((total, idx) => {
     const fila = filaTotalesInicio + idx;
 
-    const cellLabel = worksheet.getCell(fila, 7); // Cambiado de 6 a 7
+    const cellLabel = worksheet.getCell(fila, 7);
     cellLabel.value = total.label;
     cellLabel.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
     cellLabel.fill = {
@@ -460,7 +753,7 @@ async function crearHojaDiaria(
       right: { style: 'thin' }
     };
 
-    const cellValor = worksheet.getCell(fila, 8); // Cambiado de 7 a 8
+    const cellValor = worksheet.getCell(fila, 8);
     cellValor.value = total.valor;
     cellValor.numFmt = '#,##0.00';
     cellValor.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };

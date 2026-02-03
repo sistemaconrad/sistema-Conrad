@@ -36,6 +36,7 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
     comisionesPagadas: 0,
     utilidad: 0,
     ingresosConsultas: 0,
+    ingresosMoviles: 0, // ✅ NUEVO
     ingresosAdicionales: 0,
     comisionesPendientes: 0
   });
@@ -54,15 +55,13 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
   const cargarDatos = async () => {
     setLoading(true);
     try {
-      // Calcular primer y último día del mes SIN problemas de timezone
       const primerDia = `${anio}-${String(mes).padStart(2, '0')}-01`;
       const ultimoDia = `${anio}-${String(mes).padStart(2, '0')}-${new Date(anio, mes, 0).getDate()}`;
 
       console.log('📅 Cargando datos:', { primerDia, ultimoDia });
 
-      // 1. Ingresos por consultas (INCLUYENDO servicios móviles)
-      // Servicios móviles SÍ son ingresos, solo NO generan comisión
-      const { data: consultas } = await supabase
+      // ✅ 1. Ingresos por consultas REGULARES (sin móviles)
+      const { data: consultasRegulares } = await supabase
         .from('consultas')
         .select(`
           fecha,
@@ -70,15 +69,38 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
         `)
         .gte('fecha', primerDia)
         .lte('fecha', ultimoDia)
-        .or('anulado.is.null,anulado.eq.false'); // Solo excluir anuladas
+        .or('anulado.is.null,anulado.eq.false')
+        .or('es_servicio_movil.is.null,es_servicio_movil.eq.false');
 
-      console.log('💰 Consultas encontradas:', consultas?.length);
+      console.log('💰 Consultas regulares:', consultasRegulares?.length);
 
-      const ingresosConsultas = consultas?.reduce((sum, c: any) => {
+      const ingresosConsultas = consultasRegulares?.reduce((sum, c: any) => {
         return sum + (c.detalle_consultas?.reduce((s: number, d: any) => s + d.precio, 0) || 0);
       }, 0) || 0;
 
-      // 2. Ingresos adicionales
+      // ✅ 2. Ingresos por SERVICIOS MÓVILES (separado)
+      const { data: consultasMoviles } = await supabase
+        .from('consultas')
+        .select(`
+          *,
+          detalle_consultas(precio)
+        `)
+        .gte('fecha', primerDia)
+        .lte('fecha', ultimoDia)
+        .or('anulado.is.null,anulado.eq.false')
+        .eq('es_servicio_movil', true);
+
+      console.log('📱 Consultas móviles:', consultasMoviles?.length);
+
+      const ingresosMoviles = consultasMoviles?.reduce((sum, c: any) => {
+        const totalRX = c.detalle_consultas?.reduce((s: number, d: any) => s + d.precio, 0) || 0;
+        let totalExtras = 0;
+        if (c.movil_incluye_placas) totalExtras += c.movil_precio_placas || 0;
+        if (c.movil_incluye_informe) totalExtras += c.movil_precio_informe || 0;
+        return sum + totalRX + totalExtras;
+      }, 0) || 0;
+
+      // 3. Ingresos adicionales
       const { data: ingresosAd } = await supabase
         .from('ingresos_adicionales')
         .select('monto')
@@ -87,7 +109,7 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
 
       const ingresosAdicionales = ingresosAd?.reduce((sum, i) => sum + i.monto, 0) || 0;
 
-      // 3. Gastos (incluyendo comisiones pagadas)
+      // 4. Gastos (incluyendo comisiones pagadas)
       const { data: gastosData } = await supabase
         .from('gastos')
         .select('monto, fecha')
@@ -98,7 +120,7 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
 
       const gastosOperativos = gastosData?.reduce((sum, g) => sum + g.monto, 0) || 0;
 
-      // Comisiones PAGADAS en este período (por fecha de pago, no por período de comisión)
+      // Comisiones PAGADAS en este período
       const { data: comisionesPagadasData } = await supabase
         .from('comisiones_por_pagar')
         .select('total_comision')
@@ -110,7 +132,7 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
 
       const totalGastos = gastosOperativos + comisionesPagadas;
 
-      // 4. Comisiones pendientes
+      // 5. Comisiones pendientes
       const { data: comisionesData } = await supabase
         .from('comisiones_por_pagar')
         .select('total_comision')
@@ -120,11 +142,12 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
 
       const comisionesPendientes = comisionesData?.reduce((sum, c) => sum + c.total_comision, 0) || 0;
 
-      const totalIngresos = ingresosConsultas + ingresosAdicionales;
+      const totalIngresos = ingresosConsultas + ingresosMoviles + ingresosAdicionales;
       const utilidad = totalIngresos - totalGastos;
 
       console.log('📊 Totales calculados:', {
         ingresosConsultas,
+        ingresosMoviles,
         ingresosAdicionales,
         totalIngresos,
         totalGastos,
@@ -139,6 +162,7 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
         comisionesPagadas: comisionesPagadas,
         utilidad: utilidad,
         ingresosConsultas: ingresosConsultas,
+        ingresosMoviles: ingresosMoviles, // ✅ NUEVO
         ingresosAdicionales: ingresosAdicionales,
         comisionesPendientes: comisionesPendientes
       });
@@ -227,9 +251,9 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
           </div>
         </div>
 
-        {/* Resumen Cards */}
+        {/* ✅ Resumen Cards - ACTUALIZADO */}
         <div className="grid md:grid-cols-4 gap-6 mb-8">
-          {/* Ingresos */}
+          {/* Ingresos - CON DESGLOSE DE MÓVILES */}
           <div className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -241,8 +265,11 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
               <TrendingUp className="text-green-600" size={40} />
             </div>
             <div className="text-xs text-gray-500 space-y-1">
-              <p>Consultas: Q {totales.ingresosConsultas.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</p>
-              <p>Adicionales: Q {totales.ingresosAdicionales.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</p>
+              <p>Consultas Regulares: Q {totales.ingresosConsultas.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</p>
+              <p className="text-orange-600 font-semibold">
+                📱 Servicios Móviles: Q {totales.ingresosMoviles.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+              </p>
+              <p>Otros Ingresos: Q {totales.ingresosAdicionales.toLocaleString('es-GT', { minimumFractionDigits: 2 })}</p>
             </div>
           </div>
 
@@ -294,6 +321,50 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
             </div>
           </div>
         </div>
+
+        {/* ✅ NUEVA SECCIÓN: Desglose de Ingresos */}
+        {totales.ingresosMoviles > 0 && (
+          <div className="bg-orange-50 border-2 border-orange-300 rounded-lg p-6 mb-8">
+            <h3 className="text-lg font-bold text-orange-800 mb-4">
+              📱 Desglose de Ingresos - Servicios Móviles
+            </h3>
+            <div className="grid md:grid-cols-3 gap-4">
+              <div className="bg-white p-4 rounded-lg">
+                <p className="text-sm text-gray-600">Consultas Regulares</p>
+                <p className="text-2xl font-bold text-green-600">
+                  Q {totales.ingresosConsultas.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {totales.ingresos > 0 ? ((totales.ingresosConsultas / totales.ingresos) * 100).toFixed(1) : 0}% del total
+                </p>
+              </div>
+
+              <div className="bg-white p-4 rounded-lg border-2 border-orange-300">
+                <p className="text-sm text-orange-700 font-semibold">📱 Servicios Móviles</p>
+                <p className="text-2xl font-bold text-orange-600">
+                  Q {totales.ingresosMoviles.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-orange-600 mt-1 font-medium">
+                  {totales.ingresos > 0 ? ((totales.ingresosMoviles / totales.ingresos) * 100).toFixed(1) : 0}% del total
+                </p>
+              </div>
+
+              <div className="bg-white p-4 rounded-lg">
+                <p className="text-sm text-gray-600">Otros Ingresos</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  Q {totales.ingresosAdicionales.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {totales.ingresos > 0 ? ((totales.ingresosAdicionales / totales.ingresos) * 100).toFixed(1) : 0}% del total
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 bg-white p-3 rounded text-sm text-orange-800">
+              ℹ️ <strong>Nota importante:</strong> Los servicios móviles SÍ cuentan como ingresos, pero NO generan comisiones para médicos referentes.
+            </div>
+          </div>
+        )}
 
         {/* Accesos Rápidos */}
         <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -347,7 +418,8 @@ export const ContabilidadPage: React.FC<ContabilidadPageProps> = ({ onBack }) =>
         <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
           <h3 className="font-semibold text-blue-900 mb-2">ℹ️ Información</h3>
           <ul className="text-sm text-blue-800 space-y-1">
-            <li>• Los ingresos por consultas se calculan automáticamente del sistema</li>
+            <li>• Los ingresos por consultas regulares y móviles se calculan automáticamente</li>
+            <li>• Los servicios móviles se muestran separados para mejor control</li>
             <li>• Puedes registrar ingresos adicionales (alquileres, otros servicios)</li>
             <li>• Todos los gastos deben registrarse manualmente</li>
             <li>• Las comisiones pendientes son obligaciones de pago a médicos referentes</li>

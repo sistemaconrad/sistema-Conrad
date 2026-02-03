@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Toast } from '../components/Toast';
 import { useToast } from '../hooks';
-import { generarReporteExcel } from '../utils/excel-generator';
+import { generarReporteExcel, generarReporteMoviles } from '../utils/excel-generator';
 
 interface ReportesPageProps {
   onBack: () => void;
@@ -45,7 +45,6 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
       let mesReporte: number;
       let anioReporte: number;
 
-      // Determinar rango según tipo de reporte
       if (tipoReporte === 'dia') {
         primerDia = fechaUnica;
         ultimoDia = fechaUnica;
@@ -59,7 +58,6 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
         mesReporte = fecha.getMonth() + 1;
         anioReporte = fecha.getFullYear();
       } else {
-        // Mes completo
         primerDia = new Date(anio, mes - 1, 1).toISOString().split('T')[0];
         ultimoDia = new Date(anio, mes, 0).toISOString().split('T')[0];
         mesReporte = mes;
@@ -90,53 +88,21 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
 
       if (error) throw error;
 
-      // ✅ DEBUG: Ver consultas anuladas
-      console.log('=== DEBUG CONSULTAS ANULADAS ===');
-      consultasRaw?.forEach(c => {
-        if (c.anulado === true) {
-          console.log('ANULADA:', c.pacientes?.nombre, 'anulado:', c.anulado);
-        }
-      });
-
-      // ✅ Filtrar consultas anuladas Y servicios móviles DESPUÉS de obtenerlas
-      // Solo incluir si anulado es false, null, o undefined (NO true)
-      // Y si NO es servicio móvil
+      // ✅ Filtrar consultas anuladas Y servicios móviles
       const consultas = consultasRaw?.filter(c => {
         const esAnulada = c.anulado === true;
         const esMovil = c.es_servicio_movil === true;
-        
-        if (esAnulada) {
-          console.log('Filtrando (anulada):', c.pacientes?.nombre);
-        }
-        if (esMovil) {
-          console.log('Filtrando (servicio móvil):', c.pacientes?.nombre);
-        }
-        
         return !esAnulada && !esMovil;
       }) || [];
 
-      console.log('Total consultas raw:', consultasRaw?.length);
-      console.log('Total consultas filtradas:', consultas.length);
-
       if (!consultas || consultas.length === 0) {
-        showToast('No hay consultas en este período', 'error');
+        showToast('No hay consultas regulares en este período', 'error');
         setGenerando(false);
         return;
       }
 
-      // ✅ DEBUG: Ver datos de la primera consulta
-      console.log('=== DEBUG REPORTE ===');
-      console.log('Primera consulta completa:', consultas[0]);
-      console.log('medico_recomendado:', consultas[0].medico_recomendado);
-      console.log('sin_informacion_medico:', consultas[0].sin_informacion_medico);
-      console.log('medicos:', consultas[0].medicos);
-      console.log('====================');
-
       showToast('Generando archivo Excel...', 'info');
-
-      // Generar Excel directamente en el navegador
       await generarReporteExcel(mesReporte, anioReporte, consultas);
-
       showToast('¡Reporte generado y descargado exitosamente!', 'success');
     } catch (error) {
       console.error('Error:', error);
@@ -146,21 +112,31 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
     }
   };
 
+  // ✅ NUEVA FUNCIÓN PARA REPORTE DE MÓVILES
   const handleGenerarReporteMoviles = async () => {
     setGenerando(true);
     try {
-      let primerDia: string, ultimoDia: string;
+      showToast('Obteniendo servicios móviles...', 'info');
+
+      let primerDia: string, ultimoDia: string, mesReporte: number, anioReporte: number;
 
       if (tipoReporte === 'dia') {
         primerDia = fechaUnica;
         ultimoDia = fechaUnica;
+        const fecha = new Date(fechaUnica);
+        mesReporte = fecha.getMonth() + 1;
+        anioReporte = fecha.getFullYear();
       } else if (tipoReporte === 'rango') {
         primerDia = fechaInicio;
         ultimoDia = fechaFin;
+        const fecha = new Date(fechaInicio);
+        mesReporte = fecha.getMonth() + 1;
+        anioReporte = fecha.getFullYear();
       } else {
-        const fecha = new Date(anio, mes - 1, 1);
-        primerDia = new Date(fecha.getFullYear(), fecha.getMonth(), 1).toISOString().split('T')[0];
-        ultimoDia = new Date(fecha.getFullYear(), fecha.getMonth() + 1, 0).toISOString().split('T')[0];
+        primerDia = new Date(anio, mes - 1, 1).toISOString().split('T')[0];
+        ultimoDia = new Date(anio, mes, 0).toISOString().split('T')[0];
+        mesReporte = mes;
+        anioReporte = anio;
       }
 
       const { data: consultasRaw, error } = await supabase
@@ -183,7 +159,7 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
         `)
         .gte('fecha', primerDia)
         .lte('fecha', ultimoDia)
-        .eq('es_servicio_movil', true) // SOLO servicios móviles
+        .eq('es_servicio_movil', true)
         .order('fecha', { ascending: true });
 
       if (error) throw error;
@@ -196,13 +172,12 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
         return;
       }
 
-      // Usar el mismo generador
-      await generarReporteExcel(mes, anio, consultas);
-      
-      showToast('Reporte de servicios móviles generado exitosamente', 'success');
+      showToast('Generando reporte de móviles...', 'info');
+      await generarReporteMoviles(mesReporte, anioReporte, consultas);
+      showToast('¡Reporte de móviles generado exitosamente!', 'success');
     } catch (error) {
-      console.error('Error al generar reporte:', error);
-      showToast('Error al generar el reporte de móviles', 'error');
+      console.error('Error:', error);
+      showToast('Error al generar reporte de móviles', 'error');
     } finally {
       setGenerando(false);
     }
@@ -210,7 +185,6 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-6">
           <button onClick={onBack} className="text-white hover:text-green-100 mb-4 flex items-center gap-2 transition-colors">
@@ -222,7 +196,6 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
         </div>
       </div>
 
-      {/* Contenido */}
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-lg p-8">
           <div className="text-center mb-8">
@@ -237,7 +210,6 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
             </p>
           </div>
 
-          {/* Características del reporte */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             <div className="bg-blue-50 rounded-lg p-4">
               <div className="flex items-start gap-3">
@@ -288,7 +260,6 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
             </div>
           </div>
 
-          {/* Tipo de reporte */}
           <div className="border-t pt-6">
             <h3 className="font-bold text-gray-800 mb-4">Selecciona el tipo de reporte</h3>
             
@@ -330,7 +301,6 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
               </button>
             </div>
 
-            {/* Formulario según tipo */}
             {tipoReporte === 'dia' && (
               <div className="mb-6">
                 <label className="label">Fecha</label>
@@ -396,7 +366,7 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
               </div>
             )}
 
-            {/* Botones de acción */}
+            {/* ✅ BOTONES ACTUALIZADOS */}
             <div className="space-y-3">
               <button
                 onClick={handleGenerarReporte}
@@ -411,7 +381,7 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
                 ) : (
                   <>
                     <Download size={24} />
-                    Generar Reporte Regular
+                    📋 Generar Reporte Regular
                   </>
                 )}
               </button>
@@ -419,17 +389,17 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
               <button
                 onClick={handleGenerarReporteMoviles}
                 disabled={generando}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg flex items-center justify-center gap-2 py-3 text-lg transition-colors disabled:bg-gray-400"
+                className="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-lg flex items-center justify-center gap-2 py-3 text-lg transition-colors disabled:bg-gray-400"
               >
                 {generando ? (
                   <>
                     <LoadingSpinner />
-                    Generando reporte móviles...
+                    Generando móviles...
                   </>
                 ) : (
                   <>
                     <Download size={24} />
-                    📱 Generar Reporte Móviles
+                    📱 Generar Reporte Servicios Móviles
                   </>
                 )}
               </button>
@@ -438,7 +408,6 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
         </div>
       </div>
 
-      {/* Toast */}
       {toast && <Toast {...toast} onClose={hideToast} />}
     </div>
   );

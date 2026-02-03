@@ -17,6 +17,13 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const [medicoActual, setMedicoActual] = useState<Medico | null>(null);
   const [sinInfoMedico, setSinInfoMedico] = useState(false);
   const [esServicioMovil, setEsServicioMovil] = useState(false);
+  
+  // ✅ Estados para opciones extras de servicios móviles
+  const [incluyePlacas, setIncluyePlacas] = useState(false);
+  const [precioPlacas, setPrecioPlacas] = useState(0);
+  const [incluyeInforme, setIncluyeInforme] = useState(false);
+  const [precioInforme, setPrecioInforme] = useState(0);
+  const [establecimientoMovil, setEstablecimientoMovil] = useState('');
 
   // Estados del formulario principal
   const [tipoCobro, setTipoCobro] = useState<TipoCobro>('normal');
@@ -63,9 +70,9 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     cargarSubEstudios();
   }, []);
 
-  // Actualizar precios cuando cambie el tipo de cobro
+  // Actualizar precios cuando cambie el tipo de cobro (SOLO si NO es personalizado)
   useEffect(() => {
-    if (descripcion.length > 0) {
+    if (descripcion.length > 0 && tipoCobro !== 'personalizado') {
       const nuevaDescripcion = descripcion.map(item => {
         const subEstudio = subEstudios.find(se => se.id === item.sub_estudio_id);
         if (!subEstudio) return item;
@@ -185,15 +192,23 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     setDescripcion(nuevaDescripcion);
   };
 
-  // Calcular totales
+  // ✅ Calcular totales - ACTUALIZADO para incluir placas e informe
   const calcularTotales = () => {
     const subTotal = descripcion.reduce((sum, item) => sum + item.precio, 0);
-    const descuento = 0; // Implementar lógica de descuento si es necesario
-    const montoGravable = subTotal - descuento;
-    const impuesto = 0; // Implementar lógica de impuesto si es necesario
+    const descuento = 0;
+    
+    // Agregar costos extras de móviles
+    let extrasMovil = 0;
+    if (esServicioMovil) {
+      if (incluyePlacas) extrasMovil += precioPlacas;
+      if (incluyeInforme) extrasMovil += precioInforme;
+    }
+    
+    const montoGravable = subTotal + extrasMovil - descuento;
+    const impuesto = 0;
     const total = montoGravable + impuesto;
 
-    return { subTotal, descuento, montoGravable, impuesto, total };
+    return { subTotal, descuento, montoGravable, impuesto, total, extrasMovil };
   };
 
   // Guardar nuevo paciente
@@ -230,7 +245,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       setSinInfoMedico(sinInfo);
       setEsServicioMovil(esServicioMovil);
       
-      // Forzar tipo especial para servicios móviles (precio personalizado)
+      // ✅ CORREGIDO: Sugerir tipo especial pero permitir cambio
       if (esServicioMovil) {
         setTipoCobro('especial');
       }
@@ -238,7 +253,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       setShowNuevoModal(false);
       
       if (esServicioMovil) {
-        alert('📱 Servicio Móvil registrado. Recuerda: Solo estudios RX con precio personalizado.');
+        alert('📱 Servicio Móvil registrado.\n\nPuedes usar:\n• Especial: Precio del sistema\n• Personalizado: Editar precio manualmente');
       } else {
         alert('Paciente guardado exitosamente');
       }
@@ -248,13 +263,21 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     }
   };
 
-  // Limpiar todo
+  // ✅ Limpiar todo - ACTUALIZADO para limpiar opciones de móviles
   const handleLimpiar = () => {
     if (confirm('¿Está seguro de que desea limpiar toda la información?')) {
       setPacienteActual(null);
       setMedicoActual(null);
       setSinInfoMedico(false);
+      setEsServicioMovil(false);
+      setIncluyePlacas(false);
+      setPrecioPlacas(0);
+      setIncluyeInforme(false);
+      setPrecioInforme(0);
+      setEstablecimientoMovil('');
       setTipoCobro('normal');
+      setJustificacionEspecial('');
+      setShowJustificacion(false);
       setEstudioSeleccionado('');
       setSubEstudioSeleccionado('');
       setDescripcion([]);
@@ -267,7 +290,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     }
   };
 
-  // Imprimir
+  // ✅ Imprimir - ACTUALIZADO para guardar opciones de móviles
   const handleImprimir = async () => {
     if (!pacienteActual) {
       alert('Debe crear un paciente primero usando el botón "Nuevo"');
@@ -279,9 +302,21 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       return;
     }
 
+    // ✅ Validar establecimiento para servicios móviles
+    if (esServicioMovil && !establecimientoMovil.trim()) {
+      alert('Debe ingresar el nombre del establecimiento para servicios móviles');
+      return;
+    }
+
     // Validar justificación si se usa tarifa normal fuera de horario
     if (tipoCobro === 'normal' && !horarioNormal && !justificacionEspecial.trim()) {
       alert('Debe proporcionar una justificación para usar tarifa normal fuera del horario establecido');
+      return;
+    }
+
+    // Validar justificación para personalizado (solo si NO es servicio móvil)
+    if (tipoCobro === 'personalizado' && !esServicioMovil && !justificacionEspecial.trim()) {
+      alert('Debe proporcionar una justificación para usar precio personalizado');
       return;
     }
 
@@ -290,8 +325,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       alert('Debe ingresar el número de transferencia');
       return;
     }
-
-    // NOTA: Ya no validamos voucher - se puede agregar después
 
     const totales = calcularTotales();
 
@@ -306,8 +339,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           .from('consultas')
           .select('numero_paciente')
           .eq('fecha', fechaHoy)
-          .or('anulado.is.null,anulado.eq.false') // Solo contar las activas
-          .or('es_servicio_movil.is.null,es_servicio_movil.eq.false') // No contar móviles
+          .or('anulado.is.null,anulado.eq.false')
+          .or('es_servicio_movil.is.null,es_servicio_movil.eq.false')
           .order('numero_paciente', { ascending: false })
           .limit(1)
           .single();
@@ -315,28 +348,34 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         siguienteNumero = (ultimaConsulta?.numero_paciente || 0) + 1;
       }
 
-      // Crear consulta
+      // ✅ Crear consulta con opciones de móviles y tipo de cobro correcto
       const { data: consultaData, error: consultaError } = await supabase
-  .from('consultas')
-  .insert([{
-    numero_paciente: siguienteNumero, // null para servicios móviles
-    paciente_id: pacienteActual.id,
-    medico_id: medicoActual?.id || null,
-    medico_recomendado: medicoActual?.nombre || null, // ✅ Guardar nombre del médico
-    tipo_cobro: esServicioMovil ? 'especial' : tipoCobro, // Servicios móviles con precio especial (personalizado)
-    requiere_factura: requiereFactura,
-    nit: requiereFactura ? nit : null,
-    forma_pago: formaPago,
-    numero_factura: numeroFactura || null,
-    numero_transferencia: formaPago === 'transferencia' ? numeroTransferencia : null,
-    numero_voucher: formaPago === 'tarjeta' ? numeroVoucher : null,
-    sin_informacion_medico: sinInfoMedico,
-    justificacion_especial: tipoCobro === 'normal' && !horarioNormal ? justificacionEspecial : null,
-    fecha: format(new Date(), 'yyyy-MM-dd'),
-    es_servicio_movil: esServicioMovil
-  }])
-  .select()
-  .single();
+        .from('consultas')
+        .insert([{
+          numero_paciente: siguienteNumero,
+          paciente_id: pacienteActual.id,
+          medico_id: medicoActual?.id || null,
+          medico_recomendado: medicoActual?.nombre || null,
+          tipo_cobro: tipoCobro, // ✅ Usar el tipo de cobro seleccionado
+          requiere_factura: requiereFactura,
+          nit: requiereFactura ? nit : null,
+          forma_pago: formaPago,
+          numero_factura: numeroFactura || null,
+          numero_transferencia: formaPago === 'transferencia' ? numeroTransferencia : null,
+          numero_voucher: formaPago === 'tarjeta' ? numeroVoucher : null,
+          sin_informacion_medico: sinInfoMedico,
+          justificacion_especial: ((tipoCobro === 'normal' && !horarioNormal) || (tipoCobro === 'personalizado' && !esServicioMovil)) ? justificacionEspecial : null,
+          fecha: format(new Date(), 'yyyy-MM-dd'),
+          es_servicio_movil: esServicioMovil,
+          // ✅ Nuevos campos para opciones de móviles
+          movil_incluye_placas: esServicioMovil ? incluyePlacas : null,
+          movil_precio_placas: esServicioMovil && incluyePlacas ? precioPlacas : null,
+          movil_incluye_informe: esServicioMovil ? incluyeInforme : null,
+          movil_precio_informe: esServicioMovil && incluyeInforme ? precioInforme : null,
+          movil_establecimiento: esServicioMovil ? establecimientoMovil : null
+        }])
+        .select()
+        .single();
 
       if (consultaError) throw consultaError;
 
@@ -355,7 +394,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
 
       // Preparar datos para el recibo
       const fechaHora = new Date();
-      // Si tiene médico (aunque no sea referente marcado), mostrar en impresión
       const tieneMedico = medicoActual !== null;
       const esReferente = tieneMedico && !sinInfoMedico;
       
@@ -366,6 +404,22 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           precio: d.precio
         };
       });
+
+      // ✅ Agregar extras de móvil al recibo
+      if (esServicioMovil) {
+        if (incluyePlacas) {
+          estudiosRecibo.push({
+            nombre: '📋 Placas (Extra)',
+            precio: precioPlacas
+          });
+        }
+        if (incluyeInforme) {
+          estudiosRecibo.push({
+            nombre: '📄 Informe (Extra)',
+            precio: precioInforme
+          });
+        }
+      }
 
       const datosRecibo = {
         numeroPaciente: consultaData.numero_paciente,
@@ -394,29 +448,30 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
 
       try {
         if (tipoRecibo) {
-          // Recibo completo
           const htmlCompleto = generarReciboCompleto(datosRecibo);
           abrirRecibo(htmlCompleto, 'Recibo Completo');
         } else {
-          // Recibo para médico
           const htmlMedico = generarReciboMedico(datosRecibo);
           abrirRecibo(htmlMedico, 'Orden Médico');
         }
       } catch (errorImpresion) {
         console.error('Error al imprimir:', errorImpresion);
         alert('Advertencia: La consulta se guardó pero hubo un problema al abrir la impresión. Puede reimprimir desde Pacientes.');
-        // No limpiamos el formulario si falla la impresión
         return;
       }
       
-      // Solo limpiar si todo salió bien
       alert('✅ Consulta guardada exitosamente');
       
-      // Limpiar formulario después de guardar e imprimir exitosamente
+      // ✅ Limpiar formulario incluyendo opciones de móviles
       setPacienteActual(null);
       setMedicoActual(null);
       setSinInfoMedico(false);
       setEsServicioMovil(false);
+      setIncluyePlacas(false);
+      setPrecioPlacas(0);
+      setIncluyeInforme(false);
+      setPrecioInforme(0);
+      setEstablecimientoMovil('');
       setTipoCobro('normal');
       setJustificacionEspecial('');
       setShowJustificacion(false);
@@ -448,7 +503,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           <p className="text-blue-100 mt-2">Sistema de Gestión de Consultas</p>
         </div>
       </header>
-
 
       {/* Barra de botones principales */}
       <div className="container mx-auto py-4">
@@ -526,7 +580,14 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           <div className="lg:col-span-2 space-y-6">
             {pacienteActual && (
               <div className="card">
-                <h3 className="text-lg font-semibold mb-3">Información del Paciente</h3>
+                <h3 className="text-lg font-semibold mb-3">
+                  Información del Paciente
+                  {esServicioMovil && (
+                    <span className="ml-2 text-sm bg-orange-500 text-white px-3 py-1 rounded-full">
+                      📱 SERVICIO MÓVIL
+                    </span>
+                  )}
+                </h3>
                 <div className="grid md:grid-cols-2 gap-3 text-sm">
                   <div><strong>Nombre:</strong> {pacienteActual.nombre}</div>
                   <div><strong>Edad:</strong> {pacienteActual.edad} años</div>
@@ -579,9 +640,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                       setShowJustificacion(false);
                       setJustificacionEspecial('');
                     }}
+                    disabled={esServicioMovil}
                     className="mr-2"
                   />
-                  Social
+                  Social {esServicioMovil && <span className="text-gray-400 text-xs ml-1">(No disponible para móviles)</span>}
                 </label>
                 <label className="flex items-center">
                   <input
@@ -594,9 +656,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                       }
                       setTipoCobro('normal');
                     }}
+                    disabled={esServicioMovil}
                     className="mr-2"
                   />
-                  Normal {!horarioNormal && '(Requiere justificación)'}
+                  Normal {!horarioNormal && '(Requiere justificación)'} {esServicioMovil && <span className="text-gray-400 text-xs ml-1">(No disponible para móviles)</span>}
                 </label>
                 <label className="flex items-center">
                   <input
@@ -608,10 +671,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                       setShowJustificacion(false);
                       setJustificacionEspecial('');
                     }}
-                    disabled={horarioNormal}
+                    disabled={horarioNormal && !esServicioMovil}
                     className="mr-2"
                   />
-                  Especial {horarioNormal && '(Solo fuera de horario)'}
+                  Especial {horarioNormal && !esServicioMovil && '(Solo fuera de horario)'}
+                  {esServicioMovil && <span className="text-orange-600 font-medium ml-1">(Precio del sistema)</span>}
                 </label>
                 <label className="flex items-center">
                   <input
@@ -620,16 +684,17 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                     checked={tipoCobro === 'personalizado'}
                     onChange={() => {
                       setTipoCobro('personalizado');
-                      setShowJustificacion(true);
+                      setShowJustificacion(!esServicioMovil); // No pedir justificación para móviles
                     }}
                     className="mr-2"
                   />
                   <span className="text-purple-600 font-medium">Personalizado</span>
+                  {esServicioMovil && <span className="text-orange-600 text-xs ml-1">(Editar precios manualmente)</span>}
                 </label>
               </div>
 
               {/* Modal de justificación */}
-              {showJustificacion && (tipoCobro === 'normal' && !horarioNormal || tipoCobro === 'personalizado') && (
+              {showJustificacion && (tipoCobro === 'normal' && !horarioNormal || (tipoCobro === 'personalizado' && !esServicioMovil)) && (
                 <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded">
                   <label className="label">
                     {tipoCobro === 'personalizado' 
@@ -651,7 +716,113 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                   </p>
                 </div>
               )}
+              
+              {/* Info para servicios móviles */}
+              {esServicioMovil && (
+                <div className="mt-4 p-3 bg-orange-100 border border-orange-300 rounded">
+                  <p className="text-sm text-orange-800">
+                    <strong>📱 Servicio Móvil:</strong>
+                    {tipoCobro === 'especial' && ' Usando precios especiales del sistema'}
+                    {tipoCobro === 'personalizado' && ' Puedes editar el precio de cada estudio manualmente en la sección de Descripción'}
+                  </p>
+                </div>
+              )}
             </div>
+
+            {/* ✅ NUEVAS OPCIONES PARA SERVICIOS MÓVILES */}
+            {esServicioMovil && (
+              <div className="card bg-orange-50 border-2 border-orange-300">
+                <h3 className="text-lg font-semibold mb-3 text-orange-800">
+                  📱 Opciones Extras - Servicio Móvil
+                </h3>
+                
+                {/* Campo Establecimiento */}
+                <div className="mb-4">
+                  <label className="label text-orange-900">
+                    🏥 Establecimiento / Lugar <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={establecimientoMovil}
+                    onChange={(e) => setEstablecimientoMovil(e.target.value)}
+                    placeholder="Ej: Hospital San Juan de Dios, Clínica Santa María"
+                    required
+                  />
+                  <p className="text-xs text-orange-700 mt-1">
+                    * Nombre del lugar donde se realizó el servicio móvil
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Opción Placas */}
+                  <div className="flex items-center gap-4 p-3 bg-white rounded border border-orange-200">
+                    <label className="flex items-center gap-2 flex-1">
+                      <input
+                        type="checkbox"
+                        checked={incluyePlacas}
+                        onChange={(e) => {
+                          setIncluyePlacas(e.target.checked);
+                          if (!e.target.checked) setPrecioPlacas(0);
+                        }}
+                        className="w-5 h-5"
+                      />
+                      <span className="font-medium">📋 Incluir Placas</span>
+                    </label>
+                    {incluyePlacas && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">Precio:</span>
+                        <span className="text-lg">Q</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={precioPlacas}
+                          onChange={(e) => setPrecioPlacas(parseFloat(e.target.value) || 0)}
+                          className="w-24 px-2 py-1 border border-orange-300 rounded focus:ring-2 focus:ring-orange-500"
+                          placeholder="0.00"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Opción Informe */}
+                  <div className="flex items-center gap-4 p-3 bg-white rounded border border-orange-200">
+                    <label className="flex items-center gap-2 flex-1">
+                      <input
+                        type="checkbox"
+                        checked={incluyeInforme}
+                        onChange={(e) => {
+                          setIncluyeInforme(e.target.checked);
+                          if (!e.target.checked) setPrecioInforme(0);
+                        }}
+                        className="w-5 h-5"
+                      />
+                      <span className="font-medium">📄 Incluir Informe</span>
+                    </label>
+                    {incluyeInforme && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">Precio:</span>
+                        <span className="text-lg">Q</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={precioInforme}
+                          onChange={(e) => setPrecioInforme(parseFloat(e.target.value) || 0)}
+                          className="w-24 px-2 py-1 border border-orange-300 rounded focus:ring-2 focus:ring-orange-500"
+                          placeholder="0.00"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <p className="text-xs text-orange-700 mt-3 italic">
+                  💡 Los precios de estas opciones se sumarán al total del servicio
+                </p>
+              </div>
+            )}
 
             {/* Estudios */}
             <div className="card">
@@ -865,14 +1036,23 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               </div>
             </div>
 
-            {/* Totales */}
+            {/* ✅ Totales - ACTUALIZADO */}
             <div className="card bg-blue-50">
               <h3 className="text-lg font-semibold mb-3">Totales</h3>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span>Sub-Total:</span>
+                  <span>Sub-Total Estudios:</span>
                   <span className="font-semibold">Q {totales.subTotal.toFixed(2)}</span>
                 </div>
+                
+                {/* Mostrar extras de móvil si aplica */}
+                {esServicioMovil && totales.extrasMovil > 0 && (
+                  <div className="flex justify-between text-orange-700">
+                    <span>Extras Móvil:</span>
+                    <span className="font-semibold">Q {totales.extrasMovil.toFixed(2)}</span>
+                  </div>
+                )}
+                
                 <div className="flex justify-between">
                   <span>Descuento:</span>
                   <span className="font-semibold">Q {totales.descuento.toFixed(2)}</span>
