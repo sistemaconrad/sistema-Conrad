@@ -162,9 +162,9 @@ export const ReferentesPage: React.FC<ReferentesPageProps> = ({ onBack }) => {
       if (error) throw error;
 
       // Registrar en log
-      const usuario = sessionStorage.getItem('usernameConrad') || '';
-      const nombreUsuario = sessionStorage.getItem('nombreUsuarioConrad') || '';
-      const rol = sessionStorage.getItem('rolUsuarioConrad') || '';
+      const usuario = localStorage.getItem('usernameConrad') || '';
+      const nombreUsuario = localStorage.getItem('nombreUsuarioConrad') || '';
+      const rol = localStorage.getItem('rolUsuarioConrad') || '';
 
       await supabase.rpc('registrar_actividad', {
         p_usuario: usuario,

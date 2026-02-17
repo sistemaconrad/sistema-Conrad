@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Calendar, DollarSign, CheckCircle2, Plus, Trash2, X, ChevronDown, ChevronUp, Lock, FileText, Clock, Edit } from 'lucide-react';
+import { ArrowLeft, Calendar, DollarSign, CheckCircle2, Plus, Trash2, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Lock, FileText, Clock, Edit } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { format, subDays } from 'date-fns';
 import { generarCuadreExcel } from '../utils/cuadre-excel-generator';
@@ -292,6 +292,7 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
         monedas_010: parseInt(monedas.m010) || 0,
         monedas_005: parseInt(monedas.m005) || 0,
         monedas_001: parseInt(monedas.m001) || 0,
+        efectivo_contado: efectivoContadoNum,
         tarjeta_contado: parseFloat(tarjetaContado) || 0,
         transferencia_contado: parseFloat(transferenciaContado) || 0,
         estado_cuenta_contado: parseFloat(estadoCuentaContado) || 0,
@@ -299,7 +300,12 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
         validado: cuadreValidado,
         nombre_cajero: nombreCajero,
         pin_cierre: pinCierre,
-        cerrado: cuadreCerrado
+        cerrado: cuadreCerrado,
+        // ✅ Guardar también los valores esperados para poder recuperarlos desde ResumenDía
+        efectivo_esperado: efectivoEsperado,
+        tarjeta_esperada: tarjetaEsperada,
+        transferencia_esperada: depositadoEsperado,
+        estado_cuenta_esperada: estadoCuentaEsperada
       };
 
       const { error } = await supabase
@@ -455,7 +461,7 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
       Math.abs(efectivoContadoNum - efectivoEsperado) < 0.01 &&
       Math.abs(tarjetaContadoNum - tarjetaEsperada) < 0.01 &&
       Math.abs(transferenciaContadoNum - depositadoEsperado) < 0.01 &&
-      Math.abs(estadoCuentaContadoNum - estadoCuentaEsperada) < 0.01;
+      (estadoCuentaEsperada < 0.01 || Math.abs(estadoCuentaContadoNum - estadoCuentaEsperada) < 0.01);
 
     if (!cuadra) {
       alert('⚠️ El cuadre NO coincide.');
@@ -485,6 +491,7 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
         monedas_010: parseInt(monedas.m010) || 0,
         monedas_005: parseInt(monedas.m005) || 0,
         monedas_001: parseInt(monedas.m001) || 0,
+        efectivo_contado: efectivoContadoNum,
         tarjeta_contado: parseFloat(tarjetaContado) || 0,
         transferencia_contado: parseFloat(transferenciaContado) || 0,
         estado_cuenta_contado: parseFloat(estadoCuentaContado) || 0,
@@ -492,7 +499,12 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
         validado: true,
         nombre_cajero: nombreCajero,
         pin_cierre: pinCierre,
-        cerrado: true  // ✅ Marcar como cerrado en la BD
+        cerrado: true,
+        // ✅ Guardar valores esperados para poder usarlos en ResumenDía
+        efectivo_esperado: efectivoEsperado,
+        tarjeta_esperada: tarjetaEsperada,
+        transferencia_esperada: depositadoEsperado,
+        estado_cuenta_esperada: estadoCuentaEsperada
       };
 
       const { error } = await supabase
@@ -530,7 +542,7 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
       Math.abs(diferencias.efectivo) < 0.01 &&
       Math.abs(diferencias.tarjeta) < 0.01 &&
       Math.abs(diferencias.depositado) < 0.01 &&
-      Math.abs(diferencias.estado_cuenta) < 0.01;
+      (estadoCuentaEsperada < 0.01 || Math.abs(diferencias.estado_cuenta) < 0.01);
 
     const fechaFormateada = format(new Date(fecha + 'T12:00:00'), 'dd/MM/yyyy');
     const horaActual = format(new Date(), 'HH:mm');
@@ -609,7 +621,7 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
     Math.abs(diferenciaEfectivo) < 0.01 &&
     Math.abs(diferenciaDepositado) < 0.01 &&
     Math.abs(diferenciaTarjeta) < 0.01 &&
-    Math.abs(diferenciaEstadoCuenta) < 0.01;
+    (estadoCuentaEsperada < 0.01 || Math.abs(diferenciaEstadoCuenta) < 0.01);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -648,13 +660,36 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-3">
               <label className="text-sm font-medium text-gray-700">Fecha:</label>
-              <input
-                type="date"
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-                disabled={cuadreCerrado}
-              />
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    const d = new Date(fecha + 'T12:00:00');
+                    d.setDate(d.getDate() - 1);
+                    setFecha(d.toISOString().split('T')[0]);
+                  }}
+                  className="p-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+                  title="Día anterior"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <input
+                  type="date"
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={fecha}
+                  onChange={(e) => setFecha(e.target.value)}
+                />
+                <button
+                  onClick={() => {
+                    const d = new Date(fecha + 'T12:00:00');
+                    d.setDate(d.getDate() + 1);
+                    setFecha(d.toISOString().split('T')[0]);
+                  }}
+                  className="p-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+                  title="Día siguiente"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
             </div>
             <button
               onClick={() => setMostrarCuadre(!mostrarCuadre)}
@@ -956,6 +991,10 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
                             <button onClick={confirmarCierre} className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 transition-colors">
                               <Lock size={24} />
                               Confirmar y Cerrar Caja
+                            </button>
+                            <button onClick={solicitarDescargaExcel} className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors">
+                              <FileText size={20} />
+                              Descargar Excel del Cuadre
                             </button>
                           </div>
                         </div>

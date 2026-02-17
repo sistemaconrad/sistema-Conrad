@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Shield, CheckCircle, AlertTriangle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface AutorizacionModalProps {
-  accion: string; // ej: "Eliminar Paciente"
-  detalles: string; // ej: "Juan Pérez - ID: 123"
+  accion: string;
+  detalles: string;
   onAutorizado: () => void;
   onCancelar: () => void;
 }
@@ -20,8 +20,38 @@ export const AutorizacionModal: React.FC<AutorizacionModalProps> = ({
   const [error, setError] = useState('');
 
   const usuario = localStorage.getItem('usernameConrad') || '';
+  const rol = localStorage.getItem('rolUsuarioConrad') || '';
+  const esAdmin = rol === 'admin' || usuario === 'admin';
 
-  // Validar código
+  // ✅ Si es admin, aprobar automáticamente al abrir el modal
+  useEffect(() => {
+    if (esAdmin) {
+      registrarLogAdmin();
+      onAutorizado();
+    }
+  }, []);
+
+  // Registrar en log cuando es admin (sin token)
+  const registrarLogAdmin = async () => {
+    try {
+      const nombreUsuario = localStorage.getItem('nombreUsuarioConrad') || '';
+      await supabase.rpc('registrar_actividad', {
+        p_usuario: usuario,
+        p_nombre_usuario: nombreUsuario,
+        p_rol: rol,
+        p_modulo: 'sistema',
+        p_accion: accion.toLowerCase().replace(/\s+/g, '_'),
+        p_tipo_registro: 'autorizacion',
+        p_detalles: { descripcion: detalles },
+        p_requirio_autorizacion: false,
+        p_token_usado: 'ADMIN_BYPASS'
+      });
+    } catch (error) {
+      console.error('Error al registrar log admin:', error);
+    }
+  };
+
+  // Validar código (solo para no-admin)
   const validarCodigo = async () => {
     if (!codigo || codigo.length !== 6) {
       setError('⚠️ Ingresa el código de 6 dígitos');
@@ -40,7 +70,6 @@ export const AutorizacionModal: React.FC<AutorizacionModalProps> = ({
       if (error) throw error;
 
       if (data === true) {
-        // Código válido
         await registrarLog(codigo);
         onAutorizado();
       } else {
@@ -55,12 +84,9 @@ export const AutorizacionModal: React.FC<AutorizacionModalProps> = ({
     }
   };
 
-  // Registrar en log de actividad
   const registrarLog = async (codigoUsado: string) => {
     try {
       const nombreUsuario = localStorage.getItem('nombreUsuarioConrad') || '';
-      const rol = localStorage.getItem('rolUsuarioConrad') || '';
-
       await supabase.rpc('registrar_actividad', {
         p_usuario: usuario,
         p_nombre_usuario: nombreUsuario,
@@ -76,6 +102,9 @@ export const AutorizacionModal: React.FC<AutorizacionModalProps> = ({
       console.error('Error al registrar log:', error);
     }
   };
+
+  // Si es admin ya se llamó onAutorizado() en el useEffect — no renderizar nada
+  if (esAdmin) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -99,7 +128,6 @@ export const AutorizacionModal: React.FC<AutorizacionModalProps> = ({
 
         {/* Body */}
         <div className="p-6">
-          {/* Información de la acción */}
           <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-6">
             <div className="flex items-start gap-3">
               <AlertTriangle className="text-yellow-600 flex-shrink-0 mt-0.5" size={20} />
@@ -110,7 +138,6 @@ export const AutorizacionModal: React.FC<AutorizacionModalProps> = ({
             </div>
           </div>
 
-          {/* Instrucciones */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <h3 className="font-bold text-blue-900 mb-2">📋 Instrucciones:</h3>
             <ol className="text-sm text-blue-800 space-y-2 list-decimal list-inside">
@@ -121,7 +148,6 @@ export const AutorizacionModal: React.FC<AutorizacionModalProps> = ({
             </ol>
           </div>
 
-          {/* Input para el código */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Código de Autorización (6 dígitos):
@@ -144,7 +170,6 @@ export const AutorizacionModal: React.FC<AutorizacionModalProps> = ({
             </div>
           )}
 
-          {/* Botones */}
           <div className="flex gap-3">
             <button
               onClick={onCancelar}
@@ -172,7 +197,6 @@ export const AutorizacionModal: React.FC<AutorizacionModalProps> = ({
           </div>
         </div>
 
-        {/* Footer */}
         <div className="bg-gray-50 px-6 py-4 rounded-b-lg border-t">
           <p className="text-xs text-gray-600 text-center">
             🔒 El administrador debe generar el código desde su panel de control

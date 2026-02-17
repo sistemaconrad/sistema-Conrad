@@ -23,7 +23,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const handleModuleClick = (moduleId: string) => {
     // Si es visitadoras, abrir en nueva pestaña
     if (moduleId === 'visitadoras') {
-      window.open('https://conrad-visitadoras.vercel.app', '_blank');
+      window.open('https://visitadoras-medicas.vercel.app', '_blank');
       return;
     }
     // Para otros módulos, navegar normal

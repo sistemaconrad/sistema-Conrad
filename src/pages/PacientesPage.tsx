@@ -114,7 +114,7 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
     }
 
     try {
-      const usuarioActual = sessionStorage.getItem('nombreUsuarioConrad') || 'Desconocido';
+      const usuarioActual = localStorage.getItem('nombreUsuarioConrad') || 'Desconocido';
 
       const { error } = await supabase
         .from('consultas')
@@ -152,9 +152,9 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
         }
       }
 
-      const usuario = sessionStorage.getItem('usernameConrad') || '';
-      const nombreUsuario = sessionStorage.getItem('nombreUsuarioConrad') || '';
-      const rol = sessionStorage.getItem('rolUsuarioConrad') || '';
+      const usuario = localStorage.getItem('usernameConrad') || '';
+      const nombreUsuario = localStorage.getItem('nombreUsuarioConrad') || '';
+      const rol = localStorage.getItem('rolUsuarioConrad') || '';
 
       await supabase.rpc('registrar_actividad', {
         p_usuario: usuario,
@@ -218,9 +218,9 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
 
       if (errorDetalle) throw errorDetalle;
 
-      const usuario = sessionStorage.getItem('usernameConrad') || '';
-      const nombreUsuario = sessionStorage.getItem('nombreUsuarioConrad') || '';
-      const rol = sessionStorage.getItem('rolUsuarioConrad') || '';
+      const usuario = localStorage.getItem('usernameConrad') || '';
+      const nombreUsuario = localStorage.getItem('nombreUsuarioConrad') || '';
+      const rol = localStorage.getItem('rolUsuarioConrad') || '';
 
       await supabase.rpc('registrar_actividad', {
         p_usuario: usuario,
@@ -306,7 +306,7 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
     }
 
     const { detalleId, precioActual, nombreEstudio, nombrePaciente } = accionPendiente.datos;
-    const usuarioActual = sessionStorage.getItem('nombreUsuarioConrad') || 'Desconocido';
+    const usuarioActual = localStorage.getItem('nombreUsuarioConrad') || 'Desconocido';
 
     try {
       const { error } = await supabase
@@ -316,9 +316,9 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
 
       if (error) throw error;
 
-      const usuario = sessionStorage.getItem('usernameConrad') || '';
-      const nombreUsuario = sessionStorage.getItem('nombreUsuarioConrad') || '';
-      const rol = sessionStorage.getItem('rolUsuarioConrad') || '';
+      const usuario = localStorage.getItem('usernameConrad') || '';
+      const nombreUsuario = localStorage.getItem('nombreUsuarioConrad') || '';
+      const rol = localStorage.getItem('rolUsuarioConrad') || '';
 
       await supabase.rpc('registrar_actividad', {
         p_usuario: usuario,
@@ -430,9 +430,9 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
         .eq('id', consultaSeleccionada.id);
       if (errorConsulta) throw errorConsulta;
 
-      const usuario = sessionStorage.getItem('usernameConrad') || '';
-      const nombreUsuario = sessionStorage.getItem('nombreUsuarioConrad') || '';
-      const rol = sessionStorage.getItem('rolUsuarioConrad') || '';
+      const usuario = localStorage.getItem('usernameConrad') || '';
+      const nombreUsuario = localStorage.getItem('nombreUsuarioConrad') || '';
+      const rol = localStorage.getItem('rolUsuarioConrad') || '';
 
       await supabase.rpc('registrar_actividad', {
         p_usuario: usuario,

@@ -234,3 +234,134 @@ export const generarCuadreQuincenal = async (datos: DatosCuadreQuincenal) => {
   link.click();
   window.URL.revokeObjectURL(url);
 };
+
+// ============================================================
+// REPORTE DE SERVICIOS MÓVILES QUINCENAL
+// Mismo formato que el quincenal normal, solo cambia título y archivo
+// ============================================================
+export const generarCuadreQuincenalMoviles = async (datos: DatosCuadreQuincenal) => {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'CONRAD';
+
+  for (const [medico, consultas] of Object.entries(datos.consultasPorMedico)) {
+    const nombreHoja = medico.substring(0, 30).replace(/[:\\/?*[\]]/g, '');
+    const worksheet = workbook.addWorksheet(nombreHoja);
+
+    worksheet.columns = [
+      { width: 25 },
+      { width: 12 },
+      { width: 30 },
+      { width: 12 }
+    ];
+
+    let currentRow = 1;
+
+    // LOGO
+    worksheet.mergeCells(currentRow, 1, currentRow, 4);
+    const logoCell = worksheet.getCell(currentRow, 1);
+    logoCell.value = 'CONRAD';
+    logoCell.font = { size: 18, bold: true, color: { argb: 'FF1e5180' } };
+    logoCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    worksheet.getRow(currentRow).height = 30;
+    currentRow++;
+
+    worksheet.mergeCells(currentRow, 1, currentRow, 4);
+    const subtCell = worksheet.getCell(currentRow, 1);
+    subtCell.value = 'Centro de Diagnostico';
+    subtCell.font = { size: 10, color: { argb: 'FF666666' } };
+    subtCell.alignment = { horizontal: 'center' };
+    currentRow++;
+    currentRow++;
+
+    // Título — diferencia clave: dice SERVICIOS MOVILES
+    worksheet.mergeCells(currentRow, 1, currentRow, 4);
+    const tituloCell = worksheet.getCell(currentRow, 1);
+    tituloCell.value = `SERVICIOS MOVILES - ESTADO DE CUENTA ${datos.quincena === 1 ? 'PRIMERA' : 'SEGUNDA'} QUINCENA`;
+    tituloCell.font = { size: 14, bold: true };
+    tituloCell.alignment = { horizontal: 'center' };
+    tituloCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD6EAF8' } };
+    worksheet.getRow(currentRow).height = 25;
+    currentRow++;
+
+    worksheet.mergeCells(currentRow, 1, currentRow, 4);
+    const medicoCell = worksheet.getCell(currentRow, 1);
+    medicoCell.value = medico.toUpperCase();
+    medicoCell.font = { size: 12, bold: true, color: { argb: 'FF1e5180' } };
+    medicoCell.alignment = { horizontal: 'center' };
+    currentRow++;
+
+    worksheet.mergeCells(currentRow, 1, currentRow, 4);
+    const mesCell = worksheet.getCell(currentRow, 1);
+    mesCell.value = `${datos.mes.toUpperCase()} ${datos.anio}`;
+    mesCell.font = { size: 11, bold: true };
+    mesCell.alignment = { horizontal: 'center' };
+    currentRow++;
+    currentRow++;
+
+    // Headers
+    const headers = ['NOMBRE DEL PACIENTE', 'FECHA', 'ESTUDIO', 'Q'];
+    const headerRow = worksheet.getRow(currentRow);
+    headers.forEach((header, idx) => {
+      const cell = headerRow.getCell(idx + 1);
+      cell.value = header;
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E75B6' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+    });
+    headerRow.height = 20;
+    currentRow++;
+
+    // Datos
+    let totalGeneral = 0;
+    consultas.forEach(consulta => {
+      const pacienteNombre = consulta.pacientes?.nombre || 'Sin nombre';
+      const fecha = format(new Date(consulta.fecha), 'dd/MM/yy');
+      const detalles = consulta.detalle_consultas || [];
+      const estudiosTexto = detalles.map((d: any) => d.sub_estudios?.nombre || 'Estudio').join(', ');
+      const totalConsulta = detalles.reduce((sum: number, d: any) => sum + (d.precio || 0), 0);
+      const fechaObj = new Date(consulta.fecha);
+      const esInhabil = fechaObj.getDay() === 0 || fechaObj.getDay() === 6;
+
+      const border = { top: { style: 'thin' as const }, left: { style: 'thin' as const }, bottom: { style: 'thin' as const }, right: { style: 'thin' as const } };
+      const dataRow = worksheet.getRow(currentRow);
+
+      const c1 = dataRow.getCell(1); c1.value = pacienteNombre; c1.border = border;
+      const c2 = dataRow.getCell(2); c2.value = fecha; c2.alignment = { horizontal: 'center' }; c2.border = border;
+      const c3 = dataRow.getCell(3);
+      c3.value = esInhabil ? `${estudiosTexto}   INHABIL` : estudiosTexto;
+      if (esInhabil) c3.font = { color: { argb: 'FFFF0000' } };
+      c3.border = border;
+      const c4 = dataRow.getCell(4);
+      c4.value = totalConsulta; c4.numFmt = 'Q#,##0.00'; c4.alignment = { horizontal: 'right' }; c4.border = border;
+
+      totalGeneral += totalConsulta;
+      currentRow++;
+    });
+
+    currentRow++;
+
+    // Total
+    const border = { top: { style: 'thin' as const }, left: { style: 'thin' as const }, bottom: { style: 'thin' as const }, right: { style: 'thin' as const } };
+    const fillVerde = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF92D050' } };
+
+    worksheet.mergeCells(currentRow, 1, currentRow, 3);
+    const totalLabel = worksheet.getCell(currentRow, 1);
+    totalLabel.value = 'TOTAL'; totalLabel.font = { bold: true };
+    totalLabel.alignment = { horizontal: 'right' }; totalLabel.fill = fillVerde; totalLabel.border = border;
+
+    const totalVal = worksheet.getCell(currentRow, 4);
+    totalVal.value = totalGeneral; totalVal.numFmt = 'Q#,##0.00';
+    totalVal.font = { bold: true }; totalVal.alignment = { horizontal: 'right' };
+    totalVal.fill = fillVerde; totalVal.border = border;
+  }
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `Servicios_Moviles_${datos.quincena}Q_${datos.mes}_${datos.anio}.xlsx`;
+  link.click();
+  window.URL.revokeObjectURL(url);
+};

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Download, Calendar } from 'lucide-react';
+import { ArrowLeft, Download, Calendar, Smartphone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { generarCuadreQuincenal } from '../utils/cuadre-quincenal-generator';
+import { generarCuadreQuincenal, generarCuadreQuincenalMoviles } from '../utils/cuadre-quincenal-generator';
 
 interface CuadreQuincenalPageProps {
   onBack: () => void;
@@ -12,26 +12,28 @@ export const CuadreQuincenalPage: React.FC<CuadreQuincenalPageProps> = ({ onBack
   const [anio, setAnio] = useState(new Date().getFullYear());
   const [quincena, setQuincena] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
+  const [loadingMoviles, setLoadingMoviles] = useState(false);
 
   const meses = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
   ];
 
+  const getFechas = () => {
+    const fechaInicio = quincena === 1
+      ? new Date(anio, mes - 1, 1)
+      : new Date(anio, mes - 1, 16);
+    const fechaFin = quincena === 1
+      ? new Date(anio, mes - 1, 15, 23, 59, 59)
+      : new Date(anio, mes - 1 + 1, 0, 23, 59, 59);
+    return { fechaInicio, fechaFin };
+  };
+
   const generarReporte = async () => {
     setLoading(true);
-
     try {
-      // Calcular fechas según quincena
-      const fechaInicio = quincena === 1 
-        ? new Date(anio, mes - 1, 1)
-        : new Date(anio, mes - 1, 16);
-      
-      const fechaFin = quincena === 1
-        ? new Date(anio, mes - 1, 15, 23, 59, 59)
-        : new Date(anio, mes - 1 + 1, 0, 23, 59, 59); // Último día del mes
+      const { fechaInicio, fechaFin } = getFechas();
 
-      // ✅ CAMBIO PRINCIPAL: Obtener TODAS las consultas con estado de cuenta que tengan médico
       const { data: consultasRaw, error } = await supabase
         .from('consultas')
         .select(`
@@ -45,13 +47,12 @@ export const CuadreQuincenalPage: React.FC<CuadreQuincenalPageProps> = ({ onBack
         `)
         .gte('fecha', fechaInicio.toISOString())
         .lte('fecha', fechaFin.toISOString())
-        .eq('sin_informacion_medico', false) // ✅ Solo excluir los que NO tienen médico
+        .eq('sin_informacion_medico', false)
         .eq('forma_pago', 'estado_cuenta')
         .order('created_at');
 
       if (error) throw error;
 
-      // ✅ Filtrar consultas anuladas
       const consultas = consultasRaw?.filter(c => c.anulado !== true) || [];
 
       if (!consultas || consultas.length === 0) {
@@ -60,35 +61,69 @@ export const CuadreQuincenalPage: React.FC<CuadreQuincenalPageProps> = ({ onBack
         return;
       }
 
-      // ✅ Agrupar por médico (usando medicos.nombre O medico_recomendado)
       const consultasPorMedico: { [key: string]: any[] } = {};
-      
       consultas.forEach(consulta => {
-        // Prioridad: nombre del médico registrado, si no existe usar medico_recomendado
         const medicoNombre = consulta.medicos?.nombre || consulta.medico_recomendado || 'Sin médico';
-        
-        if (!consultasPorMedico[medicoNombre]) {
-          consultasPorMedico[medicoNombre] = [];
-        }
+        if (!consultasPorMedico[medicoNombre]) consultasPorMedico[medicoNombre] = [];
         consultasPorMedico[medicoNombre].push(consulta);
       });
 
-      // Generar Excel
-      await generarCuadreQuincenal({
-        consultasPorMedico,
-        mes: meses[mes - 1],
-        anio,
-        quincena,
-        fechaInicio,
-        fechaFin
-      });
-
+      await generarCuadreQuincenal({ consultasPorMedico, mes: meses[mes - 1], anio, quincena, fechaInicio, fechaFin });
       alert('✅ Cuadre quincenal generado exitosamente');
     } catch (error) {
       console.error('Error al generar cuadre:', error);
       alert('Error al generar cuadre: ' + (error as any).message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const generarReporteMoviles = async () => {
+    setLoadingMoviles(true);
+    try {
+      const { fechaInicio, fechaFin } = getFechas();
+
+      const { data: consultasRaw, error } = await supabase
+        .from('consultas')
+        .select(`
+          *,
+          pacientes(nombre, edad, telefono),
+          medicos(nombre),
+          detalle_consultas(
+            precio,
+            sub_estudios(nombre)
+          )
+        `)
+        .gte('fecha', fechaInicio.toISOString())
+        .lte('fecha', fechaFin.toISOString())
+        .eq('es_servicio_movil', true)
+        .eq('forma_pago', 'estado_cuenta')
+        .order('created_at');
+
+      if (error) throw error;
+
+      const consultas = consultasRaw?.filter(c => c.anulado !== true) || [];
+
+      if (!consultas || consultas.length === 0) {
+        alert('No hay servicios móviles con estado de cuenta en esta quincena');
+        setLoadingMoviles(false);
+        return;
+      }
+
+      const consultasPorMedico: { [key: string]: any[] } = {};
+      consultas.forEach(consulta => {
+        const medicoNombre = consulta.medicos?.nombre || consulta.medico_recomendado || 'Sin médico referente';
+        if (!consultasPorMedico[medicoNombre]) consultasPorMedico[medicoNombre] = [];
+        consultasPorMedico[medicoNombre].push(consulta);
+      });
+
+      await generarCuadreQuincenalMoviles({ consultasPorMedico, mes: meses[mes - 1], anio, quincena, fechaInicio, fechaFin });
+      alert('✅ Reporte de servicios móviles generado exitosamente');
+    } catch (error) {
+      console.error('Error al generar reporte móviles:', error);
+      alert('Error al generar reporte: ' + (error as any).message);
+    } finally {
+      setLoadingMoviles(false);
     }
   };
 
@@ -199,7 +234,7 @@ export const CuadreQuincenalPage: React.FC<CuadreQuincenalPageProps> = ({ onBack
               </p>
             </div>
 
-            {/* Botón Generar */}
+            {/* Botón Generar Estado de Cuenta */}
             <button
               onClick={generarReporte}
               disabled={loading}
@@ -217,6 +252,25 @@ export const CuadreQuincenalPage: React.FC<CuadreQuincenalPageProps> = ({ onBack
                 </>
               )}
             </button>
+
+            {/* Botón Generar Servicios Móviles */}
+            <button
+              onClick={generarReporteMoviles}
+              disabled={loadingMoviles}
+              className="w-full flex items-center justify-center gap-2 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-400"
+            >
+              {loadingMoviles ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  Generando...
+                </>
+              ) : (
+                <>
+                  <Smartphone size={20} />
+                  Generar Reporte Servicios Móviles
+                </>
+              )}
+            </button>
           </div>
         </div>
 
@@ -229,6 +283,7 @@ export const CuadreQuincenalPage: React.FC<CuadreQuincenalPageProps> = ({ onBack
               <li>• Solo muestra estados de cuenta pendientes de pago</li>
               <li>• Se genera un reporte separado por cada médico</li>
               <li>• El archivo Excel incluye logo CONRAD y formato profesional</li>
+              <li>• El reporte de móviles incluye <strong>todos</strong> los servicios móviles del período agrupados por médico</li>
             </ul>
           </div>
         </div>

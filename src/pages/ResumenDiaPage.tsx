@@ -176,40 +176,60 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack }) => {
         .or('anulado.is.null,anulado.eq.false');
 
       const cuadrePorForma: any = {};
-
-      const consultasRegulares = consultas?.filter(c => !c.es_servicio_movil) || [];
-      const consultasMoviles   = consultas?.filter(c => c.es_servicio_movil)  || [];
+      const consultasRegulares = consultas?.filter((c: any) => !c.es_servicio_movil) || [];
+      const consultasMoviles   = consultas?.filter((c: any) => c.es_servicio_movil)  || [];
 
       consultasRegulares.forEach((c: any) => {
-        const total = c.detalle_consultas?.reduce((sum: number, d: any) => sum + d.precio, 0) || 0;
+        const total = c.detalle_consultas?.reduce((s: number, d: any) => s + d.precio, 0) || 0;
         const forma = c.forma_pago;
-        if (!cuadrePorForma[forma]) {
-          cuadrePorForma[forma] = { forma_pago: forma, cantidad: 0, total: 0, es_servicio_movil: false };
-        }
+        if (!cuadrePorForma[forma]) cuadrePorForma[forma] = { forma_pago: forma, cantidad: 0, total: 0, es_servicio_movil: false };
         cuadrePorForma[forma].cantidad++;
         cuadrePorForma[forma].total += total;
       });
 
       consultasMoviles.forEach((c: any) => {
-        const total = c.detalle_consultas?.reduce((sum: number, d: any) => sum + d.precio, 0) || 0;
-        const forma = c.forma_pago;
-        const key = `${forma}_movil`;
-        if (!cuadrePorForma[key]) {
-          cuadrePorForma[key] = { forma_pago: forma, cantidad: 0, total: 0, es_servicio_movil: true };
-        }
+        const total = c.detalle_consultas?.reduce((s: number, d: any) => s + d.precio, 0) || 0;
+        const key = `${c.forma_pago}_movil`;
+        if (!cuadrePorForma[key]) cuadrePorForma[key] = { forma_pago: c.forma_pago, cantidad: 0, total: 0, es_servicio_movil: true };
         cuadrePorForma[key].cantidad++;
         cuadrePorForma[key].total += total;
       });
 
-      const efectivoTotal      = cuadrePorForma['efectivo']?.total || 0;
-      const tarjetaTotal       = cuadrePorForma['tarjeta']?.total  || 0;
-      const transferenciaTotal = (cuadrePorForma['efectivo_facturado']?.total || 0) +
-                                 (cuadrePorForma['transferencia']?.total       || 0);
+      // Gastos del día
+      const { data: gastosDia } = await supabase.from('gastos').select('monto').eq('fecha', fecha);
+      const totalGastos = gastosDia?.reduce((s: number, g: any) => s + parseFloat(g.monto || 0), 0) || 0;
+
+      // Calcular esperados igual que CuadreDiarioPage
+      const efectivoEsperado =
+        ((cuadrePorForma['efectivo']?.total || 0) + (cuadrePorForma['efectivo_movil']?.total || 0)) - totalGastos;
+      const tarjetaEsperada =
+        (cuadrePorForma['tarjeta']?.total || 0) + (cuadrePorForma['tarjeta_movil']?.total || 0);
+      const transferenciaEsperada =
+        (cuadrePorForma['efectivo_facturado']?.total || 0) +
+        (cuadrePorForma['transferencia']?.total || 0) +
+        (cuadrePorForma['efectivo_facturado_movil']?.total || 0) +
+        (cuadrePorForma['transferencia_movil']?.total || 0);
+      const estadoCuentaEsperada =
+        (cuadrePorForma['estado_cuenta']?.total || 0) +
+        (cuadrePorForma['estado_cuenta_movil']?.total || 0);
+
+      // Efectivo contado: campo directo o calculado desde billetes
+      const efectivoContado =
+        (cuadreGuardado.efectivo_contado != null && cuadreGuardado.efectivo_contado > 0)
+          ? parseFloat(cuadreGuardado.efectivo_contado)
+          : ((cuadreGuardado.billetes_200 || 0) * 200 + (cuadreGuardado.billetes_100 || 0) * 100 +
+             (cuadreGuardado.billetes_50  || 0) * 50  + (cuadreGuardado.billetes_20  || 0) * 20  +
+             (cuadreGuardado.billetes_10  || 0) * 10  + (cuadreGuardado.billetes_5   || 0) * 5   +
+             (cuadreGuardado.billetes_1   || 0) * 1);
+
+      const tarjetaContado       = parseFloat(cuadreGuardado.tarjeta_contado       || 0);
+      const transferenciaContado = parseFloat(cuadreGuardado.transferencia_contado || 0);
 
       const diferencias = {
-        efectivo:   cuadreGuardado.efectivo_contado      - efectivoTotal,
-        tarjeta:    cuadreGuardado.tarjeta_contado        - tarjetaTotal,
-        depositado: cuadreGuardado.transferencia_contado  - transferenciaTotal
+        efectivo:      efectivoContado      - efectivoEsperado,
+        tarjeta:       tarjetaContado       - tarjetaEsperada,
+        depositado:    transferenciaContado - transferenciaEsperada,
+        estado_cuenta: 0
       };
 
       const cuadreCorrecto =
@@ -217,29 +237,20 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack }) => {
         Math.abs(diferencias.tarjeta)    < 0.01 &&
         Math.abs(diferencias.depositado) < 0.01;
 
-      // ✅ CORREGIDO: Formatear fecha sin conversión UTC
-      // Parsear directamente del string yyyy-MM-dd para evitar el bug de zona horaria
       const [yyyy, mm, dd] = fecha.split('-');
-      const fechaFormateada = `${dd}/${mm}/${yyyy}`;
-
-      // ✅ CORREGIDO: Hora actual en Guatemala
-      const horaActual = getGuatemalaTime().toLocaleTimeString('es-GT', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      });
+      const horaActual = getGuatemalaTime().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', hour12: false });
 
       await generarCuadreExcel({
-        fecha: fechaFormateada,
+        fecha: `${dd}/${mm}/${yyyy}`,
         horaActual,
         totalConsultas: consultas?.length || 0,
         totalVentas: resumen.totalIngresos,
-        efectivoEsperado: efectivoTotal,
-        efectivoContado: parseFloat(cuadreGuardado.efectivo_contado || 0),
-        tarjetaEsperada: tarjetaTotal,
-        tarjetaContado: parseFloat(cuadreGuardado.tarjeta_contado || 0),
-        transferenciaEsperada: transferenciaTotal,
-        transferenciaContado: parseFloat(cuadreGuardado.transferencia_contado || 0),
+        efectivoEsperado,
+        efectivoContado,
+        tarjetaEsperada,
+        tarjetaContado,
+        transferenciaEsperada,
+        transferenciaContado,
         diferencias,
         cuadreCorrecto,
         observaciones: cuadreGuardado.observaciones,
@@ -251,8 +262,6 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack }) => {
           es_servicio_movil: c.es_servicio_movil
         }))
       });
-
-      alert('✅ Excel descargado exitosamente');
     } catch (error) {
       console.error('Error al descargar Excel:', error);
       alert('❌ Error al descargar Excel');
@@ -261,11 +270,8 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack }) => {
 
   const getFormaPagoNombre = (forma: string) => {
     const formas: any = {
-      efectivo: 'Efectivo',
-      tarjeta: 'Tarjeta',
-      transferencia: 'Transferencia',
-      efectivo_facturado: 'Depósito',
-      estado_cuenta: 'Estado de Cuenta'
+      efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia',
+      efectivo_facturado: 'Depósito', estado_cuenta: 'Estado de Cuenta'
     };
     return formas[forma] || forma;
   };
@@ -336,7 +342,7 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack }) => {
             className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center gap-2 transition-colors"
           >
             <FileText size={20} />
-            📥 Descargar Excel Cuadre
+            Descargar Excel Cuadre
           </button>
         </div>
 
