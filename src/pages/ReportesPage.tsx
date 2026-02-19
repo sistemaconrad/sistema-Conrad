@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Toast } from '../components/Toast';
 import { useToast } from '../hooks';
-import { generarReporteExcel, generarReporteMoviles, generarReporteMensualUnificado } from '../utils/excel-generator';
+import { generarReporteExcel, generarReporteMoviles, generarReporteMensualUnificado, generarReporteMensualMoviles } from '../utils/excel-generator';
 
 interface ReportesPageProps {
   onBack: () => void;
@@ -188,7 +188,13 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
       }
 
       showToast('Generando reporte de móviles...', 'info');
-      await generarReporteMoviles(mesReporte, anioReporte, consultas);
+      
+      if (tipoReporte === 'mes') {
+        await generarReporteMensualMoviles(mesReporte, anioReporte, consultas);
+      } else {
+        await generarReporteMoviles(mesReporte, anioReporte, consultas);
+      }
+      
       showToast('¡Reporte de móviles generado exitosamente!', 'success');
     } catch (error) {
       console.error('Error:', error);
