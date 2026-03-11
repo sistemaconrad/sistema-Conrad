@@ -17,7 +17,8 @@ import { ProductosInventarioPage } from './pages/ProductosInventarioPage';
 import { MovimientosPage } from './pages/MovimientosPage';
 import { ProveedoresPage } from './pages/ProveedoresPage';
 
-// Módulos faltantes
+import { ComisionesPage } from './pages/ComisionesPage';
+import { ComisionesPagarPage } from './pages/ComisionesPagarPage';
 import { ContabilidadPage } from './pages/ContabilidadPage';
 import { PersonalPage } from './pages/PersonalPage';
 import { DoctoresPage } from './pages/DoctoresPage';
@@ -87,6 +88,8 @@ function App() {
         case 'estadisticas': return <EstadisticasPage onBack={() => setCurrentPage('home')} />;
         case 'reportes': return <ReportesPage onBack={() => setCurrentPage('home')} />;
         case 'usuarios': return <GestionUsuariosPage onBack={() => setCurrentPage('home')} />;
+        case 'comisiones': return <ComisionesPage onBack={() => setCurrentPage('home')} />;
+        case 'comisiones-pagar': return <ComisionesPagarPage onBack={() => setCurrentPage('home')} />;
         default: return <HomePage onNavigate={setCurrentPage} />;
       }
     };

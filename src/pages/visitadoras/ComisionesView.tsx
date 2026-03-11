@@ -44,7 +44,7 @@ export const ComisionesView: React.FC = () => {
         .select(`
           id, fecha, tipo_cobro, medico_id, forma_pago, es_servicio_movil, sin_informacion_medico,
           pacientes(nombre),
-          medicos(id, nombre),
+          medicos(id, nombre, es_referente),
           detalle_consultas(
             precio,
             sub_estudios(
@@ -72,12 +72,14 @@ export const ComisionesView: React.FC = () => {
         if (
           c.tipo_cobro === 'social' ||
           c.tipo_cobro === 'personalizado' ||
-          c.forma_pago === 'estado_cuenta' ||
           c.es_servicio_movil === true ||
           c.sin_informacion_medico === true
         ) return;
 
+        // ✅ Solo médicos REFERENTES generan comisión
+        // ✅ estado_cuenta SÍ genera comisión
         if (!c.medico_id || !c.medicos) return;
+        if (!c.medicos.es_referente) return;
 
         const medicoId = c.medico_id;
         const medicoNombre = c.medicos.nombre;
@@ -118,6 +120,11 @@ export const ComisionesView: React.FC = () => {
         const estudioNombre = estudiosUsados[0] || 'Otros';
         const porcentaje = c.detalle_consultas?.[0]?.sub_estudios?.estudios?.porcentaje_comision || 0;
 
+        // Determinar etiqueta real: estado_cuenta va en forma_pago
+        const etiquetaTipo = c.forma_pago === 'estado_cuenta'
+          ? 'estado_cuenta'
+          : c.tipo_cobro;
+
         medico.detalle.push({
           id: c.id,
           fecha: c.fecha,
@@ -125,7 +132,7 @@ export const ComisionesView: React.FC = () => {
           total: totalConsulta,
           comision: comisionTotal,
           porcentaje,
-          tipo_cobro: c.tipo_cobro,
+          tipo_cobro: etiquetaTipo,
           estudio: estudiosUsados.length > 1 ? estudiosUsados.join(' / ') : estudioNombre,
         });
       });
@@ -222,12 +229,24 @@ export const ComisionesView: React.FC = () => {
                   <div className="flex items-center gap-3">
                     <div className="text-right">
                       <p className="font-bold text-gray-900 text-sm">{fmt(item.total_comision)}</p>
-                      {/* Desglose por estudio */}
-                      {Object.entries(item.comisiones_por_estudio).map(([estudio, monto]) =>
-                        monto > 0 ? (
-                          <p key={estudio} className="text-xs text-gray-400">{estudio}: {fmt(monto)}</p>
-                        ) : null
-                      )}
+                      {/* Desglose por tipo de cobro */}
+                      <div className="flex gap-1 justify-end flex-wrap mt-0.5">
+                        {item.detalle.filter(d => d.tipo_cobro === 'normal').length > 0 && (
+                          <span className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full font-medium">
+                            Normal: {item.detalle.filter(d => d.tipo_cobro === 'normal').length}
+                          </span>
+                        )}
+                        {item.detalle.filter(d => d.tipo_cobro === 'especial').length > 0 && (
+                          <span className="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded-full font-medium">
+                            Especial: {item.detalle.filter(d => d.tipo_cobro === 'especial').length}
+                          </span>
+                        )}
+                        {item.detalle.filter(d => d.tipo_cobro === 'estado_cuenta').length > 0 && (
+                          <span className="text-xs bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full font-medium">
+                            Est.Cuenta: {item.detalle.filter(d => d.tipo_cobro === 'estado_cuenta').length}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     {expandido === item.medico_id
                       ? <ChevronDown size={16} className="text-gray-400" />
@@ -260,12 +279,17 @@ export const ComisionesView: React.FC = () => {
                               <td className="py-2 pr-4 text-gray-900 font-medium">{d.paciente_nombre}</td>
                               <td className="py-2 pr-4 text-gray-600">{d.estudio}</td>
                               <td className="py-2 pr-4">
-                                <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-                                  d.tipo_cobro === 'normal' ? 'bg-blue-100 text-blue-700' :
-                                  d.tipo_cobro === 'social' ? 'bg-green-100 text-green-700' :
-                                  'bg-purple-100 text-purple-700'
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                  d.tipo_cobro === 'normal'        ? 'bg-blue-100 text-blue-700' :
+                                  d.tipo_cobro === 'especial'      ? 'bg-purple-100 text-purple-700' :
+                                  d.tipo_cobro === 'estado_cuenta' ? 'bg-amber-100 text-amber-700' :
+                                  d.tipo_cobro === 'social'        ? 'bg-green-100 text-green-700' :
+                                  'bg-gray-100 text-gray-600'
                                 }`}>
-                                  {d.tipo_cobro}
+                                  {d.tipo_cobro === 'estado_cuenta' ? 'Est. Cuenta' :
+                                   d.tipo_cobro === 'especial'      ? 'Especial' :
+                                   d.tipo_cobro === 'normal'        ? 'Normal' :
+                                   d.tipo_cobro}
                                 </span>
                               </td>
                               <td className="py-2 pr-4 text-right text-gray-700">{fmt(d.total)}</td>

@@ -512,7 +512,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               <BarChart3 size={20} /> Cuadre Diario
             </button>
             <button onClick={() => onNavigate('cuadre-quincenal')} className="btn-secondary flex items-center gap-2">
-              <Calendar size={20} /> Cuadre Quincenal
+              <Calendar size={20} /> Estados de Cuenta Quincenal
             </button>
             <button onClick={() => onNavigate('reportes')} className="btn-secondary flex items-center gap-2">
               <FileSpreadsheet size={20} /> Reportes

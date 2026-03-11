@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Users, Stethoscope, DollarSign, FileSpreadsheet, MapPin, CreditCard, LogOut } from 'lucide-react';
+import { ArrowLeft, Users, Stethoscope, DollarSign, FileSpreadsheet, MapPin, CreditCard, LogOut, UserPlus } from 'lucide-react';
 import { MedicosView } from './MedicosView';
 import { VisitasView } from './VisitasView';
 import { ComisionesView } from './ComisionesView';
 import { ReportesVisitadorasView } from './ReportesVisitadorasView';
 import { PagosComisionesView } from './PagosComisionesView';
+import { ProspectosView } from './ProspectosView';
 
 interface VisitadorasHomePageProps {
   onBack: () => void;
 }
 
-type TabKey = 'visitas' | 'medicos' | 'comisiones' | 'pagos' | 'reportes';
+type TabKey = 'visitas' | 'prospectos' | 'medicos' | 'comisiones' | 'pagos' | 'reportes';
 
 export const VisitadorasHomePage: React.FC<VisitadorasHomePageProps> = ({ onBack }) => {
   const [activeTab, setActiveTab] = useState<TabKey>('visitas');
@@ -28,6 +29,7 @@ export const VisitadorasHomePage: React.FC<VisitadorasHomePageProps> = ({ onBack
 
   const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
     { key: 'visitas',     label: 'Visitas',            icon: <MapPin size={16} /> },
+    { key: 'prospectos',  label: 'Prospectos',         icon: <UserPlus size={16} /> },
     { key: 'medicos',     label: 'Médicos Referentes', icon: <Stethoscope size={16} /> },
     { key: 'comisiones',  label: 'Comisiones',         icon: <DollarSign size={16} /> },
     { key: 'pagos',       label: 'Pago Comisiones',    icon: <CreditCard size={16} /> },
@@ -37,6 +39,7 @@ export const VisitadorasHomePage: React.FC<VisitadorasHomePageProps> = ({ onBack
   const renderContent = () => {
     switch (activeTab) {
       case 'visitas':    return <VisitasView />;
+      case 'prospectos': return <ProspectosView />;
       case 'medicos':    return <MedicosView />;
       case 'comisiones': return <ComisionesView />;
       case 'pagos':      return <PagosComisionesView />;
@@ -87,6 +90,12 @@ export const VisitadorasHomePage: React.FC<VisitadorasHomePageProps> = ({ onBack
               >
                 {tab.icon}
                 {tab.label}
+                {/* Badge naranja en Prospectos */}
+                {tab.key === 'prospectos' && activeTab !== 'prospectos' && (
+                  <span className="bg-orange-400 text-white text-xs px-1.5 py-0.5 rounded-full font-bold leading-none">
+                    !
+                  </span>
+                )}
               </button>
             ))}
           </div>

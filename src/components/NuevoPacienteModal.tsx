@@ -356,66 +356,59 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                     </p>
                   </div>
                   
-                  {/* ✅ SELECTOR de médico - solo de la lista */}
+                  {/* MÉDICO con búsqueda en tiempo real */}
                   <div>
                     <label className="label">👨‍⚕️ Médico Referente (opcional)</label>
-                    <div className="space-y-2">
-                      {/* Mostrar médico seleccionado o mensaje */}
-                      <div className="input-field bg-gray-50 flex items-center justify-between">
-                        {nombreMedico ? (
-                          <span className="text-gray-900">{nombreMedico}</span>
-                        ) : (
-                          <span className="text-gray-400">Seleccione un médico de la lista</span>
-                        )}
-                        {nombreMedico && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setNombreMedico('');
-                              setMedicoSeleccionado(null);
-                              setTelefonoMedico('');
-                              setDepartamentoMedico('');
-                              setMunicipioMedico('');
-                              setDireccionMedico('');
+                    <div className="space-y-1">
+                      {nombreMedico ? (
+                        <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5">
+                          <span className="text-sm font-medium text-blue-900">{nombreMedico}</span>
+                          <button type="button" onClick={() => {
+                            setNombreMedico(''); setMedicoSeleccionado(null);
+                            setTelefonoMedico(''); setDepartamentoMedico('');
+                            setMunicipioMedico(''); setDireccionMedico('');
+                          }} className="text-red-400 hover:text-red-600 text-xs font-bold ml-2">✕ Quitar</button>
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <input
+                            type="text"
+                            className="input-field pr-8"
+                            placeholder="🔍 Buscar médico por nombre..."
+                            onChange={(e) => {
+                              const q = e.target.value.toLowerCase();
+                              const el = document.getElementById('lista-medicos-movil');
+                              if (el) {
+                                el.querySelectorAll('button[data-nombre]').forEach((btn: any) => {
+                                  btn.style.display = btn.dataset.nombre.toLowerCase().includes(q) ? '' : 'none';
+                                });
+                              }
                             }}
-                            className="text-red-500 hover:text-red-700 text-sm"
-                          >
-                            ✕ Limpiar
-                          </button>
-                        )}
-                      </div>
-                      
-                      {/* Lista de médicos */}
-                      {medicosReferentes.length > 0 && (
-                        <details className="bg-blue-50 border border-blue-200 rounded-lg" open={!nombreMedico}>
-                          <summary className="px-3 py-2 cursor-pointer text-sm text-blue-700 font-medium hover:bg-blue-100">
-                            📋 Ver lista de médicos registrados (click para desplegar)
-                          </summary>
-                          <div className="px-3 pb-2 pt-1 max-h-48 overflow-y-auto">
-                            {medicosReferentes.map(medico => (
-                              <button
-                                key={medico.id}
-                                type="button"
-                                onClick={() => {
-                                  setMedicoSeleccionado(medico);
-                                  setNombreMedico(medico.nombre);
-                                  setTelefonoMedico(medico.telefono);
-                                  setDepartamentoMedico(medico.departamento);
-                                  setMunicipioMedico(medico.municipio);
-                                  setDireccionMedico(medico.direccion);
-                                }}
-                                className="w-full text-left px-3 py-2 hover:bg-blue-100 rounded text-sm transition-colors"
-                              >
-                                {medico.nombre}
-                              </button>
-                            ))}
-                          </div>
-                        </details>
+                          />
+                        </div>
                       )}
-                      
-                      <p className="text-xs text-gray-500">
-                        💡 <strong>Tip:</strong> Si este médico se repite frecuentemente, agrégalo al catálogo en <strong>Gestión → Médicos</strong> para que aparezca siempre en la lista.
-                      </p>
+                      {!nombreMedico && medicosReferentes.length > 0 && (
+                        <div id="lista-medicos-movil" className="border border-blue-200 rounded-lg bg-blue-50 max-h-44 overflow-y-auto">
+                          {medicosReferentes.map(medico => (
+                            <button
+                              key={medico.id}
+                              type="button"
+                              data-nombre={medico.nombre}
+                              onClick={() => {
+                                setMedicoSeleccionado(medico);
+                                setNombreMedico(medico.nombre);
+                                setTelefonoMedico(medico.telefono);
+                                setDepartamentoMedico(medico.departamento);
+                                setMunicipioMedico(medico.municipio);
+                                setDireccionMedico(medico.direccion);
+                              }}
+                              className="w-full text-left px-3 py-2 hover:bg-blue-100 text-sm border-b border-blue-100 last:border-0 transition-colors"
+                            >
+                              {medico.nombre}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -427,33 +420,37 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                       {nombreMedico && <span className="text-gray-500 text-xs ml-1">(opcional si hay médico)</span>}
                     </label>
                     <div className="space-y-2">
+                      {/* Búsqueda + lista siempre visible */}
                       <input
                         type="text"
                         className="input-field"
                         value={establecimientoMovil}
-                        onChange={(e) => setEstablecimientoMovil(e.target.value)}
-                        placeholder="Escribir nombre del establecimiento"
+                        onChange={(e) => {
+                          setEstablecimientoMovil(e.target.value);
+                          const q = e.target.value.toLowerCase();
+                          const el = document.getElementById('lista-estab-movil');
+                          if (el) {
+                            el.querySelectorAll('button[data-nombre]').forEach((btn: any) => {
+                              btn.style.display = btn.dataset.nombre.toLowerCase().includes(q) ? '' : 'none';
+                            });
+                          }
+                        }}
+                        placeholder="🔍 Escribir o buscar establecimiento..."
                       />
-                      
-                      {/* Botón para ver lista de establecimientos */}
                       {establecimientos.length > 0 && (
-                        <details className="bg-green-50 border border-green-200 rounded-lg">
-                          <summary className="px-3 py-2 cursor-pointer text-sm text-green-700 font-medium hover:bg-green-100">
-                            📋 Ver establecimientos guardados (click para desplegar)
-                          </summary>
-                          <div className="px-3 pb-2 pt-1 max-h-48 overflow-y-auto">
-                            {establecimientos.map(est => (
-                              <button
-                                key={est.id}
-                                type="button"
-                                onClick={() => setEstablecimientoMovil(est.nombre)}
-                                className="w-full text-left px-3 py-2 hover:bg-green-100 rounded text-sm transition-colors"
-                              >
-                                {est.nombre}
-                              </button>
-                            ))}
-                          </div>
-                        </details>
+                        <div id="lista-estab-movil" className="border border-green-200 rounded-lg bg-green-50 max-h-44 overflow-y-auto">
+                          {establecimientos.map(est => (
+                            <button
+                              key={est.id}
+                              type="button"
+                              data-nombre={est.nombre}
+                              onClick={() => setEstablecimientoMovil(est.nombre)}
+                              className={`w-full text-left px-3 py-2 hover:bg-green-100 text-sm border-b border-green-100 last:border-0 transition-colors ${establecimientoMovil === est.nombre ? 'bg-green-200 font-semibold' : ''}`}
+                            >
+                              {est.nombre}
+                            </button>
+                          ))}
+                        </div>
                       )}
                       
                       <p className="text-xs text-orange-600">

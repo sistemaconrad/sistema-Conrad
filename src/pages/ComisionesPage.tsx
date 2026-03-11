@@ -37,7 +37,7 @@ export const ComisionesPage: React.FC<ComisionesPageProps> = ({ onBack }) => {
         .select(`
           *,
           pacientes(nombre, edad),
-          medicos(id, nombre),
+          medicos(id, nombre, es_referente),
           detalle_consultas(
             precio,
             sub_estudios(
@@ -67,11 +67,15 @@ export const ComisionesPage: React.FC<ComisionesPageProps> = ({ onBack }) => {
         // 1. tipo_cobro es 'social' o 'personalizado'
         // 2. forma_pago es 'estado_cuenta'
         // 3. es_servicio_movil es true
+        // ✅ Solo médicos REFERENTES generan comisión
+        if (!consulta.medicos?.es_referente) return;
+
+        // ✅ SÍ genera: normal, especial, estado_cuenta
+        // ❌ NO genera: social, personalizado, servicio_movil
         if (consulta.tipo_cobro === 'social' || 
             consulta.tipo_cobro === 'personalizado' ||
-            consulta.forma_pago === 'estado_cuenta' ||
             consulta.es_servicio_movil === true) {
-          return; // Saltar esta consulta
+          return;
         }
 
         const medicoId = consulta.medico_id;
@@ -92,29 +96,39 @@ export const ComisionesPage: React.FC<ComisionesPageProps> = ({ onBack }) => {
         const medico = medicoMap.get(medicoId)!;
         medico.total_pacientes++;
 
-        // Calcular total de la consulta
-        const totalConsulta = consulta.detalle_consultas?.reduce((sum, d) => sum + d.precio, 0) || 0;
-        
-        // Determinar el tipo de estudio y su porcentaje
-        const primerDetalle = consulta.detalle_consultas?.[0];
-        const estudioNombre = primerDetalle?.sub_estudios?.estudios?.nombre || 'Otros';
-        const porcentaje = primerDetalle?.sub_estudios?.estudios?.porcentaje_comision || 0;
-        
-        // Calcular comisión sobre el TOTAL de la consulta
-        const comisionTotal = totalConsulta * (porcentaje / 100);
+        // ✅ Cálculo línea por línea (igual que ComisionesView)
+        let totalConsulta = 0;
+        let comisionTotal = 0;
+        const estudiosUsados: string[] = [];
 
-        // Agregar a la categoría del estudio (dinámico)
-        if (!medico.comisiones_por_estudio[estudioNombre]) {
-          medico.comisiones_por_estudio[estudioNombre] = 0;
-        }
-        medico.comisiones_por_estudio[estudioNombre] += comisionTotal;
+        (consulta.detalle_consultas || []).forEach((d: any) => {
+          const precio = d.precio || 0;
+          const estudio = d.sub_estudios?.estudios?.nombre || 'Otros';
+          const pct = d.sub_estudios?.estudios?.porcentaje_comision || 0;
+          const comisionLinea = precio * (pct / 100);
+          totalConsulta += precio;
+          comisionTotal += comisionLinea;
+          estudiosUsados.push(estudio);
+          if (!medico.comisiones_por_estudio[estudio]) medico.comisiones_por_estudio[estudio] = 0;
+          medico.comisiones_por_estudio[estudio] += comisionLinea;
+        });
+
+        const estudioNombre = estudiosUsados[0] || 'Otros';
+        const porcentaje = consulta.detalle_consultas?.[0]?.sub_estudios?.estudios?.porcentaje_comision || 0;
 
         medico.total_comision += comisionTotal;
+
+        // estado_cuenta se guarda en forma_pago, no en tipo_cobro
+        const etiquetaTipo = consulta.forma_pago === 'estado_cuenta'
+          ? 'estado_cuenta'
+          : consulta.tipo_cobro;
 
         medico.pacientes.push({
           nombre: consulta.pacientes?.nombre,
           fecha: consulta.fecha,
-          estudios: consulta.detalle_consultas
+          estudios: consulta.detalle_consultas,
+          tipo_cobro: etiquetaTipo,
+          comision: comisionTotal,
         });
       });
 
@@ -448,9 +462,24 @@ export const ComisionesPage: React.FC<ComisionesPageProps> = ({ onBack }) => {
                   />
                   <div className="flex-1">
                     <h3 className="text-lg font-bold text-gray-800">{medico.medico_nombre}</h3>
-                    <p className="text-sm text-gray-600">
-                      {medico.total_pacientes} pacientes referidos
-                    </p>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="text-sm text-gray-500">{medico.total_pacientes} pacientes</span>
+                      {medico.pacientes.filter(p => p.tipo_cobro === 'normal').length > 0 && (
+                        <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">
+                          Normal: {medico.pacientes.filter(p => p.tipo_cobro === 'normal').length}
+                        </span>
+                      )}
+                      {medico.pacientes.filter(p => p.tipo_cobro === 'especial').length > 0 && (
+                        <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-medium">
+                          Especial: {medico.pacientes.filter(p => p.tipo_cobro === 'especial').length}
+                        </span>
+                      )}
+                      {medico.pacientes.filter(p => p.tipo_cobro === 'estado_cuenta').length > 0 && (
+                        <span className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full font-medium">
+                          Est.Cuenta: {medico.pacientes.filter(p => p.tipo_cobro === 'estado_cuenta').length}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-bold text-purple-600">
@@ -502,9 +531,24 @@ export const ComisionesPage: React.FC<ComisionesPageProps> = ({ onBack }) => {
                       <h4 className="font-semibold text-gray-700 mb-2">Pacientes:</h4>
                       <div className="bg-gray-50 rounded p-4 max-h-60 overflow-y-auto">
                         {medico.pacientes.map((p, idx) => (
-                          <div key={idx} className="text-sm py-2 border-b last:border-0">
-                            <p className="font-medium">{p.nombre}</p>
-                            <p className="text-gray-600">{p.fecha}</p>
+                          <div key={idx} className="text-sm py-2 border-b last:border-0 flex items-center justify-between gap-2">
+                            <div>
+                              <p className="font-medium">{p.nombre}</p>
+                              <p className="text-gray-500 text-xs">{p.fecha}</p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                                p.tipo_cobro === 'normal'        ? 'bg-blue-100 text-blue-700' :
+                                p.tipo_cobro === 'especial'      ? 'bg-purple-100 text-purple-700' :
+                                p.tipo_cobro === 'estado_cuenta' ? 'bg-amber-100 text-amber-700' :
+                                'bg-gray-100 text-gray-600'
+                              }`}>
+                                {p.tipo_cobro === 'estado_cuenta' ? 'Est. Cuenta' :
+                                 p.tipo_cobro === 'especial'      ? 'Especial' :
+                                 p.tipo_cobro === 'normal'        ? 'Normal' : p.tipo_cobro}
+                              </span>
+                              <span className="text-xs font-bold text-purple-600">Q {(p.comision||0).toFixed(2)}</span>
+                            </div>
                           </div>
                         ))}
                       </div>

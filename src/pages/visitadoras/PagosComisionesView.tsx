@@ -9,6 +9,7 @@ interface MedicoComision {
   total_consultas: number;
   total_comision: number;
   comisiones_por_estudio: { [key: string]: number };
+  tipos_cobro?: { [key: string]: number };
   seleccionado: boolean;
   ya_pagado: boolean;
   pago_id?: string;
@@ -60,7 +61,7 @@ export const PagosComisionesView: React.FC = () => {
     const [{ data: consultas }, { data: pagosExistentes }] = await Promise.all([
       supabase.from('consultas').select(`
         id, fecha, tipo_cobro, medico_id, forma_pago, es_servicio_movil, sin_informacion_medico,
-        medicos(id, nombre),
+        medicos(id, nombre, es_referente),
         detalle_consultas(precio, sub_estudios(nombre, estudios(nombre, porcentaje_comision)))
       `)
       .not('medico_id', 'is', null)
@@ -82,14 +83,16 @@ export const PagosComisionesView: React.FC = () => {
     const medicoMap = new Map<string, MedicoComision>();
 
     (consultas || []).forEach((c: any) => {
+      // ✅ Solo referentes, sin social/personalizado/servicio_movil
+      // ✅ estado_cuenta SÍ genera comisión
       if (
         c.tipo_cobro === 'social' ||
         c.tipo_cobro === 'personalizado' ||
-        c.forma_pago === 'estado_cuenta' ||
         c.es_servicio_movil === true ||
         c.sin_informacion_medico === true ||
         !c.medico_id || !c.medicos
       ) return;
+      if (!c.medicos.es_referente) return;
 
       const medicoId = c.medico_id;
       if (!medicoMap.has(medicoId)) {
@@ -107,13 +110,26 @@ export const PagosComisionesView: React.FC = () => {
 
       const medico = medicoMap.get(medicoId)!;
       medico.total_consultas++;
-      const total = (c.detalle_consultas || []).reduce((s: number, d: any) => s + (d.precio || 0), 0);
-      const estudio = c.detalle_consultas?.[0]?.sub_estudios?.estudios?.nombre || 'Otros';
-      const pct = c.detalle_consultas?.[0]?.sub_estudios?.estudios?.porcentaje_comision || 0;
-      const comision = total * (pct / 100);
-      medico.total_comision += comision;
-      if (!medico.comisiones_por_estudio[estudio]) medico.comisiones_por_estudio[estudio] = 0;
-      medico.comisiones_por_estudio[estudio] += comision;
+
+      // ✅ Cálculo línea por línea (igual que ComisionesView)
+      let comisionConsulta = 0;
+      (c.detalle_consultas || []).forEach((d: any) => {
+        const precio = d.precio || 0;
+        const estudio = d.sub_estudios?.estudios?.nombre || 'Otros';
+        const pct = d.sub_estudios?.estudios?.porcentaje_comision || 0;
+        const comisionLinea = precio * (pct / 100);
+        comisionConsulta += comisionLinea;
+        if (!medico.comisiones_por_estudio[estudio]) medico.comisiones_por_estudio[estudio] = 0;
+        medico.comisiones_por_estudio[estudio] += comisionLinea;
+      });
+
+      // Etiqueta tipo: estado_cuenta viene en forma_pago
+      const etiqueta = c.forma_pago === 'estado_cuenta' ? 'estado_cuenta' : c.tipo_cobro;
+      if (!medico.tipos_cobro) medico.tipos_cobro = {};
+      if (!medico.tipos_cobro[etiqueta]) medico.tipos_cobro[etiqueta] = 0;
+      medico.tipos_cobro[etiqueta]++;
+
+      medico.total_comision += comisionConsulta;
     });
 
     setMedicos(Array.from(medicoMap.values()).sort((a, b) => b.total_comision - a.total_comision));
@@ -301,7 +317,24 @@ export const PagosComisionesView: React.FC = () => {
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500">{m.total_consultas} consultas referidas</p>
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          <span className="text-xs text-gray-400">{m.total_consultas} consultas</span>
+                          {m.tipos_cobro?.['normal'] ? (
+                            <span className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full font-medium">
+                              Normal: {m.tipos_cobro['normal']}
+                            </span>
+                          ) : null}
+                          {m.tipos_cobro?.['especial'] ? (
+                            <span className="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded-full font-medium">
+                              Especial: {m.tipos_cobro['especial']}
+                            </span>
+                          ) : null}
+                          {m.tipos_cobro?.['estado_cuenta'] ? (
+                            <span className="text-xs bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full font-medium">
+                              Est.Cuenta: {m.tipos_cobro['estado_cuenta']}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
 
                       {/* Monto + expand */}
