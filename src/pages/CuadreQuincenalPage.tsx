@@ -112,7 +112,11 @@ export const CuadreQuincenalPage: React.FC<CuadreQuincenalPageProps> = ({ onBack
 
       const consultasPorMedico: { [key: string]: any[] } = {};
       consultas.forEach(consulta => {
-        const medicoNombre = consulta.medicos?.nombre || consulta.medico_recomendado || 'Sin médico referente';
+        // ✅ Prioridad: médico referente > médico recomendado > establecimiento > fallback
+        const medicoNombre = consulta.medicos?.nombre 
+          || consulta.medico_recomendado 
+          || consulta.movil_establecimiento 
+          || 'Sin información';
         if (!consultasPorMedico[medicoNombre]) consultasPorMedico[medicoNombre] = [];
         consultasPorMedico[medicoNombre].push(consulta);
       });

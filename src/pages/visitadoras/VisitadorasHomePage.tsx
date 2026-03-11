@@ -1,57 +1,100 @@
-import React, { useEffect, useState } from 'react';
-import { useVisitadorasStore } from '../../store/visitadorasStore';
-import { ArrowLeft } from 'lucide-react';
-import { AdminVisitadorasView } from './AdminVisitadorasView';
+import React, { useState } from 'react';
+import { ArrowLeft, Users, Stethoscope, DollarSign, FileSpreadsheet, MapPin, CreditCard, LogOut } from 'lucide-react';
+import { MedicosView } from './MedicosView';
+import { VisitasView } from './VisitasView';
+import { ComisionesView } from './ComisionesView';
+import { ReportesVisitadorasView } from './ReportesVisitadorasView';
+import { PagosComisionesView } from './PagosComisionesView';
 
 interface VisitadorasHomePageProps {
   onBack: () => void;
 }
 
+type TabKey = 'visitas' | 'medicos' | 'comisiones' | 'pagos' | 'reportes';
+
 export const VisitadorasHomePage: React.FC<VisitadorasHomePageProps> = ({ onBack }) => {
-  const { adminUsuario, setAdminUsuario } = useVisitadorasStore();
-  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabKey>('visitas');
+  const rolUsuario = localStorage.getItem('rolUsuarioConrad');
+  const nombreUsuario = localStorage.getItem('nombreUsuarioConrad') || '';
+  const esVisitadora = rolUsuario === 'visitadora';
 
-  useEffect(() => {
-    autoLogin();
-  }, []);
-
-  const autoLogin = () => {
-    // Obtener nombre desde localStorage o default
-    const nombre = localStorage.getItem('nombreUsuarioConrad') || 'Administrador';
-    setAdminUsuario(nombre);
-    setLoading(false);
+  const handleLogout = () => {
+    localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('nombreUsuarioConrad');
+    localStorage.removeItem('usernameConrad');
+    localStorage.removeItem('rolUsuarioConrad');
+    window.location.reload();
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando módulo...</p>
-        </div>
-      </div>
-    );
-  }
+  const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
+    { key: 'visitas',     label: 'Visitas',            icon: <MapPin size={16} /> },
+    { key: 'medicos',     label: 'Médicos Referentes', icon: <Stethoscope size={16} /> },
+    { key: 'comisiones',  label: 'Comisiones',         icon: <DollarSign size={16} /> },
+    { key: 'pagos',       label: 'Pago Comisiones',    icon: <CreditCard size={16} /> },
+    { key: 'reportes',    label: 'Reportes',           icon: <FileSpreadsheet size={16} /> },
+  ];
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'visitas':    return <VisitasView />;
+      case 'medicos':    return <MedicosView />;
+      case 'comisiones': return <ComisionesView />;
+      case 'pagos':      return <PagosComisionesView />;
+      case 'reportes':   return <ReportesVisitadorasView />;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-pink-600 to-pink-700 text-white shadow-lg">
-        <div className="container mx-auto px-4 py-6">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 text-white hover:text-pink-100 mb-4 transition-colors"
-          >
-            <ArrowLeft size={20} />
-            Volver al Dashboard
-          </button>
-          <h1 className="text-3xl font-bold">👋 ¡Hola, {adminUsuario}!</h1>
-          <p className="text-pink-100 mt-1">Módulo de Visitadoras Médicas</p>
+      <header className="bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-lg">
+        <div className="container mx-auto px-4 py-5">
+          {esVisitadora ? (
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-pink-100 text-sm">Bienvenida, <span className="font-semibold text-white">{nombreUsuario}</span></p>
+              <button onClick={handleLogout}
+                className="flex items-center gap-1.5 text-pink-100 hover:text-white transition-colors text-sm">
+                <LogOut size={14} /> Cerrar sesión
+              </button>
+            </div>
+          ) : (
+            <button onClick={onBack}
+              className="flex items-center gap-2 text-pink-100 hover:text-white mb-3 transition-colors text-sm">
+              <ArrowLeft size={16} />
+              Volver al Dashboard
+            </button>
+          )}
+          <div className="flex items-center gap-3">
+            <div className="bg-white/20 rounded-xl p-2.5">
+              <Users size={28} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold">Visitadoras Médicas</h1>
+              <p className="text-pink-100 text-sm">Gestión de visitas, médicos referentes y comisiones</p>
+            </div>
+          </div>
+        </div>
+        <div className="container mx-auto px-4">
+          <div className="flex gap-1 overflow-x-auto">
+            {tabs.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-all border-b-2 ${
+                  activeTab === tab.key
+                    ? 'border-white text-white bg-white/10'
+                    : 'border-transparent text-pink-200 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
-
-      {/* Contenido principal */}
-      <AdminVisitadorasView adminUsuario={adminUsuario} />
+      <div className="container mx-auto px-4 py-6">
+        {renderContent()}
+      </div>
     </div>
   );
 };

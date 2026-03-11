@@ -34,12 +34,16 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
   const [municipioMedico, setMunicipioMedico] = useState('');
   const [direccionMedico, setDireccionMedico] = useState('');
   const [establecimientoMovil, setEstablecimientoMovil] = useState('');
+  const [establecimientos, setEstablecimientos] = useState<Array<{ id: string; nombre: string }>>([]);
 
   const [medicosReferentes, setMedicosReferentes] = useState<Medico[]>([]);
   const [medicoSeleccionado, setMedicoSeleccionado] = useState<Medico | null>(null);
 
   useEffect(() => {
-    if (isOpen) cargarMedicosReferentes();
+    if (isOpen) {
+      cargarMedicosReferentes();
+      cargarEstablecimientos();
+    }
   }, [isOpen]);
 
   const cargarMedicosReferentes = async () => {
@@ -53,6 +57,19 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
       setMedicosReferentes(data || []);
     } catch (error) {
       console.error('Error al cargar médicos referentes:', error);
+    }
+  };
+
+  const cargarEstablecimientos = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('establecimientos')
+        .select('id, nombre')
+        .order('nombre');
+      if (error) throw error;
+      setEstablecimientos(data || []);
+    } catch (error) {
+      console.error('Error al cargar establecimientos:', error);
     }
   };
 
@@ -73,6 +90,31 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
       setDepartamentoMedico(medico.departamento);
       setMunicipioMedico(medico.municipio);
       setDireccionMedico(medico.direccion);
+    }
+  };
+
+  const handleEstablecimientoChange = async (nombreEstablecimiento: string) => {
+    setEstablecimientoMovil(nombreEstablecimiento);
+    
+    // Si el establecimiento no existe en la lista, agregarlo a la BD
+    const existe = establecimientos.some(e => e.nombre.toLowerCase() === nombreEstablecimiento.toLowerCase());
+    if (!existe && nombreEstablecimiento.trim()) {
+      try {
+        const { data, error } = await supabase
+          .from('establecimientos')
+          .insert([{ nombre: nombreEstablecimiento.trim() }])
+          .select()
+          .single();
+        
+        if (error) throw error;
+        
+        // Agregar a la lista local
+        if (data) {
+          setEstablecimientos(prev => [...prev, { id: data.id, nombre: data.nombre }].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+        }
+      } catch (error) {
+        console.error('Error al guardar establecimiento:', error);
+      }
     }
   };
 
@@ -111,14 +153,16 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
       return;
     }
 
-    if (esServicioMovil && !establecimientoMovil.trim()) {
-      alert('El nombre del establecimiento es requerido para Servicios Móviles.');
+    const tieneMedico = nombreMedico.trim() !== '';
+
+    // ✅ Para servicios móviles: establecimiento es obligatorio SOLO si no hay médico
+    if (esServicioMovil && !tieneMedico && !establecimientoMovil.trim()) {
+      alert('Para Servicios Móviles debe ingresar al menos:\n- Un médico referente, O\n- El nombre del establecimiento\n\n(Preferiblemente ambos)');
       return;
     }
 
-    const tieneMedico = nombreMedico.trim() !== '';
-
-    if (tieneMedico && !sinInformacion) {
+    if (tieneMedico && !sinInformacion && !esServicioMovil) {
+      // ✅ Solo validar campos completos si NO es servicio móvil
       if (!telefonoMedico.trim() || !departamentoMedico || !municipioMedico || !direccionMedico.trim()) {
         alert('Por favor complete todos los campos del médico o marque "Sin información"');
         return;
@@ -145,9 +189,21 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
 
     let medico: Medico | null = null;
     if (tieneMedico && !sinInformacion) {
-      if (esReferente && medicoSeleccionado) {
+      if ((esReferente || esServicioMovil) && medicoSeleccionado) {
+        // ✅ Médico seleccionado de la lista
         medico = medicoSeleccionado;
+      } else if (esServicioMovil && !medicoSeleccionado) {
+        // ✅ Servicio móvil con nombre manual (no está en la lista)
+        medico = {
+          nombre: nombreMedico,
+          telefono: telefonoMedico || '',
+          departamento: departamentoMedico || '',
+          municipio: municipioMedico || '',
+          direccion: direccionMedico || '',
+          es_referente: false
+        };
       } else {
+        // ✅ Médico no referente con datos completos
         medico = {
           nombre: nombreMedico,
           telefono: telefonoMedico,
@@ -292,23 +348,118 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                 <label htmlFor="sinInfo" className="text-sm font-medium text-gray-700">Sin información</label>
               </div>
 
-              {esServicioMovil && (
+{esServicioMovil && (
                 <div className="space-y-3">
                   <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
                     <p className="text-sm text-purple-800">
                       <strong>📱 Servicio Móvil:</strong> Este registro no cuenta como paciente regular ni genera comisión. Solo se registran estudios RX con precio personalizado.
                     </p>
                   </div>
+                  
+                  {/* ✅ SELECTOR de médico - solo de la lista */}
                   <div>
-                    <label className="label">🏥 Establecimiento / Lugar <span className="text-red-500">*</span></label>
-                    <input
-                      type="text"
-                      className="input-field border-orange-300 focus:ring-orange-400 focus:border-orange-400"
-                      value={establecimientoMovil}
-                      onChange={(e) => setEstablecimientoMovil(e.target.value)}
-                      placeholder="Ej: Hospital San Juan de Dios, Clínica Santa María"
-                    />
-                    <p className="text-xs text-orange-600 mt-1">* Nombre del lugar donde se realizará el servicio móvil</p>
+                    <label className="label">👨‍⚕️ Médico Referente (opcional)</label>
+                    <div className="space-y-2">
+                      {/* Mostrar médico seleccionado o mensaje */}
+                      <div className="input-field bg-gray-50 flex items-center justify-between">
+                        {nombreMedico ? (
+                          <span className="text-gray-900">{nombreMedico}</span>
+                        ) : (
+                          <span className="text-gray-400">Seleccione un médico de la lista</span>
+                        )}
+                        {nombreMedico && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNombreMedico('');
+                              setMedicoSeleccionado(null);
+                              setTelefonoMedico('');
+                              setDepartamentoMedico('');
+                              setMunicipioMedico('');
+                              setDireccionMedico('');
+                            }}
+                            className="text-red-500 hover:text-red-700 text-sm"
+                          >
+                            ✕ Limpiar
+                          </button>
+                        )}
+                      </div>
+                      
+                      {/* Lista de médicos */}
+                      {medicosReferentes.length > 0 && (
+                        <details className="bg-blue-50 border border-blue-200 rounded-lg" open={!nombreMedico}>
+                          <summary className="px-3 py-2 cursor-pointer text-sm text-blue-700 font-medium hover:bg-blue-100">
+                            📋 Ver lista de médicos registrados (click para desplegar)
+                          </summary>
+                          <div className="px-3 pb-2 pt-1 max-h-48 overflow-y-auto">
+                            {medicosReferentes.map(medico => (
+                              <button
+                                key={medico.id}
+                                type="button"
+                                onClick={() => {
+                                  setMedicoSeleccionado(medico);
+                                  setNombreMedico(medico.nombre);
+                                  setTelefonoMedico(medico.telefono);
+                                  setDepartamentoMedico(medico.departamento);
+                                  setMunicipioMedico(medico.municipio);
+                                  setDireccionMedico(medico.direccion);
+                                }}
+                                className="w-full text-left px-3 py-2 hover:bg-blue-100 rounded text-sm transition-colors"
+                              >
+                                {medico.nombre}
+                              </button>
+                            ))}
+                          </div>
+                        </details>
+                      )}
+                      
+                      <p className="text-xs text-gray-500">
+                        💡 <strong>Tip:</strong> Si este médico se repite frecuentemente, agrégalo al catálogo en <strong>Gestión → Médicos</strong> para que aparezca siempre en la lista.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* ✅ Campo de texto simple para establecimiento */}
+                  <div>
+                    <label className="label">
+                      🏥 Establecimiento / Lugar 
+                      {!nombreMedico && <span className="text-red-500"> *</span>}
+                      {nombreMedico && <span className="text-gray-500 text-xs ml-1">(opcional si hay médico)</span>}
+                    </label>
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        className="input-field"
+                        value={establecimientoMovil}
+                        onChange={(e) => setEstablecimientoMovil(e.target.value)}
+                        placeholder="Escribir nombre del establecimiento"
+                      />
+                      
+                      {/* Botón para ver lista de establecimientos */}
+                      {establecimientos.length > 0 && (
+                        <details className="bg-green-50 border border-green-200 rounded-lg">
+                          <summary className="px-3 py-2 cursor-pointer text-sm text-green-700 font-medium hover:bg-green-100">
+                            📋 Ver establecimientos guardados (click para desplegar)
+                          </summary>
+                          <div className="px-3 pb-2 pt-1 max-h-48 overflow-y-auto">
+                            {establecimientos.map(est => (
+                              <button
+                                key={est.id}
+                                type="button"
+                                onClick={() => setEstablecimientoMovil(est.nombre)}
+                                className="w-full text-left px-3 py-2 hover:bg-green-100 rounded text-sm transition-colors"
+                              >
+                                {est.nombre}
+                              </button>
+                            ))}
+                          </div>
+                        </details>
+                      )}
+                      
+                      <p className="text-xs text-orange-600">
+                        * Nombre del lugar donde se realizará el servicio móvil
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}

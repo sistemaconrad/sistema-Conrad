@@ -21,12 +21,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   };
 
   const handleModuleClick = (moduleId: string) => {
-    // Si es visitadoras, abrir en nueva pestaña
-    if (moduleId === 'visitadoras') {
-      window.open('https://visitadoras-medicas.vercel.app', '_blank');
-      return;
-    }
-    // Para otros módulos, navegar normal
     onNavigateToModule(moduleId);
   };
 
@@ -34,6 +28,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const permisosPorRol: { [key: string]: string[] } = {
     'admin': ['sanatorio', 'inventario', 'contabilidad', 'personal', 'doctores', 'visitadoras'],
     'secretaria': ['sanatorio', 'inventario', 'visitadoras'],
+    'visitadora': ['visitadoras'],
     'doctor': ['doctores']
   };
 

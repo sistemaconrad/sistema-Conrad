@@ -9,6 +9,7 @@ interface AutocompleteProps {
   disabled?: boolean;
   label: string;
   required?: boolean;
+  allowCustomValue?: boolean; // ✅ NUEVO: Permite escribir valores que no están en la lista
 }
 
 export const Autocomplete: React.FC<AutocompleteProps> = ({
@@ -18,7 +19,8 @@ export const Autocomplete: React.FC<AutocompleteProps> = ({
   placeholder = 'Escriba para buscar...',
   disabled = false,
   label,
-  required = false
+  required = false,
+  allowCustomValue = false // ✅ NUEVO
 }) => {
   const [inputValue, setInputValue] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -33,8 +35,11 @@ export const Autocomplete: React.FC<AutocompleteProps> = ({
       setInputValue(selected.nombre);
     } else if (value === '') {
       setInputValue('');
+    } else if (allowCustomValue && value) {
+      // ✅ Si allowCustomValue está activo, mostrar el valor directamente
+      setInputValue(value);
     }
-  }, [value, options]);
+  }, [value, options, allowCustomValue]);
 
   useEffect(() => {
     setFilteredOptions(options);
@@ -56,6 +61,11 @@ export const Autocomplete: React.FC<AutocompleteProps> = ({
     setInputValue(newValue);
     setIsOpen(true);
 
+    // ✅ Si allowCustomValue está activo, pasar el texto directamente a onChange
+    if (allowCustomValue) {
+      onChange(newValue);
+    }
+
     if (newValue === '') {
       setFilteredOptions(options);
     } else {
@@ -68,7 +78,8 @@ export const Autocomplete: React.FC<AutocompleteProps> = ({
 
   const handleSelectOption = (option: { id: string; nombre: string }) => {
     setInputValue(option.nombre);
-    onChange(option.id);
+    // ✅ Si allowCustomValue está activo, pasar el nombre en vez del id
+    onChange(allowCustomValue ? option.nombre : option.id);
     setIsOpen(false);
   };
 
