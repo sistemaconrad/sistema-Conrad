@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase';
 interface NuevoPacienteModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (paciente: Paciente, medico: Medico | null, sinInfoMedico: boolean, esServicioMovil: boolean, establecimiento: string) => void;
+  onSave: (paciente: Paciente, medico: Medico | null, sinInfoMedico: boolean, esServicioMovil: boolean, establecimiento: string, sinOrdenMedica?: boolean) => void;
 }
 
 export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
@@ -27,6 +27,7 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
   // Estado del médico
   const [esReferente, setEsReferente] = useState(true);
   const [sinInformacion, setSinInformacion] = useState(false);
+  const [sinOrdenMedica, setSinOrdenMedica] = useState(false);
   const [esServicioMovil, setEsServicioMovil] = useState(false);
   const [nombreMedico, setNombreMedico] = useState('');
   const [telefonoMedico, setTelefonoMedico] = useState('');
@@ -136,6 +137,7 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
     setDepartamentoPaciente('');
     setMunicipioPaciente('');
     setEsReferente(true);
+    setSinOrdenMedica(false);
     setSinInformacion(false);
     setEsServicioMovil(false);
     setNombreMedico('');
@@ -216,7 +218,7 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
     }
 
     const sinInfoParaImprimir = !tieneMedico || sinInformacion;
-    onSave(paciente, medico, sinInfoParaImprimir, esServicioMovil, establecimientoMovil.trim());
+    onSave(paciente, medico, sinInfoParaImprimir, esServicioMovil, establecimientoMovil.trim(), sinOrdenMedica);
     resetForm();
   };
 
@@ -347,6 +349,18 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                   onChange={(e) => handleSinInformacionChange(e.target.checked)} className="mr-2" />
                 <label htmlFor="sinInfo" className="text-sm font-medium text-gray-700">Sin información</label>
               </div>
+
+              {/* Sin orden médica — solo si hay médico y no es sin información */}
+              {!sinInformacion && !esServicioMovil && (
+                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${sinOrdenMedica ? 'bg-amber-50 border-amber-300' : 'border-gray-200'}`}>
+                  <input type="checkbox" id="sinOrden" checked={sinOrdenMedica}
+                    onChange={(e) => setSinOrdenMedica(e.target.checked)} className="mr-1" />
+                  <label htmlFor="sinOrden" className="text-sm font-medium text-gray-700 cursor-pointer flex items-center gap-1.5">
+                    📋 Sin orden médica
+                    {sinOrdenMedica && <span className="text-xs text-amber-600 font-normal">— No genera comisión</span>}
+                  </label>
+                </div>
+              )}
 
 {esServicioMovil && (
                 <div className="space-y-3">

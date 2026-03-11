@@ -22,6 +22,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const [pacienteActual, setPacienteActual] = useState<(Paciente & { id: string }) | null>(null);
   const [medicoActual, setMedicoActual] = useState<Medico | null>(null);
   const [sinInfoMedico, setSinInfoMedico] = useState(false);
+  const [sinOrdenMedicaConsulta, setSinOrdenMedicaConsulta] = useState(false);
   const [esServicioMovil, setEsServicioMovil] = useState(false);
 
   // ✅ ELIMINADO: incluyePlacas, precioPlacas, incluyeInforme, precioInforme
@@ -195,7 +196,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     medico: Medico | null,
     sinInfo: boolean,
     esServicioMovilParam: boolean = false,
-    establecimiento: string = ''          // ✅ NUEVO parámetro
+    establecimiento: string = '',
+    sinOrdenMedica: boolean = false
   ) => {
     try {
       const { data: pacienteData, error: pacienteError } = await supabase
@@ -221,6 +223,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       setPacienteActual(pacienteData);
       setMedicoActual(medico);
       setSinInfoMedico(sinInfo);
+      setSinOrdenMedicaConsulta(sinOrdenMedica);
       setEsServicioMovil(esServicioMovilParam);
 
       // ✅ Guardar establecimiento recibido del modal
@@ -355,6 +358,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           numero_transferencia: formaPago === 'transferencia' ? numeroTransferencia : null,
           numero_voucher: formaPago === 'tarjeta' ? numeroVoucher : null,
           sin_informacion_medico: sinInfoMedico,
+          sin_orden_medica: sinOrdenMedicaConsulta,
           justificacion_especial: ((tipoCobro === 'normal' && !esHorarioNormal()) || (tipoCobro === 'personalizado' && !esServicioMovil)) ? justificacionEspecial : null,
           fecha: format(new Date(), 'yyyy-MM-dd'),
           es_servicio_movil: esServicioMovil,

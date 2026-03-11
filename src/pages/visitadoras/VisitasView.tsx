@@ -31,8 +31,7 @@ interface Visita {
   created_at: string;
 }
 
-const CANVAS_W = 600;
-const CANVAS_H = 260;
+// Canvas toma el tamaño real del contenedor (dinámico)
 
 const getNombreDepto = (id: string) => departamentosGuatemala.find(d => d.id === id)?.nombre || id;
 const getNombreMun   = (id: string) => municipiosGuatemala.find(m => m.id === id)?.nombre || id;
@@ -88,19 +87,14 @@ export const VisitasView: React.FC = () => {
   // ── Canvas firma ───────────────────────────────────────────────
   const getPos = (e: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current!;
-    const rect   = canvas.getBoundingClientRect();
-    const scaleX = CANVAS_W / rect.width;
-    const scaleY = CANVAS_H / rect.height;
+    const rect = canvas.getBoundingClientRect();
+    // Sin escalado: el canvas ahora tiene el mismo tamaño que su contenedor
     if ('touches' in e) {
-      return {
-        x: (e.touches[0].clientX - rect.left) * scaleX,
-        y: (e.touches[0].clientY - rect.top)  * scaleY,
-      };
+      const t = e.touches[0];
+      return { x: t.clientX - rect.left, y: t.clientY - rect.top };
     }
-    return {
-      x: ((e as React.MouseEvent).clientX - rect.left) * scaleX,
-      y: ((e as React.MouseEvent).clientY - rect.top)  * scaleY,
-    };
+    const m = e as React.MouseEvent;
+    return { x: m.clientX - rect.left, y: m.clientY - rect.top };
   };
 
   const startDraw = (e: React.MouseEvent | React.TouchEvent) => {
@@ -136,7 +130,7 @@ export const VisitasView: React.FC = () => {
   const limpiarFirma = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    canvas.getContext('2d')!.clearRect(0, 0, CANVAS_W, CANVAS_H);
+    canvas.getContext('2d')!.clearRect(0, 0, canvasRef.current?.width || 600, canvasRef.current?.height || 200);
     setFirmaVacia(true);
   };
 
@@ -147,13 +141,26 @@ export const VisitasView: React.FC = () => {
     setShowFirmaModal(false);
   };
 
+  const sizearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const container = canvas.parentElement;
+    if (!container) return;
+    const w = container.clientWidth;
+    const h = 200;
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+  };
+
   const abrirFirmaModal = () => {
     setFirmaVacia(true);
     setShowFirmaModal(true);
     // limpiar canvas al abrir
     setTimeout(() => {
       const canvas = canvasRef.current;
-      if (canvas) canvas.getContext('2d')!.clearRect(0, 0, CANVAS_W, CANVAS_H);
+      if (canvas) canvas.getContext('2d')!.clearRect(0, 0, canvasRef.current?.width || 600, canvasRef.current?.height || 200);
     }, 50);
   };
 
@@ -460,10 +467,7 @@ export const VisitasView: React.FC = () => {
                 style={{ touchAction: 'none' }}>
                 <canvas
                   ref={canvasRef}
-                  width={CANVAS_W}
-                  height={CANVAS_H}
-                  className="w-full cursor-crosshair block"
-                  style={{ touchAction: 'none', userSelect: 'none' }}
+                  className="block w-full cursor-crosshair" style={{ height: 200, touchAction: 'none', userSelect: 'none' }}
                   onMouseDown={startDraw}
                   onMouseMove={draw}
                   onMouseUp={endDraw}

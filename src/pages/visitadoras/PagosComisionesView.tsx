@@ -60,7 +60,7 @@ export const PagosComisionesView: React.FC = () => {
 
     const [{ data: consultas }, { data: pagosExistentes }] = await Promise.all([
       supabase.from('consultas').select(`
-        id, fecha, tipo_cobro, medico_id, forma_pago, es_servicio_movil, sin_informacion_medico,
+        id, fecha, tipo_cobro, medico_id, forma_pago, es_servicio_movil, sin_informacion_medico, sin_orden_medica,
         medicos(id, nombre, es_referente),
         detalle_consultas(precio, sub_estudios(nombre, estudios(nombre, porcentaje_comision)))
       `)

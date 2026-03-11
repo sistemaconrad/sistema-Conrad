@@ -42,7 +42,7 @@ export const ComisionesView: React.FC = () => {
       const { data: consultas } = await supabase
         .from('consultas')
         .select(`
-          id, fecha, tipo_cobro, medico_id, forma_pago, es_servicio_movil, sin_informacion_medico,
+          id, fecha, tipo_cobro, medico_id, forma_pago, es_servicio_movil, sin_informacion_medico, sin_orden_medica,
           pacientes(nombre),
           medicos(id, nombre, es_referente),
           detalle_consultas(
@@ -73,7 +73,8 @@ export const ComisionesView: React.FC = () => {
           c.tipo_cobro === 'social' ||
           c.tipo_cobro === 'personalizado' ||
           c.es_servicio_movil === true ||
-          c.sin_informacion_medico === true
+          c.sin_informacion_medico === true ||
+          c.sin_orden_medica === true
         ) return;
 
         // ✅ Solo médicos REFERENTES generan comisión

@@ -156,9 +156,9 @@ export const ReportesVisitadorasView: React.FC = () => {
     setGenerando('comisiones');
     try {
       const { data: consultas, error } = await supabase.from('consultas').select(`
-        id, fecha, tipo_cobro, medico_id, forma_pago, es_servicio_movil, sin_informacion_medico,
+        id, fecha, tipo_cobro, medico_id, forma_pago, es_servicio_movil, sin_informacion_medico, sin_orden_medica,
         pacientes(nombre),
-        medicos(nombre),
+        medicos(nombre, es_referente),
         detalle_consultas(precio, sub_estudios(nombre, estudios(nombre, porcentaje_comision)))
       `)
       .not('medico_id', 'is', null)
@@ -173,16 +173,34 @@ export const ReportesVisitadorasView: React.FC = () => {
       const detalle: any[] = [];
 
       (consultas || []).forEach((c: any) => {
-        if (!c.medico_id || !c.medicos || c.tipo_cobro === 'social' || c.tipo_cobro === 'personalizado' || c.forma_pago === 'estado_cuenta' || c.es_servicio_movil || c.sin_informacion_medico) return;
-        const total = (c.detalle_consultas||[]).reduce((s: number, d: any) => s + (d.precio||0), 0);
-        const pct   = (c.detalle_consultas?.[0]?.sub_estudios?.estudios?.porcentaje_comision || 0);
-        const com   = total * pct / 100;
-        const estudio = c.detalle_consultas?.[0]?.sub_estudios?.estudios?.nombre || 'Otros';
+        // ✅ Mismas reglas que ComisionesView
+        if (!c.medico_id || !c.medicos) return;
+        if (!c.medicos.es_referente) return;
+        if (c.tipo_cobro === 'social' || c.tipo_cobro === 'personalizado') return;
+        if (c.es_servicio_movil || c.sin_informacion_medico || c.sin_orden_medica) return;
+
+        // ✅ Cálculo línea por línea
+        let total = 0, com = 0;
+        const estudios: string[] = [];
+        (c.detalle_consultas || []).forEach((d: any) => {
+          const precio = d.precio || 0;
+          const pct = d.sub_estudios?.estudios?.porcentaje_comision || 0;
+          total += precio;
+          com += precio * pct / 100;
+          estudios.push(d.sub_estudios?.estudios?.nombre || 'Otros');
+        });
+
+        const estudio = estudios[0] || 'Otros';
+        const pct = c.detalle_consultas?.[0]?.sub_estudios?.estudios?.porcentaje_comision || 0;
+        // ✅ estado_cuenta va en forma_pago
+        const etiquetaTipo = c.forma_pago === 'estado_cuenta' ? 'Estado Cuenta'
+          : c.tipo_cobro === 'especial' ? 'Especial' : 'Normal';
+
         if (!map[c.medico_id]) map[c.medico_id] = { nombre: c.medicos.nombre, consultas: 0, total: 0, comision: 0 };
         map[c.medico_id].consultas++;
         map[c.medico_id].total += total;
         map[c.medico_id].comision += com;
-        detalle.push({ fecha: c.fecha, medico: c.medicos.nombre, paciente: c.pacientes?.nombre||'—', tipo: c.tipo_cobro, estudio, total, pct, com });
+        detalle.push({ fecha: c.fecha, medico: c.medicos.nombre, paciente: c.pacientes?.nombre||'—', tipo: etiquetaTipo, estudio, total, pct, com });
       });
 
       const lista = Object.values(map).sort((a,b) => b.comision - a.comision);

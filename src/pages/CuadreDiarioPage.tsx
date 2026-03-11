@@ -118,6 +118,8 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
   const [mostrarGastos, setMostrarGastos] = useState(true);
   const [mostrarAnuladas, setMostrarAnuladas] = useState(false);
   const [consultasAnuladas, setConsultasAnuladas] = useState<any[]>([]);
+  const [listaConsultas, setListaConsultas] = useState<any[]>([]);
+  const [mostrarListaPacientes, setMostrarListaPacientes] = useState(false);
 
   const cajaBloqueada = debeEstarCerrada() && !modoEdicion;
 
@@ -174,7 +176,7 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
         .select(`
           *,
           pacientes(nombre),
-          medicos(nombre)
+          medicos(nombre, es_referente)
         `)
         .eq('fecha', fecha);
 
@@ -242,6 +244,7 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
         cuadres_forma_pago: Object.values(cuadrePorForma)
       });
 
+      setListaConsultas(consultasRegulares);
       setConsultasAnuladas(consultasAnuladasData.map(c => ({
         nombre: c.pacientes?.nombre,
         usuario_anulo: c.usuario_anulo,
@@ -1071,6 +1074,79 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
                 )
               )}
             </div>
+
+            {/* Lista de pacientes del día */}
+            {listaConsultas.length > 0 && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-4">
+                <button onClick={() => setMostrarListaPacientes(!mostrarListaPacientes)}
+                  className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-blue-100 p-2 rounded-lg">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    </div>
+                    <span className="font-semibold text-gray-800">Pacientes del día ({listaConsultas.length})</span>
+                  </div>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-gray-400 transition-transform ${mostrarListaPacientes ? 'rotate-180' : ''}`}><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                {mostrarListaPacientes && (
+                  <div className="border-t border-gray-100 divide-y divide-gray-50">
+                    {listaConsultas.map((c, idx) => {
+                      const esSinOrden = c.sin_orden_medica === true;
+                      const tieneReferente = c.medicos?.es_referente === true;
+                      const tieneNoReferente = c.medico_id && !tieneReferente && !c.sin_informacion_medico && !c.es_servicio_movil;
+                      const medicoNombre = c.medicos?.nombre || c.medico_recomendado;
+
+                      return (
+                        <div key={c.id} className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs text-gray-400 w-5 text-right">{idx + 1}</span>
+                            <div>
+                              <p className="text-sm font-semibold text-gray-900">{c.pacientes?.nombre || '—'}</p>
+                              {medicoNombre && (
+                                <p className={`text-xs mt-0.5 font-medium ${
+                                  esSinOrden && tieneReferente   ? 'text-amber-600' :
+                                  esSinOrden && tieneNoReferente ? 'text-orange-600' :
+                                  tieneReferente                 ? 'text-emerald-600' :
+                                  tieneNoReferente               ? 'text-blue-500' :
+                                  'text-gray-400'
+                                }`}>
+                                  {medicoNombre}
+                                  {esSinOrden
+                                    ? <span className="ml-1 font-normal">(sin orden médica)</span>
+                                    : tieneNoReferente
+                                      ? <span className="ml-1 font-normal">(referente)</span>
+                                      : null
+                                  }
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs">
+                            {esSinOrden && (
+                              <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Sin orden</span>
+                            )}
+                            {!esSinOrden && tieneReferente && (
+                              <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">Referente</span>
+                            )}
+                            {!esSinOrden && tieneNoReferente && (
+                              <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">No Ref.</span>
+                            )}
+                            <span className={`px-2 py-0.5 rounded-full font-medium ${
+                              c.tipo_cobro === 'normal' ? 'bg-gray-100 text-gray-600' :
+                              c.tipo_cobro === 'especial' ? 'bg-purple-100 text-purple-700' :
+                              c.forma_pago === 'estado_cuenta' ? 'bg-amber-100 text-amber-700' :
+                              'bg-gray-100 text-gray-500'
+                            }`}>
+                              {c.forma_pago === 'estado_cuenta' ? 'Est.Cta' : c.tipo_cobro}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Anuladas */}
             {consultasAnuladas.length > 0 && (

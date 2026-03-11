@@ -74,7 +74,8 @@ export const ComisionesPage: React.FC<ComisionesPageProps> = ({ onBack }) => {
         // ❌ NO genera: social, personalizado, servicio_movil
         if (consulta.tipo_cobro === 'social' || 
             consulta.tipo_cobro === 'personalizado' ||
-            consulta.es_servicio_movil === true) {
+            consulta.es_servicio_movil === true ||
+            consulta.sin_orden_medica === true) {
           return;
         }
 

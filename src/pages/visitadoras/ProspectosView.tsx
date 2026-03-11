@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   UserPlus, Stethoscope, MapPin, Phone, Star, Clock, Search, X,
   ChevronRight, AlertCircle, CheckCircle, Trash2, Navigation,
-  PenTool, MapPinIcon, MessageSquare, Plus
+  PenTool, MapPinIcon, MessageSquare, Plus, Edit2, Save
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { departamentosGuatemala, municipiosGuatemala } from '../../data/guatemala';
@@ -18,8 +18,7 @@ interface VisitaProspecto {
   visitadora_nombre: string; comentario?: string;
 }
 
-const CANVAS_W = 600;
-const CANVAS_H = 260;
+// Canvas toma el tamaño real del contenedor (dinámico)
 const getNombreDepto = (id: string) => departamentosGuatemala.find(d => d.id === id)?.nombre || id;
 const getNombreMun   = (id: string) => municipiosGuatemala.find(m => m.id === id)?.nombre || id;
 
@@ -35,6 +34,12 @@ export const ProspectosView: React.FC = () => {
   const [modalProspecto, setModalProspecto] = useState<Medico | null>(null);
   const [confirmConvertir, setConfirmConvertir] = useState(false);
   const [confirmEliminar, setConfirmEliminar]   = useState(false);
+  const [modoEdicion, setModoEdicion]           = useState(false);
+  const [editNombre, setEditNombre]             = useState('');
+  const [editTelefono, setEditTelefono]         = useState('');
+  const [editDireccion, setEditDireccion]       = useState('');
+  const [editClinica, setEditClinica]           = useState('');
+  const [guardandoEdit, setGuardandoEdit]       = useState(false);
 
   // Modal visita
   const [visitaProspecto, setVisitaProspecto] = useState<Medico | null>(null);
@@ -73,9 +78,13 @@ export const ProspectosView: React.FC = () => {
   const getPos = (e: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
-    const sx = CANVAS_W / rect.width, sy = CANVAS_H / rect.height;
-    if ('touches' in e) return { x: (e.touches[0].clientX - rect.left) * sx, y: (e.touches[0].clientY - rect.top) * sy };
-    return { x: ((e as React.MouseEvent).clientX - rect.left) * sx, y: ((e as React.MouseEvent).clientY - rect.top) * sy };
+    // Sin escalado: el canvas ahora tiene el mismo tamaño que su contenedor
+    if ('touches' in e) {
+      const t = e.touches[0];
+      return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+    }
+    const m = e as React.MouseEvent;
+    return { x: m.clientX - rect.left, y: m.clientY - rect.top };
   };
   const startDraw = (e: React.MouseEvent | React.TouchEvent) => { e.preventDefault(); e.stopPropagation(); setDibujando(true); lastPos.current = getPos(e); };
   const draw = (e: React.MouseEvent | React.TouchEvent) => {
@@ -88,16 +97,25 @@ export const ProspectosView: React.FC = () => {
     lastPos.current = pos; setFirmaVacia(false);
   };
   const endDraw = (e: React.MouseEvent | React.TouchEvent) => { e.preventDefault(); setDibujando(false); };
-  const limpiarFirma = () => { canvasRef.current?.getContext('2d')!.clearRect(0, 0, CANVAS_W, CANVAS_H); setFirmaVacia(true); };
+  const limpiarFirma = () => { canvasRef.current?.getContext('2d')!.clearRect(0, 0, canvasRef.current?.width || 600, canvasRef.current?.height || 200); setFirmaVacia(true); };
   const confirmarFirma = () => {
     if (firmaVacia) { alert('Por favor dibuja la firma'); return; }
     setFirmaGuardada(canvasRef.current!.toDataURL('image/png'));
     setShowFirmaModal(false);
   };
+  const sizearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const container = canvas.parentElement;
+    if (!container) return;
+    canvas.width = container.clientWidth;
+    canvas.height = 200;
+  };
+
   const abrirFirma = () => {
     setFirmaVacia(true);
     setShowFirmaModal(true);
-    setTimeout(() => canvasRef.current?.getContext('2d')!.clearRect(0, 0, CANVAS_W, CANVAS_H), 50);
+    setTimeout(() => { sizearCanvas(); canvasRef.current?.getContext('2d')!.clearRect(0, 0, canvasRef.current?.width || 600, canvasRef.current?.height || 200); }, 100);
   };
 
   // ── GPS ────────────────────────────────────────────────────────
@@ -146,6 +164,35 @@ export const ProspectosView: React.FC = () => {
   };
 
   // ── Convertir / Eliminar ───────────────────────────────────────
+  const abrirEdicion = (m: Medico) => {
+    setEditNombre(m.nombre);
+    setEditTelefono(m.telefono || '');
+    setEditDireccion(m.direccion || '');
+    setEditClinica(m.clinica || '');
+    setModoEdicion(true);
+  };
+
+  const guardarEdicion = async () => {
+    if (!modalProspecto || !editNombre.trim()) { alert('El nombre es obligatorio'); return; }
+    setGuardandoEdit(true);
+    try {
+      await supabase.from('medicos').update({
+        nombre: editNombre.trim(),
+        telefono: editTelefono.trim(),
+        direccion: editDireccion.trim(),
+        clinica: editClinica.trim() || null,
+      }).eq('id', modalProspecto.id);
+      await cargarDatos();
+      // Update local modal state
+      setModalProspecto({ ...modalProspecto,
+        nombre: editNombre.trim(), telefono: editTelefono.trim(),
+        direccion: editDireccion.trim(), clinica: editClinica.trim() || undefined,
+      });
+      setModoEdicion(false);
+    } catch (e: any) { alert('Error al guardar: ' + e.message); }
+    setGuardandoEdit(false);
+  };
+
   const convertirAReferente = async (m: Medico) => {
     setConvirtiendo(true);
     try {
@@ -248,12 +295,63 @@ export const ProspectosView: React.FC = () => {
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center px-5 py-4 border-b sticky top-0 bg-white rounded-t-3xl sm:rounded-t-2xl z-10">
-              <h2 className="font-bold text-gray-800">Prospecto</h2>
-              <button onClick={() => { setModalProspecto(null); setConfirmConvertir(false); setConfirmEliminar(false); }}
-                className="p-2 text-gray-400 hover:bg-gray-100 rounded-xl"><X size={20} /></button>
+              <h2 className="font-bold text-gray-800">{modoEdicion ? '✏️ Editar Prospecto' : 'Prospecto'}</h2>
+              <div className="flex items-center gap-1">
+                {!modoEdicion && (
+                  <button onClick={() => abrirEdicion(modalProspecto)}
+                    className="p-2 text-blue-500 hover:bg-blue-50 rounded-xl" title="Editar">
+                    <Edit2 size={17} />
+                  </button>
+                )}
+                <button onClick={() => { setModalProspecto(null); setConfirmConvertir(false); setConfirmEliminar(false); setModoEdicion(false); }}
+                  className="p-2 text-gray-400 hover:bg-gray-100 rounded-xl"><X size={20} /></button>
+              </div>
             </div>
             <div className="p-5 space-y-4">
-              {/* Info */}
+
+              {/* ── MODO EDICIÓN ── */}
+              {modoEdicion ? (
+                <div className="space-y-3">
+                  <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
+                    <p className="text-xs text-blue-600 font-medium">Editando datos de {modalProspecto.nombre}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Nombre *</label>
+                    <input type="text" value={editNombre} onChange={e => setEditNombre(e.target.value)}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Teléfono</label>
+                    <input type="text" value={editTelefono} onChange={e => setEditTelefono(e.target.value)}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                      placeholder="55551234" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Clínica / Centro</label>
+                    <input type="text" value={editClinica} onChange={e => setEditClinica(e.target.value)}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"
+                      placeholder="Nombre de la clínica u hospital" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Dirección</label>
+                    <textarea value={editDireccion} onChange={e => setEditDireccion(e.target.value)} rows={2}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none resize-none"
+                      placeholder="Dirección exacta..." />
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={() => setModoEdicion(false)}
+                      className="flex-1 py-3 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50">
+                      Cancelar
+                    </button>
+                    <button onClick={guardarEdicion} disabled={guardandoEdit}
+                      className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-blue-700">
+                      <Save size={15} /> {guardandoEdit ? 'Guardando...' : 'Guardar cambios'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+              <>
+              {/* ── MODO VISTA ── */}
               <div className="bg-orange-50 rounded-xl p-4 border border-orange-100">
                 <div className="flex items-start gap-3">
                   <div className="bg-orange-100 rounded-xl p-2 shrink-0"><Stethoscope size={20} className="text-orange-600" /></div>
@@ -349,6 +447,8 @@ export const ProspectosView: React.FC = () => {
                   </div>
                 )}
               </div>
+            </>
+            )}
             </div>
           </div>
         </div>
@@ -459,8 +559,7 @@ export const ProspectosView: React.FC = () => {
             </div>
             <div className="p-4">
               <div className="border-2 border-gray-200 rounded-xl overflow-hidden bg-gray-50 relative" style={{ touchAction: 'none' }}>
-                <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H}
-                  className="w-full cursor-crosshair block" style={{ touchAction: 'none', userSelect: 'none' }}
+                <canvas ref={canvasRef} className="block w-full cursor-crosshair" style={{ height: 200, touchAction: 'none', userSelect: 'none' }}
                   onMouseDown={startDraw} onMouseMove={draw} onMouseUp={endDraw} onMouseLeave={endDraw}
                   onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={endDraw} />
                 {firmaVacia && (

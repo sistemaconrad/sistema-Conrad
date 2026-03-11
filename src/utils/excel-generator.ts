@@ -18,9 +18,12 @@ interface Consulta {
   };
   medicos?: {
     nombre: string;
+    es_referente?: boolean;
   };
   medico_recomendado?: string;
   sin_informacion_medico?: boolean;
+  sin_orden_medica?: boolean;
+  medico_es_referente?: boolean;
   numero_factura?: string;
   tipo_cobro: string;
   forma_pago: string;
@@ -264,15 +267,29 @@ async function crearHojaDiaria(
     const precioTotal = consulta.detalle_consultas.reduce((sum, det) => sum + det.precio, 0);
       
     let nombreMedico: string;
-    
+    // Color para celda médico: verde=referente, azul=no referente, ámbar=sin orden, gris=sin info
+    let medicoColorArgb: string | null = null;
+
     if (consulta.sin_informacion_medico) {
       nombreMedico = 'SIN INFORMACIÓN';
-    } else if (consulta.medicos?.nombre) {
-      nombreMedico = consulta.medicos.nombre;
-    } else if (consulta.medico_recomendado) {
-      nombreMedico = consulta.medico_recomendado;
+      medicoColorArgb = null; // sin color especial
+    } else if (consulta.sin_orden_medica) {
+      // Sin orden médica — ámbar
+      const nm = consulta.medicos?.nombre || consulta.medico_recomendado || 'TRATANTE';
+      nombreMedico = `${nm} (SIN ORDEN MÉDICA)`;
+      medicoColorArgb = 'FFFFF3CD'; // ámbar claro
+    } else if (consulta.medicos?.es_referente || consulta.medico_es_referente) {
+      // Referente — verde, sin etiqueta extra
+      nombreMedico = consulta.medicos?.nombre || consulta.medico_recomendado || 'TRATANTE';
+      medicoColorArgb = 'FFD4EDDA'; // verde claro
+    } else if (consulta.medicos?.nombre || consulta.medico_recomendado) {
+      // No referente — azul claro con etiqueta
+      const nm = consulta.medicos?.nombre || consulta.medico_recomendado || '';
+      nombreMedico = `${nm} (NO REFERENTE)`;
+      medicoColorArgb = 'FFD1ECF1'; // azul claro
     } else {
       nombreMedico = 'TRATANTE';
+      medicoColorArgb = null;
     }
 
     // Formatear edad correctamente
@@ -375,6 +392,10 @@ async function crearHojaDiaria(
       // ✅ Actualizado: colIdx 5 es ESTUDIO (antes era 4)
       if (colIdx === 5 && esInhabil) {
         cell.font = { name: 'Arial', size: 10, color: { argb: 'FFFF0000' }, bold: true };
+      } else if (colIdx === 6 && medicoColorArgb) {
+        // Color de fondo para columna MEDICO REFERENTE según tipo
+        cell.font = { name: 'Arial', size: 10, bold: true };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: medicoColorArgb } };
       } else {
         cell.font = { name: 'Arial', size: 10 };
       }
