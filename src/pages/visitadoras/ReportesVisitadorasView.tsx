@@ -8,13 +8,11 @@ const meses = [
   'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'
 ];
 
-// Hora local Guatemala (UTC-6)
-const toGT = (iso: string) => {
-  const d = new Date(iso);
-  return new Date(d.getTime() - 6 * 60 * 60 * 1000);
-};
-const fechaGT = (iso: string) => toGT(iso).toLocaleDateString('es-GT');
-const horaGT  = (iso: string) => toGT(iso).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
+// ✅ Hora Guatemala correcta usando timeZone explícito
+const fechaGT = (iso: string) =>
+  new Date(iso).toLocaleDateString('es-GT', { timeZone: 'America/Guatemala' });
+const horaGT = (iso: string) =>
+  new Date(iso).toLocaleTimeString('es-GT', { timeZone: 'America/Guatemala', hour: '2-digit', minute: '2-digit', hour12: true });
 
 export const ReportesVisitadorasView: React.FC = () => {
   const [mes,   setMes]   = useState(() => new Date().getMonth() + 1);
@@ -76,8 +74,8 @@ export const ReportesVisitadorasView: React.FC = () => {
     setGenerando('visitas-mes');
     try {
       const { data, error } = await supabase.from('visitas_medicas').select('*')
-        .gte('created_at', `${periodoInicio()}T00:00:00`)
-        .lte('created_at', `${periodoFin()}T23:59:59`)
+        .gte('created_at', `${periodoInicio()}T06:00:00.000Z`)
+        .lt('created_at', new Date(new Date(`${periodoFin()}T06:00:00.000Z`).getTime() + 86400000).toISOString())
         .order('created_at');
       if (error) throw error;
 
@@ -91,8 +89,10 @@ export const ReportesVisitadorasView: React.FC = () => {
       (data || []).forEach((v: any, i) => {
         const r = ws.addRow([i+1, fechaGT(v.created_at), horaGT(v.created_at), v.medico_nombre, v.medico_especialidad||'—', v.visitadora_nombre, v.nombre_receptor||'—', v.comentario||'—']);
         zebra(r, i);
+        r.height = 28;
+        r.getCell(8).alignment = { wrapText: true, vertical: 'top' };
       });
-      [5,14,12,28,18,22,22,40].forEach((w,i) => ws.getColumn(i+1).width = w);
+      [5,14,12,28,18,22,22,50].forEach((w,i) => ws.getColumn(i+1).width = w);
       await descargar(wb, `Visitas_${meses[mes-1]}_${anio}.xlsx`);
     } catch(e) { console.error(e); alert('Error al generar reporte de visitas.'); }
     setGenerando(null);
@@ -103,8 +103,8 @@ export const ReportesVisitadorasView: React.FC = () => {
     setGenerando('visitas-dia');
     try {
       const { data, error } = await supabase.from('visitas_medicas').select('*')
-        .gte('created_at', `${fecha}T00:00:00`)
-        .lte('created_at', `${fecha}T23:59:59`)
+        .gte('created_at', `${fecha}T06:00:00.000Z`)
+        .lt('created_at', new Date(new Date(`${fecha}T06:00:00.000Z`).getTime() + 86400000).toISOString())
         .order('created_at');
       if (error) throw error;
 
@@ -119,8 +119,10 @@ export const ReportesVisitadorasView: React.FC = () => {
       (data || []).forEach((v: any, i) => {
         const r = ws.addRow([i+1, horaGT(v.created_at), v.medico_nombre, v.medico_especialidad||'—', v.visitadora_nombre, v.nombre_receptor||'—', v.comentario||'—']);
         zebra(r, i);
+        r.height = 28;
+        r.getCell(7).alignment = { wrapText: true, vertical: 'top' };
       });
-      [5,12,28,18,22,22,40].forEach((w,i) => ws.getColumn(i+1).width = w);
+      [5,12,28,18,22,22,50].forEach((w,i) => ws.getColumn(i+1).width = w);
       await descargar(wb, `Visitas_${d}-${m}-${y}.xlsx`);
     } catch(e) { console.error(e); alert('Error al generar reporte diario.'); }
     setGenerando(null);

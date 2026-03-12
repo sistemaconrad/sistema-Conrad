@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, FileText, Users, BarChart3, Trash2, FileSpreadsheet, Settings, Calendar, DollarSign } from 'lucide-react';
+import { Plus, FileText, Users, BarChart3, Trash2, FileSpreadsheet, Settings, Calendar, DollarSign, Database } from 'lucide-react';
 import { NuevoPacienteModal } from '../components/NuevoPacienteModal';
 import { Autocomplete } from '../components/Autocomplete';
 import { Paciente, Medico, SubEstudio, TipoCobro, FormaPago, DetalleConsulta } from '../types';
@@ -18,6 +18,7 @@ interface PagoMultiple {
 }
 
 export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
+  const rolUsuario = localStorage.getItem('rolUsuarioConrad') || '';
   const [showNuevoModal, setShowNuevoModal] = useState(false);
   const [pacienteActual, setPacienteActual] = useState<(Paciente & { id: string }) | null>(null);
   const [medicoActual, setMedicoActual] = useState<Medico | null>(null);
@@ -479,120 +480,136 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const horarioNormal = esHorarioNormal();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen" style={{ background: '#f0f4f8' }}>
       {/* HEADER */}
-      <header className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg">
-        <div className="container mx-auto px-4 py-6">
+      <header style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1d4ed8 100%)' }} className="text-white shadow-xl">
+        <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">Centro de Diagnóstico</h1>
-              <p className="text-blue-100 mt-2">Sistema de Gestión de Consultas</p>
+            <div className="flex items-center gap-4">
+              <div className="bg-white/10 backdrop-blur rounded-xl p-2.5 border border-white/20">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              </div>
+              <div>
+                <h1 className="text-2xl font-black tracking-tight">Centro de Diagnóstico</h1>
+                <p className="text-blue-200 text-xs mt-0.5 font-medium tracking-wide">SISTEMA DE GESTIÓN MÉDICA · CONRAD</p>
+              </div>
             </div>
-            <div className="text-right text-sm text-blue-100">
-              <p>{format(new Date(), 'EEEE, dd MMMM yyyy')}</p>
-              <p>{format(new Date(), 'HH:mm')}</p>
+            <div className="text-right">
+              <p className="text-white font-semibold text-sm">{format(new Date(), "EEEE, dd 'de' MMMM yyyy")}</p>
+              <p className="text-blue-300 text-xs font-mono mt-0.5">{format(new Date(), 'HH:mm')}</p>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Barra de botones principales */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex flex-wrap gap-3">
-            <button onClick={() => setShowNuevoModal(true)} className="btn-primary flex items-center gap-2">
-              <Plus size={20} /> Nuevo
+      {/* Barra de navegación */}
+      <div className="bg-white/80 backdrop-blur border-b border-gray-200 shadow-sm sticky top-0 z-30">
+        <div className="container mx-auto px-4 py-2.5">
+          <div className="flex flex-wrap gap-1.5">
+            <button onClick={() => setShowNuevoModal(true)}
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-sm shadow-blue-200">
+              <Plus size={16} /> Nuevo
             </button>
-            <button onClick={() => onNavigate('productos')} className="btn-secondary flex items-center gap-2">
-              <FileText size={20} /> Productos
-            </button>
-            <button onClick={() => onNavigate('referentes')} className="btn-secondary flex items-center gap-2">
-              <Users size={20} /> Referentes
-            </button>
-            <button onClick={() => onNavigate('pacientes')} className="btn-secondary flex items-center gap-2">
-              <Users size={20} /> Pacientes
-            </button>
-            <button onClick={() => onNavigate('cuadre')} className="btn-secondary flex items-center gap-2">
-              <BarChart3 size={20} /> Cuadre Diario
-            </button>
-            <button onClick={() => onNavigate('cuadre-quincenal')} className="btn-secondary flex items-center gap-2">
-              <Calendar size={20} /> Estados de Cuenta Quincenal
-            </button>
-            <button onClick={() => onNavigate('reportes')} className="btn-secondary flex items-center gap-2">
-              <FileSpreadsheet size={20} /> Reportes
-            </button>
-            <button onClick={() => onNavigate('comisiones')} className="btn-secondary flex items-center gap-2">
-              <DollarSign size={20} /> Comisiones
-            </button>
+            {[
+              { label: 'Productos', icon: <FileText size={15}/>, nav: 'productos' },
+              { label: 'Referentes', icon: <Users size={15}/>, nav: 'referentes' },
+              { label: 'Pacientes', icon: <Users size={15}/>, nav: 'pacientes' },
+              { label: 'Cuadre Diario', icon: <BarChart3 size={15}/>, nav: 'cuadre' },
+              { label: 'Est. Cta Quincenal', icon: <Calendar size={15}/>, nav: 'cuadre-quincenal' },
+              { label: 'Reportes', icon: <FileSpreadsheet size={15}/>, nav: 'reportes' },
+              { label: 'Comisiones', icon: <DollarSign size={15}/>, nav: 'comisiones' },
+            ].map(({ label, icon, nav }) => (
+              <button key={nav} onClick={() => onNavigate(nav)}
+                className="flex items-center gap-1.5 bg-white hover:bg-slate-50 border border-gray-200 hover:border-blue-300 text-gray-600 hover:text-blue-700 px-3 py-2 rounded-lg text-sm font-medium transition-all">
+                {icon} {label}
+              </button>
+            ))}
+            {rolUsuario === 'admin' && (
+              <button onClick={() => onNavigate('importar-medicos')}
+                className="flex items-center gap-1.5 bg-white hover:bg-slate-50 border border-dashed border-gray-300 hover:border-emerald-400 text-gray-400 hover:text-emerald-700 px-3 py-2 rounded-lg text-sm font-medium transition-all ml-1"
+                title="Importar base de datos de médicos desde Excel">
+                <Database size={15}/> Importar BD
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* Contenido principal */}
-      <div className="container mx-auto px-4 pb-8 pt-6">
+      <div className="container mx-auto px-4 pb-10 pt-5">
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Columna izquierda */}
           <div className="lg:col-span-2 space-y-6">
             {pacienteActual && (
-              <div className="card">
-                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                  Información del Paciente
-                  {esServicioMovil && (
-                    <span className="text-sm bg-orange-500 text-white px-3 py-1 rounded-full">
-                      📱 SERVICIO MÓVIL
-                    </span>
-                  )}
-                  {consultaGuardada && (
-                    <span className="text-sm bg-green-500 text-white px-3 py-1 rounded-full">
-                      ✅ GUARDADO
-                    </span>
-                  )}
-                </h3>
-                <div className="grid md:grid-cols-2 gap-3 text-sm">
-                  <div><strong>Nombre:</strong> {pacienteActual.nombre}</div>
-                  <div><strong>Edad:</strong> {pacienteActual.edad} años</div>
-                  <div><strong>Teléfono:</strong> {pacienteActual.telefono}</div>
-                  <div><strong>Departamento:</strong> {pacienteActual.departamento}</div>
-                  <div><strong>Municipio:</strong> {pacienteActual.municipio}</div>
-                  {/* ✅ Mostrar establecimiento si es servicio móvil */}
-                  {esServicioMovil && establecimientoMovil && (
-                    <div className="col-span-2">
-                      <strong>🏥 Establecimiento:</strong>{' '}
-                      <span className="text-orange-700 font-medium">{establecimientoMovil}</span>
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                {/* Header paciente */}
+                <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100"
+                  style={{ background: consultaGuardada ? 'linear-gradient(90deg,#f0fdf4,#dcfce7)' : esServicioMovil ? 'linear-gradient(90deg,#fff7ed,#fed7aa33)' : 'linear-gradient(90deg,#eff6ff,#dbeafe33)' }}>
+                  <div className="flex items-center gap-2">
+                    <div className={`rounded-lg p-1.5 ${consultaGuardada ? 'bg-green-100' : esServicioMovil ? 'bg-orange-100' : 'bg-blue-100'}`}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={consultaGuardada ? '#16a34a' : esServicioMovil ? '#ea580c' : '#2563eb'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </div>
+                    <span className="font-bold text-sm text-gray-800">Información del Paciente</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {esServicioMovil && <span className="text-xs bg-orange-500 text-white px-2.5 py-1 rounded-full font-bold">📱 MÓVIL</span>}
+                    {consultaGuardada && <span className="text-xs bg-green-500 text-white px-2.5 py-1 rounded-full font-bold">✅ GUARDADO</span>}
+                    {sinOrdenMedicaConsulta && <span className="text-xs bg-amber-400 text-white px-2.5 py-1 rounded-full font-bold">📋 SIN ORDEN</span>}
+                  </div>
+                </div>
+                {/* Datos */}
+                <div className="px-5 py-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-sm">
+                    <div><span className="text-gray-400 text-xs uppercase tracking-wide font-medium">Nombre</span><p className="font-semibold text-gray-900 mt-0.5">{pacienteActual.nombre}</p></div>
+                    <div><span className="text-gray-400 text-xs uppercase tracking-wide font-medium">Edad</span><p className="font-semibold text-gray-900 mt-0.5">{pacienteActual.edad} años</p></div>
+                    <div><span className="text-gray-400 text-xs uppercase tracking-wide font-medium">Teléfono</span><p className="font-semibold text-gray-900 mt-0.5">{pacienteActual.telefono}</p></div>
+                    <div><span className="text-gray-400 text-xs uppercase tracking-wide font-medium">Departamento</span><p className="font-semibold text-gray-900 mt-0.5">{pacienteActual.departamento}</p></div>
+                    <div><span className="text-gray-400 text-xs uppercase tracking-wide font-medium">Municipio</span><p className="font-semibold text-gray-900 mt-0.5">{pacienteActual.municipio}</p></div>
+                    {esServicioMovil && establecimientoMovil && (
+                      <div className="col-span-2 md:col-span-3">
+                        <span className="text-gray-400 text-xs uppercase tracking-wide font-medium">Establecimiento</span>
+                        <p className="font-semibold text-orange-700 mt-0.5">🏥 {establecimientoMovil}</p>
+                      </div>
+                    )}
+                  </div>
+                  {medicoActual && !sinInfoMedico && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-2 flex items-center gap-1">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                        Médico {sinOrdenMedicaConsulta && <span className="text-amber-500 ml-1">(Sin orden médica)</span>}
+                      </p>
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                        <div><span className="text-gray-400 text-xs">Nombre</span><p className="font-semibold text-gray-900">{medicoActual.nombre}</p></div>
+                        <div><span className="text-gray-400 text-xs">Teléfono</span><p className="font-semibold text-gray-900">{medicoActual.telefono}</p></div>
+                      </div>
                     </div>
                   )}
                 </div>
-                {medicoActual && !sinInfoMedico && (
-                  <>
-                    <h4 className="text-md font-semibold mt-4 mb-2">Médico</h4>
-                    <div className="grid md:grid-cols-2 gap-3 text-sm">
-                      <div><strong>Nombre:</strong> {medicoActual.nombre}</div>
-                      <div><strong>Teléfono:</strong> {medicoActual.telefono}</div>
-                      <div><strong>Departamento:</strong> {medicoActual.departamento}</div>
-                      <div><strong>Municipio:</strong> {medicoActual.municipio}</div>
-                    </div>
-                  </>
-                )}
               </div>
             )}
 
             {!pacienteActual && (
-              <div className="card bg-blue-50 border-2 border-blue-200">
-                <div className="text-center py-8">
-                  <div className="text-4xl mb-4">🏥</div>
-                  <h3 className="text-xl font-bold text-blue-900 mb-2">Bienvenido al Centro de Diagnóstico</h3>
-                  <p className="text-blue-700 mb-4">Para comenzar, registra un nuevo paciente</p>
-                  <button onClick={() => setShowNuevoModal(true)} className="btn-primary inline-flex items-center gap-2">
-                    <Plus size={20} /> Crear Nuevo Paciente
+              <div className="rounded-2xl overflow-hidden border border-blue-100 shadow-sm"
+                style={{ background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)' }}>
+                <div className="p-8 text-center">
+                  <div className="w-16 h-16 mx-auto mb-5 rounded-2xl flex items-center justify-center shadow-lg"
+                    style={{ background: 'linear-gradient(135deg, #1d4ed8, #0f172a)' }}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                  </div>
+                  <h3 className="text-xl font-black text-slate-900 mb-1">Bienvenido al Centro de Diagnóstico</h3>
+                  <p className="text-blue-600 text-sm mb-6 font-medium">Registra un nuevo paciente para comenzar la consulta</p>
+                  <button onClick={() => setShowNuevoModal(true)}
+                    className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all shadow-md shadow-blue-200 hover:shadow-lg">
+                    <Plus size={18} /> Crear Nuevo Paciente
                   </button>
                 </div>
               </div>
             )}
 
             {/* Tipo de cobro */}
-            <div className="card">
-              <h3 className="text-lg font-semibold mb-3">Tipo de Cobro</h3>
-              <div className="flex gap-4 flex-wrap">
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-5 py-4">
+              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3">Tipo de Cobro</h3>
+              <div className="flex gap-2 flex-wrap">
                 <label className="flex items-center">
                   <input type="radio" name="tipoCobro" checked={tipoCobro === 'social'}
                     onChange={() => { setTipoCobro('social'); setShowJustificacion(false); setJustificacionEspecial(''); }}
@@ -640,8 +657,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               )}
 
               {esServicioMovil && (
-                <div className="mt-4 p-3 bg-orange-100 border border-orange-300 rounded">
-                  <p className="text-sm text-orange-800">
+                <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-xl">
+                  <p className="text-sm text-orange-700">
                     <strong>📱 Servicio Móvil:</strong>
                     {tipoCobro === 'especial' && ' Usando precios especiales del sistema'}
                     {tipoCobro === 'personalizado' && ' Puedes editar el precio de cada estudio manualmente en la sección de Descripción'}
@@ -653,8 +670,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             {/* ✅ ELIMINADA: Sección "Opciones Extras - Servicio Móvil" */}
 
             {/* Estudios */}
-            <div className="card">
-              <h3 className="text-lg font-semibold mb-3">Estudios</h3>
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-5 py-4">
+              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3">Estudios</h3>
               <div className="grid md:grid-cols-2 gap-4">
                 <Autocomplete
                   label="Estudio"
@@ -677,23 +694,23 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               </div>
               <button
                 onClick={agregarSubEstudio}
-                className="btn-primary mt-4 flex items-center gap-2 justify-center w-full"
+                className="mt-3 flex items-center gap-2 justify-center w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl font-bold text-sm transition-all shadow-sm shadow-blue-100"
                 disabled={!subEstudioSeleccionado || !!consultaGuardada}
               >
-                <Plus size={18} />
-                Agregar {estudioSeleccionado && descripcion.length > 0 ? 'Otro' : 'a Descripción'}
+                <Plus size={16} />
+                Agregar {estudioSeleccionado && descripcion.length > 0 ? 'Otro Estudio' : 'a Descripción'}
               </button>
               {estudioSeleccionado && descripcion.length > 0 && !consultaGuardada && (
                 <p className="text-sm text-green-600 mt-2 text-center">✓ Puedes seguir agregando más estudios del mismo tipo</p>
               )}
               {consultaGuardada && (
-                <p className="text-sm text-yellow-600 mt-2 text-center">⚠️ Consulta guardada - No se pueden agregar más estudios</p>
+                <p className="text-sm text-amber-600 mt-2 text-center font-medium">⚠️ Consulta guardada — no se pueden agregar más estudios</p>
               )}
             </div>
 
             {/* Descripción */}
-            <div className="card">
-              <h3 className="text-lg font-semibold mb-3">Descripción</h3>
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-5 py-4">
+              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3">Descripción de Estudios</h3>
               {descripcion.length === 0 ? (
                 <p className="text-gray-500 text-center py-4">No hay estudios agregados</p>
               ) : (
@@ -784,20 +801,18 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                 </div>
               )}
               {medicoActual && !sinInfoMedico && descripcion.length > 0 && !consultaGuardada && (
-                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded text-sm">
-                  <p className="text-blue-800">
-                    <strong>💡 Control de comisiones:</strong> Usa el botón "Referido" para controlar qué estudios generan comisión al médico.
-                  </p>
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-xl text-sm">
+                  <p className="text-blue-700">💡 Usa el botón <strong>"Referido"</strong> para controlar qué estudios generan comisión al médico.</p>
                 </div>
               )}
             </div>
           </div>
 
           {/* Columna derecha */}
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Facturación */}
-            <div className="card">
-              <h3 className="text-lg font-semibold mb-3">Facturación</h3>
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-5 py-4">
+              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3">Facturación</h3>
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <label className="font-medium">Factura:</label>
@@ -885,41 +900,42 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             </div>
 
             {/* Totales */}
-            <div className="card bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300">
-              <h3 className="text-lg font-semibold mb-3 text-blue-800">💰 Totales</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Sub-Total Estudios:</span>
-                  <span className="font-semibold">Q {totales.subTotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Descuento:</span>
-                  <span className="font-semibold">Q {totales.descuento.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Monto Gravable:</span>
-                  <span className="font-semibold">Q {totales.montoGravable.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Impuesto:</span>
-                  <span className="font-semibold">Q {totales.impuesto.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-lg border-t-2 border-blue-400 pt-2 mt-2">
-                  <span className="font-bold">Total Ventas:</span>
-                  <span className="font-bold text-blue-700">Q {totales.total.toFixed(2)}</span>
+            <div className="rounded-2xl overflow-hidden border border-blue-200 shadow-sm"
+              style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #1d4ed8 100%)' }}>
+              <div className="px-5 py-4">
+                <h3 className="text-xs font-bold text-blue-200 uppercase tracking-wide mb-3">💰 Totales</h3>
+                <div className="space-y-2">
+                  {[
+                    { label: 'Sub-Total', value: totales.subTotal },
+                    { label: 'Descuento', value: totales.descuento },
+                    { label: 'Monto Gravable', value: totales.montoGravable },
+                    { label: 'Impuesto', value: totales.impuesto },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="flex justify-between text-sm">
+                      <span className="text-blue-200">{label}:</span>
+                      <span className="text-white font-medium">Q {value.toFixed(2)}</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between pt-3 mt-1 border-t border-white/20">
+                    <span className="font-bold text-white text-base">Total Ventas:</span>
+                    <span className="font-black text-white text-xl">Q {totales.total.toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Botones de acción */}
-            <div className="space-y-3">
-              <button onClick={handleLimpiar} className="btn-secondary w-full">🗑️ Limpiar</button>
+            <div className="space-y-2.5">
+              <button onClick={handleLimpiar}
+                className="w-full flex items-center justify-center gap-2 py-2.5 bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-600 rounded-xl font-semibold text-sm transition-all">
+                🗑️ Limpiar
+              </button>
               <button
                 onClick={handleGuardar}
-                className={`w-full font-semibold py-3 px-4 rounded-lg transition-all ${
-                  guardando ? 'bg-yellow-500 text-white cursor-wait'
-                  : consultaGuardada ? 'bg-green-600 text-white cursor-default'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl'
+                className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm transition-all ${
+                  guardando ? 'bg-amber-500 text-white cursor-wait shadow-md'
+                  : consultaGuardada ? 'bg-emerald-600 text-white cursor-default shadow-md'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 hover:shadow-lg'
                 }`}
                 disabled={!pacienteActual || descripcion.length === 0 || guardando || !!consultaGuardada}
               >
@@ -927,18 +943,20 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               </button>
               <button
                 onClick={handleImprimir}
-                className={`w-full font-semibold py-3 px-4 rounded-lg transition-all ${
-                  consultaGuardada ? 'bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-xl' : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${
+                  consultaGuardada
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-green-100'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 }`}
                 disabled={!consultaGuardada}
               >
                 🖨️ Imprimir Recibo
               </button>
               {!consultaGuardada && pacienteActual && descripcion.length > 0 && (
-                <p className="text-xs text-blue-600 text-center font-medium">ℹ️ Primero debe guardar la consulta</p>
+                <p className="text-xs text-blue-500 text-center font-medium">ℹ️ Primero debe guardar la consulta</p>
               )}
               {consultaGuardada && (
-                <p className="text-xs text-green-600 text-center font-medium">✅ Consulta guardada correctamente. Puede imprimir ahora.</p>
+                <p className="text-xs text-emerald-600 text-center font-medium">✅ Guardado · puede imprimir ahora</p>
               )}
             </div>
           </div>

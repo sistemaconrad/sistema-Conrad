@@ -9,6 +9,8 @@ import ExcelJS from 'exceljs';
 interface Medico {
   id: string; nombre: string; telefono: string;
   departamento: string; municipio: string; direccion: string;
+  clinica?: string; especialidad?: string;
+  referencia?: string; horario?: string; especial?: string;
   es_referente: boolean; activo: boolean;
 }
 interface Establecimiento {
@@ -36,6 +38,9 @@ export const ReferentesPage: React.FC<ReferentesPageProps> = ({ onBack }) => {
   const [departamento, setDepartamento] = useState('');
   const [municipio, setMunicipio] = useState('');
   const [direccion, setDireccion] = useState('');
+  const [referencia, setReferencia] = useState('');
+  const [horario, setHorario] = useState('');
+  const [especial, setEspecial] = useState('');
 
   // ── ESTABLECIMIENTOS ─────────────────────────────────────────────
   const [establecimientos, setEstablecimientos] = useState<Establecimiento[]>([]);
@@ -57,6 +62,7 @@ export const ReferentesPage: React.FC<ReferentesPageProps> = ({ onBack }) => {
   const abrirModalNuevo = () => {
     setEditando(false); setMedicoEditando(null);
     setNombre(''); setTelefono(''); setDepartamento(''); setMunicipio(''); setDireccion('');
+    setReferencia(''); setHorario(''); setEspecial('');
     setShowModal(true);
   };
 
@@ -64,22 +70,24 @@ export const ReferentesPage: React.FC<ReferentesPageProps> = ({ onBack }) => {
     setEditando(true); setMedicoEditando(m);
     setNombre(m.nombre); setTelefono(m.telefono); setDepartamento(m.departamento);
     setMunicipio(m.municipio); setDireccion(m.direccion);
+    setReferencia(m.referencia || ''); setHorario(m.horario || ''); setEspecial(m.especial || '');
     setShowModal(true);
   };
 
   const cerrarModal = () => {
     setShowModal(false); setEditando(false); setMedicoEditando(null);
     setNombre(''); setTelefono(''); setDepartamento(''); setMunicipio(''); setDireccion('');
+    setReferencia(''); setHorario(''); setEspecial('');
   };
 
   const guardarMedico = async () => {
     if (!nombre || !telefono || !departamento || !municipio || !direccion) { alert('Complete todos los campos'); return; }
     try {
       if (editando && medicoEditando) {
-        await supabase.from('medicos').update({ nombre, telefono, departamento, municipio, direccion }).eq('id', medicoEditando.id);
+        await supabase.from('medicos').update({ nombre, telefono, departamento, municipio, direccion, referencia: referencia || null, horario: horario || null, especial: especial || null }).eq('id', medicoEditando.id);
         alert('Médico actualizado');
       } else {
-        await supabase.from('medicos').insert([{ nombre, telefono, departamento, municipio, direccion, es_referente: true, activo: true }]);
+        await supabase.from('medicos').insert([{ nombre, telefono, departamento, municipio, direccion, referencia: referencia || null, horario: horario || null, especial: especial || null, es_referente: true, activo: true }]);
         alert('Médico agregado');
       }
       cerrarModal(); cargarMedicos();
@@ -278,6 +286,9 @@ export const ReferentesPage: React.FC<ReferentesPageProps> = ({ onBack }) => {
                     <p><strong>Teléfono:</strong> {m.telefono}</p>
                     <p><strong>Ubicación:</strong> {departamentosGuatemala.find(d => d.id === m.departamento)?.nombre} - {municipiosGuatemala.find(mu => mu.id === m.municipio)?.nombre}</p>
                     <p className="text-gray-500">{m.direccion}</p>
+                    {m.referencia && <p className="text-blue-500 text-xs">📍 {m.referencia}</p>}
+                    {m.horario && <p className="text-violet-600 text-xs font-medium">⏰ {m.horario}</p>}
+                    {m.especial && <p className="text-amber-600 text-xs">⭐ {m.especial}</p>}
                   </div>
                 </div>
               ))}
@@ -387,6 +398,17 @@ export const ReferentesPage: React.FC<ReferentesPageProps> = ({ onBack }) => {
               <div><label className="label">Dirección Completa *</label>
                 <textarea className="input-field" value={direccion} onChange={e => setDireccion(e.target.value)}
                   placeholder="Zona 10, Edificio X, Oficina Y" rows={3} /></div>
+              <div><label className="label">Referencia de ubicación</label>
+                <input type="text" className="input-field" value={referencia} onChange={e => setReferencia(e.target.value)}
+                  placeholder="Ej: Enfrente de la entrada de Zaragoza a mano izquierda" /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="label">Horario</label>
+                  <input type="text" className="input-field" value={horario} onChange={e => setHorario(e.target.value)}
+                    placeholder="Ej: 8AM a 4:30PM" /></div>
+                <div><label className="label">Especial</label>
+                  <input type="text" className="input-field" value={especial} onChange={e => setEspecial(e.target.value)}
+                    placeholder="Notas especiales" /></div>
+              </div>
             </div>
             <div className="flex gap-3 justify-end mt-6">
               <button onClick={cerrarModal} className="btn-secondary">Cancelar</button>

@@ -12,6 +12,9 @@ interface Medico {
   municipio: string;
   direccion: string;
   clinica?: string;
+  referencia?: string;
+  horario?: string;
+  especial?: string;
   es_referente: boolean;
   activo: boolean;
 }
@@ -24,6 +27,9 @@ const emptyForm = {
   municipio: '',
   direccion: '',
   clinica: '',
+  referencia: '',
+  horario: '',
+  especial: '',
 };
 
 const ESPECIALIDAD_COLORS: { [key: string]: string } = {
@@ -88,6 +94,9 @@ export const MedicosView: React.FC = () => {
         municipio: medico.municipio,
         direccion: medico.direccion,
         clinica: medico.clinica || '',
+        referencia: medico.referencia || '',
+        horario: medico.horario || '',
+        especial: medico.especial || '',
       });
     } else {
       setEditando(null);
@@ -245,6 +254,22 @@ export const MedicosView: React.FC = () => {
                     <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{m.direccion}</p>
                   </div>
                 )}
+                {m.referencia && (
+                  <div className="flex items-start gap-2">
+                    <div className="bg-blue-50 rounded-lg p-1.5 shrink-0 mt-0.5">
+                      <MapPin size={13} className="text-blue-400" />
+                    </div>
+                    <p className="text-xs text-blue-600 line-clamp-2 leading-relaxed">{m.referencia}</p>
+                  </div>
+                )}
+                {m.horario && (
+                  <div className="flex items-center gap-2">
+                    <div className="bg-violet-50 rounded-lg p-1.5 shrink-0">
+                      <span className="text-violet-500 text-xs font-bold">⏰</span>
+                    </div>
+                    <p className="text-xs text-violet-600 font-medium">{m.horario}</p>
+                  </div>
+                )}
                 <div className="flex items-center gap-2">
                   <div className="bg-green-50 rounded-lg p-1.5">
                     <Phone size={13} className="text-green-500" />
@@ -291,6 +316,8 @@ export const MedicosView: React.FC = () => {
                         <span className="font-medium">{getNombreMunicipio(m.municipio)}, {getNombreDepto(m.departamento)}</span>
                       </div>
                       {m.direccion && <p className="text-gray-400 mt-0.5 pl-4">{m.direccion}</p>}
+                      {m.referencia && <p className="text-blue-500 mt-0.5 pl-4 text-xs">{m.referencia}</p>}
+                      {m.horario && <p className="text-violet-500 mt-0.5 pl-4 text-xs font-medium">⏰ {m.horario}</p>}
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex justify-center gap-2">
@@ -366,6 +393,24 @@ export const MedicosView: React.FC = () => {
                   <input type="text" value={form.clinica} onChange={e => setForm({ ...form, clinica: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                     placeholder="Opcional" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Referencia de ubicación</label>
+                  <input type="text" value={form.referencia} onChange={e => setForm({ ...form, referencia: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                    placeholder="Ej: Enfrente de la entrada de Zaragoza a mano izquierda" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Horario</label>
+                  <input type="text" value={form.horario} onChange={e => setForm({ ...form, horario: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                    placeholder="Ej: 8AM a 4:30PM" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Especial</label>
+                  <input type="text" value={form.especial} onChange={e => setForm({ ...form, especial: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                    placeholder="Notas especiales (opcional)" />
                 </div>
               </div>
             </div>

@@ -130,6 +130,9 @@ export const ComisionesPage: React.FC<ComisionesPageProps> = ({ onBack }) => {
           estudios: consulta.detalle_consultas,
           tipo_cobro: etiquetaTipo,
           comision: comisionTotal,
+          total: consulta.detalle_consultas?.reduce((s: number, d: any) => s + (d.precio || 0), 0) || 0,
+          porcentaje,
+          estudio: estudiosUsados.length > 1 ? estudiosUsados.join(' / ') : (estudiosUsados[0] || '—'),
         });
       });
 
@@ -335,234 +338,217 @@ export const ComisionesPage: React.FC<ComisionesPageProps> = ({ onBack }) => {
     .reduce((sum, m) => sum + m.total_comision, 0);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <button 
-            onClick={onBack} 
-            className="text-white hover:text-purple-100 mb-4 flex items-center gap-2 transition-colors"
-          >
-            <ArrowLeft size={20} />
-            Volver al Dashboard
-          </button>
-          <h1 className="text-3xl font-bold">Comisiones Médicas</h1>
-          <p className="text-purple-100 mt-2">Cálculo de comisiones por referencias</p>
-        </div>
-      </div>
+    <div className="min-h-screen" style={{ background: '#f0f4f8' }}>
 
-      {/* Contenido */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Filtros */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex-1 min-w-[200px]">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Calendar className="inline mr-2" size={16} />
-                Fecha Inicio
-              </label>
-              <input
-                type="date"
-                value={fechaInicio}
-                onChange={(e) => setFechaInicio(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-              />
+      {/* ── HEADER ── */}
+      <header className="text-white shadow-xl" style={{ background: 'linear-gradient(135deg,#0f172a 0%,#3b0764 60%,#7c3aed 100%)' }}>
+        <div className="container mx-auto px-6 py-4 flex items-center gap-4">
+          <button onClick={onBack} className="bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl p-2 transition-colors">
+            <ArrowLeft size={18} />
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="bg-white/10 rounded-xl p-2 border border-white/20">
+              <DollarSign size={20} />
             </div>
-            <div className="flex-1 min-w-[200px]">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Calendar className="inline mr-2" size={16} />
-                Fecha Fin
-              </label>
-              <input
-                type="date"
-                value={fechaFin}
-                onChange={(e) => setFechaFin(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-              />
+            <div>
+              <h1 className="text-xl font-black tracking-tight">Comisiones Médicas</h1>
+              <p className="text-purple-200 text-xs">Cálculo de comisiones por referencias</p>
             </div>
-            <div className="flex items-end gap-3">
-              <button
-                onClick={calcularComisiones}
-                disabled={loading}
-                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 transition-colors"
-              >
+          </div>
+        </div>
+      </header>
+
+      <div className="container mx-auto px-4 py-5 max-w-6xl">
+
+        {/* ── FILTROS ── */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-5 py-4 mb-5">
+          <div className="flex items-end gap-3 flex-wrap">
+            <div>
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">
+                <Calendar className="inline mr-1" size={12} /> Fecha Inicio
+              </label>
+              <input type="date"
+                className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-purple-400 focus:border-purple-400"
+                value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">
+                <Calendar className="inline mr-1" size={12} /> Fecha Fin
+              </label>
+              <input type="date"
+                className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-purple-400 focus:border-purple-400"
+                value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} />
+            </div>
+            <div className="flex gap-2 ml-auto">
+              <button onClick={calcularComisiones} disabled={loading}
+                className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 text-white rounded-xl text-sm font-bold shadow-sm shadow-purple-200 transition-all">
                 {loading ? 'Calculando...' : 'Actualizar'}
               </button>
-              <button
-                onClick={exportarExcel}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-              >
-                <Download size={18} />
-                Exportar Excel
+              <button onClick={exportarExcel}
+                className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-sm shadow-emerald-200 transition-all">
+                <Download size={15} /> Exportar Excel
               </button>
             </div>
           </div>
         </div>
 
-        {/* Resumen */}
-        <div className="grid md:grid-cols-3 gap-6 mb-6">
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <Users className="text-purple-600" size={24} />
-              </div>
+        {/* ── STATS ── */}
+        <div className="grid grid-cols-3 gap-4 mb-5">
+          {[
+            { label: 'Médicos seleccionados', value: medicos.filter(m => m.seleccionado).length, icon: <Users size={18}/>, color: 'purple', text: 'text-purple-700' },
+            { label: 'Total comisiones', value: `Q ${totalComisionesSeleccionadas.toFixed(2)}`, icon: <DollarSign size={18}/>, color: 'emerald', text: 'text-emerald-700' },
+            { label: 'Total pacientes', value: medicos.filter(m => m.seleccionado).reduce((sum, m) => sum + m.total_pacientes, 0), icon: <Users size={18}/>, color: 'blue', text: 'text-blue-700' },
+          ].map(s => (
+            <div key={s.label} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex items-center gap-4">
+              <div className={`bg-${s.color}-100 rounded-xl p-2.5 text-${s.color}-600 shrink-0`}>{s.icon}</div>
               <div>
-                <p className="text-sm text-gray-600">Médicos Seleccionados</p>
-                <p className="text-2xl font-bold text-gray-800">
-                  {medicos.filter(m => m.seleccionado).length}
-                </p>
+                <p className="text-xs text-gray-400 font-medium">{s.label}</p>
+                <p className={`text-2xl font-black ${s.text}`}>{s.value}</p>
               </div>
             </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <DollarSign className="text-green-600" size={24} />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Total Comisiones</p>
-                <p className="text-2xl font-bold text-green-600">
-                  Q {totalComisionesSeleccionadas.toFixed(2)}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Users className="text-blue-600" size={24} />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Total Pacientes</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {medicos.filter(m => m.seleccionado).reduce((sum, m) => sum + m.total_pacientes, 0)}
-                </p>
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
 
-        {/* Lista de Médicos */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="px-6 py-4 bg-gray-50 border-b">
-            <h2 className="text-lg font-bold text-gray-800">Médicos con Referencias</h2>
-            <p className="text-sm text-gray-600">Seleccione los médicos que recibirán comisión</p>
+        {/* ── LISTA MÉDICOS ── */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/60">
+            <p className="font-black text-gray-800">Médicos con Referencias</p>
+            <p className="text-xs text-gray-400 mt-0.5">Seleccione los médicos que recibirán comisión</p>
           </div>
 
-          <div className="divide-y">
-            {medicos.map(medico => (
-              <div key={medico.medico_id} className="p-6">
-                <div className="flex items-center gap-4">
-                  <input
-                    type="checkbox"
-                    checked={medico.seleccionado}
-                    onChange={() => toggleSeleccion(medico.medico_id)}
-                    className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500"
-                  />
-                  <div className="flex-1">
-                    <h3 className="text-lg font-bold text-gray-800">{medico.medico_nombre}</h3>
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      <span className="text-sm text-gray-500">{medico.total_pacientes} pacientes</span>
-                      {medico.pacientes.filter(p => p.tipo_cobro === 'normal').length > 0 && (
-                        <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">
-                          Normal: {medico.pacientes.filter(p => p.tipo_cobro === 'normal').length}
-                        </span>
-                      )}
-                      {medico.pacientes.filter(p => p.tipo_cobro === 'especial').length > 0 && (
-                        <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-medium">
-                          Especial: {medico.pacientes.filter(p => p.tipo_cobro === 'especial').length}
-                        </span>
-                      )}
-                      {medico.pacientes.filter(p => p.tipo_cobro === 'estado_cuenta').length > 0 && (
-                        <span className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full font-medium">
-                          Est.Cuenta: {medico.pacientes.filter(p => p.tipo_cobro === 'estado_cuenta').length}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-purple-600">
-                      Q {medico.total_comision.toFixed(2)}
-                    </p>
-                    <button
-                      onClick={() => setMedicoExpandido(
-                        medicoExpandido === medico.medico_id ? null : medico.medico_id
-                      )}
-                      className="text-sm text-purple-600 hover:text-purple-800"
-                    >
-                      {medicoExpandido === medico.medico_id ? 'Ocultar detalle' : 'Ver detalle'}
-                    </button>
-                  </div>
-                </div>
+          {loading ? (
+            <div className="text-center py-16">
+              <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-purple-600 mb-3" />
+              <p className="text-gray-400 text-sm">Calculando comisiones...</p>
+            </div>
+          ) : medicos.length === 0 ? (
+            <div className="text-center py-16">
+              <p className="text-gray-400 font-medium">No se encontraron médicos con referencias en este período</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {medicos.map(medico => (
+                <div key={medico.medico_id} className={`transition-colors ${medico.seleccionado ? 'bg-purple-50/40' : 'bg-white'}`}>
 
-                {/* Detalle expandido */}
-                {medicoExpandido === medico.medico_id && (
-                  <div className="mt-4 pl-9 space-y-3">
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
-                      {Object.entries(medico.comisiones_por_estudio)
-                        .filter(([_, monto]) => monto > 0)
-                        .sort((a, b) => b[1] - a[1])
-                        .map(([estudio, monto], idx) => {
-                          const colores = [
-                            'bg-blue-50 text-blue-700',
-                            'bg-green-50 text-green-700',
-                            'bg-purple-50 text-purple-700',
-                            'bg-yellow-50 text-yellow-700',
-                            'bg-orange-50 text-orange-700',
-                            'bg-pink-50 text-pink-700',
-                            'bg-indigo-50 text-indigo-700',
-                            'bg-red-50 text-red-700'
-                          ];
-                          const colorClass = colores[idx % colores.length];
-                          
-                          return (
-                            <div key={estudio} className={`${colorClass.split(' ')[0]} p-3 rounded`}>
-                              <p className="text-gray-600 text-xs truncate" title={estudio}>{estudio}</p>
-                              <p className={`font-bold ${colorClass.split(' ')[1]}`}>
-                                Q {monto.toFixed(2)}
-                              </p>
-                            </div>
-                          );
-                        })}
-                    </div>
+                  {/* Row principal */}
+                  <div className="px-5 py-4 flex items-center gap-4">
+                    <input type="checkbox"
+                      checked={medico.seleccionado}
+                      onChange={() => toggleSeleccion(medico.medico_id)}
+                      className="w-4 h-4 accent-purple-600 rounded shrink-0" />
 
-                    <div className="mt-4">
-                      <h4 className="font-semibold text-gray-700 mb-2">Pacientes:</h4>
-                      <div className="bg-gray-50 rounded p-4 max-h-60 overflow-y-auto">
-                        {medico.pacientes.map((p, idx) => (
-                          <div key={idx} className="text-sm py-2 border-b last:border-0 flex items-center justify-between gap-2">
-                            <div>
-                              <p className="font-medium">{p.nombre}</p>
-                              <p className="text-gray-500 text-xs">{p.fecha}</p>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                                p.tipo_cobro === 'normal'        ? 'bg-blue-100 text-blue-700' :
-                                p.tipo_cobro === 'especial'      ? 'bg-purple-100 text-purple-700' :
-                                p.tipo_cobro === 'estado_cuenta' ? 'bg-amber-100 text-amber-700' :
-                                'bg-gray-100 text-gray-600'
-                              }`}>
-                                {p.tipo_cobro === 'estado_cuenta' ? 'Est. Cuenta' :
-                                 p.tipo_cobro === 'especial'      ? 'Especial' :
-                                 p.tipo_cobro === 'normal'        ? 'Normal' : p.tipo_cobro}
-                              </span>
-                              <span className="text-xs font-bold text-purple-600">Q {(p.comision||0).toFixed(2)}</span>
-                            </div>
-                          </div>
-                        ))}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-gray-900">{medico.medico_nombre}</p>
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        <span className="text-xs text-gray-400">{medico.total_pacientes} pacientes</span>
+                        {medico.pacientes.filter(p => p.tipo_cobro === 'normal').length > 0 && (
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">
+                            Normal: {medico.pacientes.filter(p => p.tipo_cobro === 'normal').length}
+                          </span>
+                        )}
+                        {medico.pacientes.filter(p => p.tipo_cobro === 'especial').length > 0 && (
+                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-semibold">
+                            Especial: {medico.pacientes.filter(p => p.tipo_cobro === 'especial').length}
+                          </span>
+                        )}
+                        {medico.pacientes.filter(p => p.tipo_cobro === 'estado_cuenta').length > 0 && (
+                          <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold">
+                            Est.Cta: {medico.pacientes.filter(p => p.tipo_cobro === 'estado_cuenta').length}
+                          </span>
+                        )}
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
 
-          {medicos.length === 0 && !loading && (
-            <div className="p-12 text-center text-gray-500">
-              No se encontraron médicos con referencias en este período
+                    <div className="text-right shrink-0">
+                      <p className="text-xl font-black text-purple-700">Q {medico.total_comision.toFixed(2)}</p>
+                      <button
+                        onClick={() => setMedicoExpandido(medicoExpandido === medico.medico_id ? null : medico.medico_id)}
+                        className="text-xs text-purple-500 hover:text-purple-700 font-semibold mt-0.5 transition-colors">
+                        {medicoExpandido === medico.medico_id ? '▲ Ocultar' : '▼ Ver detalle'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Detalle expandido */}
+                  {medicoExpandido === medico.medico_id && (
+                    <div className="px-5 pb-5 pt-1 border-t border-purple-100 bg-purple-50/30">
+
+                      {/* Estudios */}
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 mt-3">Comisión por estudio</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-5">
+                        {Object.entries(medico.comisiones_por_estudio)
+                          .filter(([_, monto]) => monto > 0)
+                          .sort((a, b) => b[1] - a[1])
+                          .map(([estudio, monto], idx) => {
+                            const colors = [
+                              ['bg-blue-50 border-blue-100','text-blue-700'],
+                              ['bg-emerald-50 border-emerald-100','text-emerald-700'],
+                              ['bg-purple-50 border-purple-100','text-purple-700'],
+                              ['bg-amber-50 border-amber-100','text-amber-700'],
+                              ['bg-orange-50 border-orange-100','text-orange-700'],
+                              ['bg-pink-50 border-pink-100','text-pink-700'],
+                              ['bg-indigo-50 border-indigo-100','text-indigo-700'],
+                              ['bg-rose-50 border-rose-100','text-rose-700'],
+                            ];
+                            const [bg, text] = colors[idx % colors.length];
+                            return (
+                              <div key={estudio} className={`${bg} border rounded-xl px-3 py-2.5`}>
+                                <p className="text-xs text-gray-500 truncate" title={estudio}>{estudio}</p>
+                                <p className={`font-black text-sm mt-0.5 ${text}`}>Q {monto.toFixed(2)}</p>
+                              </div>
+                            );
+                          })}
+                      </div>
+
+                      {/* Pacientes — tabla estilo visitadoras */}
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Pacientes</p>
+                      <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+                        <div className="overflow-x-auto max-h-72 overflow-y-auto">
+                          <table className="min-w-full text-xs">
+                            <thead className="sticky top-0 bg-gray-50 border-b border-gray-100">
+                              <tr className="text-gray-500">
+                                <th className="text-left py-2.5 px-4 font-bold">Fecha</th>
+                                <th className="text-left py-2.5 px-4 font-bold">Paciente</th>
+                                <th className="text-left py-2.5 px-4 font-bold">Estudio</th>
+                                <th className="text-left py-2.5 px-4 font-bold">Tipo</th>
+                                <th className="text-right py-2.5 px-4 font-bold">Total</th>
+                                <th className="text-right py-2.5 px-4 font-bold">%</th>
+                                <th className="text-right py-2.5 px-4 font-bold text-purple-600">Comisión</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                              {medico.pacientes.map((p, idx) => (
+                                <tr key={idx} className="hover:bg-purple-50/30 transition-colors">
+                                  <td className="py-2.5 px-4 text-gray-500 whitespace-nowrap">
+                                    {new Date(p.fecha + 'T12:00:00').toLocaleDateString('es-GT')}
+                                  </td>
+                                  <td className="py-2.5 px-4 font-semibold text-gray-900">{p.nombre}</td>
+                                  <td className="py-2.5 px-4 text-gray-600">{p.estudio || '—'}</td>
+                                  <td className="py-2.5 px-4">
+                                    <span className={`px-2 py-0.5 rounded-full font-bold ${
+                                      p.tipo_cobro === 'normal'        ? 'bg-blue-100 text-blue-700' :
+                                      p.tipo_cobro === 'especial'      ? 'bg-purple-100 text-purple-700' :
+                                      p.tipo_cobro === 'estado_cuenta' ? 'bg-amber-100 text-amber-700' :
+                                      'bg-gray-100 text-gray-500'
+                                    }`}>
+                                      {p.tipo_cobro === 'estado_cuenta' ? 'Est. Cuenta' :
+                                       p.tipo_cobro === 'especial'      ? 'Especial' :
+                                       p.tipo_cobro === 'normal'        ? 'Normal' : p.tipo_cobro}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 px-4 text-right text-gray-700">Q {(p.total||0).toFixed(2)}</td>
+                                  <td className="py-2.5 px-4 text-right text-gray-400">{p.porcentaje || 0}%</td>
+                                  <td className="py-2.5 px-4 text-right font-black text-purple-600">Q {(p.comision||0).toFixed(2)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>
