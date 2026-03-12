@@ -247,6 +247,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       setPacienteActual(null);
       setMedicoActual(null);
       setSinInfoMedico(false);
+      setSinOrdenMedicaConsulta(false);
       setEsServicioMovil(false);
       setEstablecimientoMovil('');
       setTipoCobro('normal');

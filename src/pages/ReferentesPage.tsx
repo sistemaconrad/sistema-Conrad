@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Edit2, Trash2, Save, X, FileSpreadsheet, Building2, Users, Search } from 'lucide-react';
+import { ArrowLeft, Plus, Edit2, Trash2, Save, X, FileSpreadsheet, Building2, Users, Search, MapPin, Phone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Autocomplete } from '../components/Autocomplete';
 import { departamentosGuatemala, municipiosGuatemala } from '../data/guatemala';
@@ -194,26 +194,37 @@ export const ReferentesPage: React.FC<ReferentesPageProps> = ({ onBack }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg">
-        <div className="container mx-auto px-4 py-6">
-          <button onClick={onBack} className="flex items-center gap-2 text-white hover:text-blue-100 mb-4 transition-colors">
-            <ArrowLeft size={20} /> Volver al Dashboard
-          </button>
-          <h1 className="text-3xl font-bold">Gestión de Médicos</h1>
-          <p className="text-blue-100 mt-1">Médicos referentes y establecimientos de servicio móvil</p>
-        </div>
+    <div className="min-h-screen" style={{ background: '#f0f4f8' }}>
 
-        {/* Tabs */}
-        <div className="container mx-auto px-4">
+      {/* ── HEADER ── */}
+      <header className="text-white shadow-xl" style={{ background: 'linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#1d4ed8 100%)' }}>
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center gap-4 mb-4">
+            <button onClick={onBack} className="bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl p-2 transition-colors">
+              <ArrowLeft size={18} />
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="bg-white/10 rounded-xl p-2 border border-white/20">
+                <Users size={20} />
+              </div>
+              <div>
+                <h1 className="text-xl font-black tracking-tight">Gestión de Médicos</h1>
+                <p className="text-blue-200 text-xs">Médicos referentes y establecimientos de servicio móvil</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Tabs en header */}
           <div className="flex gap-1">
             {[
-              { key: 'medicos', label: 'Médicos Referentes', icon: <Users size={16} />, count: medicos.length },
-              { key: 'establecimientos', label: 'Establecimientos Móvil', icon: <Building2 size={16} />, count: establecimientos.length },
+              { key: 'medicos', label: 'Médicos Referentes', icon: <Users size={14} />, count: medicos.length },
+              { key: 'establecimientos', label: 'Establecimientos Móvil', icon: <Building2 size={14} />, count: establecimientos.length },
             ].map(t => (
               <button key={t.key} onClick={() => setTabActiva(t.key as TabActiva)}
-                className={`flex items-center gap-2 px-5 py-3 text-sm font-medium transition-all border-b-2 ${
-                  tabActiva === t.key ? 'border-white text-white bg-white/10' : 'border-transparent text-blue-200 hover:text-white hover:bg-white/5'
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-t-xl transition-all border-b-2 ${
+                  tabActiva === t.key
+                    ? 'border-white text-white bg-white/15'
+                    : 'border-transparent text-blue-200 hover:text-white hover:bg-white/8'
                 }`}>
                 {t.icon} {t.label}
                 <span className="bg-white/20 text-white text-xs px-1.5 py-0.5 rounded-full font-bold">{t.count}</span>
@@ -223,78 +234,125 @@ export const ReferentesPage: React.FC<ReferentesPageProps> = ({ onBack }) => {
         </div>
       </header>
 
-      <div className="container mx-auto p-4">
+      <div className="container mx-auto px-4 py-5 max-w-7xl">
 
         {/* ═══ TAB MÉDICOS ═══ */}
         {tabActiva === 'medicos' && (
           <>
-            <div className="card mb-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">Filtros de Búsqueda</h2>
-                <div className="flex gap-2">
-                  <button onClick={exportarExcel} className="btn-secondary flex items-center gap-2">
-                    <FileSpreadsheet size={18} /> Exportar Excel
-                  </button>
-                  <button onClick={abrirModalNuevo} className="btn-primary flex items-center gap-2">
-                    <Plus size={18} /> Agregar Médico
-                  </button>
-                </div>
-              </div>
-              <div className="grid md:grid-cols-3 gap-4">
-                <div>
-                  <label className="label">Buscar por Nombre</label>
-                  <input type="text" className="input-field" placeholder="Nombre del médico..."
+            {/* Filtros */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-5 py-4 mb-5">
+              <div className="flex items-end gap-3 flex-wrap">
+                <div className="flex-1 min-w-48">
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Buscar</label>
+                  <input type="text"
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                    placeholder="Nombre del médico..."
                     value={filtroNombre} onChange={e => setFiltroNombre(e.target.value)} />
                 </div>
                 <div>
-                  <label className="label">Departamento</label>
-                  <select className="input-field" value={filtroDepartamento}
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Departamento</label>
+                  <select className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 bg-white"
+                    value={filtroDepartamento}
                     onChange={e => { setFiltroDepartamento(e.target.value); setFiltroMunicipio(''); }}>
                     <option value="">Todos</option>
                     {departamentosGuatemala.map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="label">Municipio</label>
-                  <select className="input-field" value={filtroMunicipio}
-                    onChange={e => setFiltroMunicipio(e.target.value)} disabled={!filtroDepartamento}>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Municipio</label>
+                  <select className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 bg-white disabled:bg-gray-50"
+                    value={filtroMunicipio} onChange={e => setFiltroMunicipio(e.target.value)} disabled={!filtroDepartamento}>
                     <option value="">Todos</option>
                     {municipiosFiltradosFiltro.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
                   </select>
                 </div>
+                <div className="flex gap-2 ml-auto">
+                  <button onClick={exportarExcel}
+                    className="flex items-center gap-1.5 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+                    <FileSpreadsheet size={15} /> Excel
+                  </button>
+                  <button onClick={abrirModalNuevo}
+                    className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm shadow-blue-200 transition-all">
+                    <Plus size={15} /> Agregar Médico
+                  </button>
+                </div>
               </div>
-              <p className="mt-3 text-sm text-gray-500">
-                Mostrando <strong>{medicosFiltrados.length}</strong> de <strong>{medicos.length}</strong> médicos referentes
+              <p className="text-xs text-gray-400 mt-3">
+                Mostrando <strong className="text-gray-600">{medicosFiltrados.length}</strong> de <strong className="text-gray-600">{medicos.length}</strong> médicos referentes
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {medicosFiltrados.map(m => (
-                <div key={m.id} className="card hover:shadow-lg transition-shadow">
-                  <div className="flex justify-between items-start mb-3">
-                    <h3 className="text-lg font-bold text-blue-700">{m.nombre}</h3>
-                    <div className="flex gap-1">
-                      <button onClick={() => abrirModalEditar(m)} className="p-2 text-blue-600 hover:bg-blue-50 rounded" title="Editar">
-                        <Edit2 size={16} />
-                      </button>
-                      <button onClick={() => solicitarEliminarMedico(m)} className="p-2 text-red-600 hover:bg-red-50 rounded" title="Eliminar">
-                        <Trash2 size={16} />
-                      </button>
+            {/* Grid tarjetas */}
+            {medicosFiltrados.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-gray-200 text-center py-16">
+                <p className="text-gray-400 font-medium">No se encontraron médicos referentes</p>
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {medicosFiltrados.map(m => (
+                  <div key={m.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all overflow-hidden group">
+                    {/* Card header */}
+                    <div className="bg-gradient-to-br from-blue-600 to-blue-700 px-4 py-3 relative">
+                      <div className="flex items-start justify-between">
+                        <div className="bg-white/20 rounded-xl p-2 backdrop-blur-sm">
+                          <Users size={16} className="text-white" />
+                        </div>
+                        <div className="flex gap-1">
+                          <button onClick={() => abrirModalEditar(m)}
+                            className="p-1.5 bg-white/15 hover:bg-white/30 rounded-lg transition-colors">
+                            <Edit2 size={12} className="text-white" />
+                          </button>
+                          <button onClick={() => solicitarEliminarMedico(m)}
+                            className="p-1.5 bg-white/15 hover:bg-red-400/60 rounded-lg transition-colors">
+                            <Trash2 size={12} className="text-white" />
+                          </button>
+                        </div>
+                      </div>
+                      <p className="font-bold text-white text-sm mt-2 leading-tight">{m.nombre}</p>
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        <MapPin size={11} className="text-blue-200 shrink-0" />
+                        <p className="text-blue-100 text-xs truncate">
+                          {municipiosGuatemala.find(mu => mu.id === m.municipio)?.nombre || m.municipio}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Card body */}
+                    <div className="px-4 py-3 space-y-2">
+                      {m.telefono && (
+                        <div className="flex items-center gap-2">
+                          <div className="bg-green-50 rounded-lg p-1.5 shrink-0">
+                            <Phone size={12} className="text-green-500" />
+                          </div>
+                          <a href={`tel:${m.telefono}`} className="text-sm text-green-600 font-bold hover:underline">{m.telefono}</a>
+                        </div>
+                      )}
+                      {m.direccion && (
+                        <div className="flex items-start gap-2">
+                          <div className="bg-amber-50 rounded-lg p-1.5 shrink-0 mt-0.5">
+                            <Building2 size={12} className="text-amber-500" />
+                          </div>
+                          <p className="text-xs text-gray-500 line-clamp-2">{m.direccion}</p>
+                        </div>
+                      )}
+                      {m.referencia && (
+                        <div className="flex items-start gap-2">
+                          <div className="bg-blue-50 rounded-lg p-1.5 shrink-0 mt-0.5">
+                            <MapPin size={12} className="text-blue-400" />
+                          </div>
+                          <p className="text-xs text-blue-600 line-clamp-2">{m.referencia}</p>
+                        </div>
+                      )}
+                      {m.horario && (
+                        <p className="text-xs text-violet-600 font-medium bg-violet-50 rounded-lg px-2.5 py-1.5">⏰ {m.horario}</p>
+                      )}
+                      {m.especial && (
+                        <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-2.5 py-1.5">⭐ {m.especial}</p>
+                      )}
                     </div>
                   </div>
-                  <div className="space-y-1 text-sm">
-                    <p><strong>Teléfono:</strong> {m.telefono}</p>
-                    <p><strong>Ubicación:</strong> {departamentosGuatemala.find(d => d.id === m.departamento)?.nombre} - {municipiosGuatemala.find(mu => mu.id === m.municipio)?.nombre}</p>
-                    <p className="text-gray-500">{m.direccion}</p>
-                    {m.referencia && <p className="text-blue-500 text-xs">📍 {m.referencia}</p>}
-                    {m.horario && <p className="text-violet-600 text-xs font-medium">⏰ {m.horario}</p>}
-                    {m.especial && <p className="text-amber-600 text-xs">⭐ {m.especial}</p>}
-                  </div>
-                </div>
-              ))}
-            </div>
-            {medicosFiltrados.length === 0 && (
-              <div className="card text-center py-12"><p className="text-gray-500">No se encontraron médicos referentes</p></div>
+                ))}
+              </div>
             )}
           </>
         )}
@@ -302,66 +360,64 @@ export const ReferentesPage: React.FC<ReferentesPageProps> = ({ onBack }) => {
         {/* ═══ TAB ESTABLECIMIENTOS ═══ */}
         {tabActiva === 'establecimientos' && (
           <>
-            <div className="card mb-5">
-              <div className="flex items-center justify-between mb-4">
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-5 py-4 mb-5">
+              <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <h2 className="text-xl font-bold">Establecimientos de Servicio Móvil</h2>
-                  <p className="text-sm text-gray-500 mt-0.5">Lugares donde se realiza servicio móvil — aparecen en el modal de nuevo paciente</p>
+                  <p className="font-black text-gray-800">Establecimientos de Servicio Móvil</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Aparecen en el modal de nuevo paciente al seleccionar Servicio Móvil</p>
                 </div>
-                <button onClick={abrirNuevoEstab} className="btn-primary flex items-center gap-2">
-                  <Plus size={18} /> Nuevo Establecimiento
+                <button onClick={abrirNuevoEstab}
+                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm shadow-blue-200 transition-all">
+                  <Plus size={15} /> Nuevo Establecimiento
                 </button>
               </div>
-
-              {/* Búsqueda */}
-              <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2 max-w-sm">
-                <Search size={16} className="text-gray-400" />
+              <div className="mt-3 flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 max-w-sm bg-gray-50/50">
+                <Search size={14} className="text-gray-400" />
                 <input type="text" placeholder="Buscar establecimiento..." value={filtroEstab}
                   onChange={e => setFiltroEstab(e.target.value)}
-                  className="flex-1 text-sm focus:outline-none" />
-                {filtroEstab && <button onClick={() => setFiltroEstab('')} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>}
+                  className="flex-1 text-sm bg-transparent focus:outline-none" />
+                {filtroEstab && (
+                  <button onClick={() => setFiltroEstab('')} className="text-gray-400 hover:text-gray-600"><X size={13} /></button>
+                )}
               </div>
-              <p className="text-sm text-gray-500 mt-2">
-                {establecimientosFiltrados.length} de {establecimientos.length} establecimientos
-              </p>
+              <p className="text-xs text-gray-400 mt-2">{establecimientosFiltrados.length} de {establecimientos.length} establecimientos</p>
             </div>
 
-            {/* Lista */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               {establecimientosFiltrados.length === 0 ? (
-                <div className="text-center py-16 text-gray-400">
-                  <Building2 size={40} className="mx-auto mb-3 text-gray-200" />
-                  <p className="font-medium text-gray-500">No hay establecimientos registrados</p>
-                  <p className="text-sm">Los establecimientos aparecen al crear pacientes con Servicio Móvil</p>
+                <div className="text-center py-16">
+                  <Building2 size={36} className="mx-auto mb-3 text-gray-200" />
+                  <p className="font-medium text-gray-400">No hay establecimientos registrados</p>
+                  <p className="text-xs text-gray-300 mt-1">Se crean al registrar pacientes con Servicio Móvil</p>
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">
                   {establecimientosFiltrados.map((e, idx) => (
-                    <div key={e.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-colors">
+                    <div key={e.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-blue-50/30 transition-colors group">
                       <div className="flex items-center gap-3">
-                        <span className="text-xs text-gray-400 w-6 text-right shrink-0">{idx + 1}</span>
-                        <div className="bg-blue-100 rounded-lg p-1.5 shrink-0">
-                          <Building2 size={14} className="text-blue-600" />
+                        <span className="text-xs text-gray-300 w-5 text-right font-mono">{idx + 1}</span>
+                        <div className="bg-blue-100 rounded-xl p-1.5 shrink-0">
+                          <Building2 size={13} className="text-blue-600" />
                         </div>
-                        <span className="font-medium text-gray-800 text-sm">{e.nombre}</span>
+                        <span className="font-semibold text-gray-800 text-sm">{e.nombre}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <button onClick={() => abrirEditarEstab(e)}
-                          className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
-                          <Edit2 size={15} />
+                          className="p-2 text-blue-500 hover:bg-blue-50 rounded-xl transition-colors opacity-0 group-hover:opacity-100">
+                          <Edit2 size={14} />
                         </button>
                         {eliminarEstabId === e.id ? (
-                          <div className="flex items-center gap-1 bg-red-50 border border-red-200 rounded-lg px-2 py-1">
-                            <span className="text-xs text-red-600 font-medium">¿Eliminar?</span>
+                          <div className="flex items-center gap-1 bg-red-50 border border-red-200 rounded-xl px-2.5 py-1.5">
+                            <span className="text-xs text-red-600 font-bold">¿Eliminar?</span>
                             <button onClick={() => eliminarEstab(e.id)}
-                              className="text-xs bg-red-500 text-white px-2 py-0.5 rounded font-bold hover:bg-red-600">Sí</button>
+                              className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-lg font-bold hover:bg-red-600">Sí</button>
                             <button onClick={() => setEliminarEstabId(null)}
-                              className="text-xs text-gray-500 hover:text-gray-700 px-1">No</button>
+                              className="text-xs text-gray-400 hover:text-gray-600 px-1">No</button>
                           </div>
                         ) : (
                           <button onClick={() => setEliminarEstabId(e.id)}
-                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
-                            <Trash2 size={15} />
+                            className="p-2 text-red-400 hover:bg-red-50 rounded-xl transition-colors opacity-0 group-hover:opacity-100">
+                            <Trash2 size={14} />
                           </button>
                         )}
                       </div>
@@ -374,78 +430,109 @@ export const ReferentesPage: React.FC<ReferentesPageProps> = ({ onBack }) => {
         )}
       </div>
 
-      {/* Modal médico */}
+      {/* ── MODAL MÉDICO ── */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">{editando ? 'Editar Médico Referente' : 'Agregar Médico Referente'}</h2>
-              <button onClick={cerrarModal} className="text-gray-500 hover:text-gray-700"><X size={24} /></button>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-100 rounded-xl p-2"><Users size={16} className="text-blue-600" /></div>
+                <h2 className="text-base font-black text-gray-900">{editando ? 'Editar Médico Referente' : 'Agregar Médico Referente'}</h2>
+              </div>
+              <button onClick={cerrarModal} className="text-gray-300 hover:text-gray-500 p-1 rounded-lg hover:bg-gray-100"><X size={18} /></button>
             </div>
-            <div className="space-y-4">
-              <div><label className="label">Nombre Completo *</label>
-                <input type="text" className="input-field" value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Dr. Juan Pérez" /></div>
-              <div><label className="label">Teléfono *</label>
-                <input type="text" className="input-field" value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="5555-5555" /></div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Nombre Completo *</label>
+                <input type="text" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Dr. Juan Pérez" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Teléfono *</label>
+                <input type="text" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="5555-5555" />
+              </div>
               <div className="grid md:grid-cols-2 gap-4">
-                <div><label className="label">Departamento *</label>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Departamento *</label>
                   <Autocomplete label="Departamento" options={departamentosGuatemala} value={departamento}
-                    onChange={v => { setDepartamento(v); setMunicipio(''); }} placeholder="Seleccione departamento" required /></div>
-                <div><label className="label">Municipio *</label>
+                    onChange={v => { setDepartamento(v); setMunicipio(''); }} placeholder="Seleccione departamento" required />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Municipio *</label>
                   <Autocomplete label="Municipio" options={municipiosFiltradosFormulario} value={municipio}
-                    onChange={setMunicipio} placeholder="Seleccione municipio" disabled={!departamento} required /></div>
+                    onChange={setMunicipio} placeholder="Seleccione municipio" disabled={!departamento} required />
+                </div>
               </div>
-              <div><label className="label">Dirección Completa *</label>
-                <textarea className="input-field" value={direccion} onChange={e => setDireccion(e.target.value)}
-                  placeholder="Zona 10, Edificio X, Oficina Y" rows={3} /></div>
-              <div><label className="label">Referencia de ubicación</label>
-                <input type="text" className="input-field" value={referencia} onChange={e => setReferencia(e.target.value)}
-                  placeholder="Ej: Enfrente de la entrada de Zaragoza a mano izquierda" /></div>
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Dirección Completa *</label>
+                <textarea className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 resize-none"
+                  value={direccion} onChange={e => setDireccion(e.target.value)} placeholder="Zona 10, Edificio X, Oficina Y" rows={3} />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Referencia de Ubicación</label>
+                <input type="text" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  value={referencia} onChange={e => setReferencia(e.target.value)} placeholder="Ej: Enfrente de la entrada a mano izquierda" />
+              </div>
               <div className="grid grid-cols-2 gap-4">
-                <div><label className="label">Horario</label>
-                  <input type="text" className="input-field" value={horario} onChange={e => setHorario(e.target.value)}
-                    placeholder="Ej: 8AM a 4:30PM" /></div>
-                <div><label className="label">Especial</label>
-                  <input type="text" className="input-field" value={especial} onChange={e => setEspecial(e.target.value)}
-                    placeholder="Notas especiales" /></div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Horario</label>
+                  <input type="text" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                    value={horario} onChange={e => setHorario(e.target.value)} placeholder="Ej: 8AM a 4:30PM" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Especial</label>
+                  <input type="text" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                    value={especial} onChange={e => setEspecial(e.target.value)} placeholder="Notas especiales" />
+                </div>
               </div>
             </div>
-            <div className="flex gap-3 justify-end mt-6">
-              <button onClick={cerrarModal} className="btn-secondary">Cancelar</button>
-              <button onClick={guardarMedico} className="btn-primary flex items-center gap-2"><Save size={18} /> Guardar</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal establecimiento */}
-      {showModalEstab && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full">
-            <div className="flex justify-between items-center mb-5">
-              <h2 className="text-lg font-bold">{editandoEstab ? 'Editar Establecimiento' : 'Nuevo Establecimiento'}</h2>
-              <button onClick={() => { setShowModalEstab(false); setEditandoEstab(null); setNombreEstab(''); }}
-                className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
-            </div>
-            <div className="mb-5">
-              <label className="label">Nombre del Establecimiento *</label>
-              <input type="text" className="input-field" value={nombreEstab}
-                onChange={e => setNombreEstab(e.target.value.toUpperCase())}
-                placeholder="CLINICA EJEMPLO" autoFocus
-                onKeyDown={e => e.key === 'Enter' && guardarEstab()} />
-              <p className="text-xs text-gray-400 mt-1">Se guardará en mayúsculas</p>
-            </div>
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => { setShowModalEstab(false); setEditandoEstab(null); setNombreEstab(''); }} className="btn-secondary">Cancelar</button>
-              <button onClick={guardarEstab} disabled={guardandoEstab} className="btn-primary flex items-center gap-2">
-                <Save size={16} /> {guardandoEstab ? 'Guardando...' : 'Guardar'}
+            <div className="flex gap-3 px-6 pb-6">
+              <button onClick={cerrarModal}
+                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 font-semibold transition-colors">Cancelar</button>
+              <button onClick={guardarMedico}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-sm shadow-blue-200 transition-all">
+                <Save size={14} /> Guardar
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal autorización */}
+      {/* ── MODAL ESTABLECIMIENTO ── */}
+      {showModalEstab && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full">
+            <div className="flex justify-between items-center mb-5">
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-100 rounded-xl p-2"><Building2 size={16} className="text-blue-600" /></div>
+                <h2 className="text-base font-black text-gray-900">{editandoEstab ? 'Editar Establecimiento' : 'Nuevo Establecimiento'}</h2>
+              </div>
+              <button onClick={() => { setShowModalEstab(false); setEditandoEstab(null); setNombreEstab(''); }}
+                className="text-gray-300 hover:text-gray-500 p-1 rounded-lg hover:bg-gray-100"><X size={18} /></button>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Nombre del Establecimiento *</label>
+              <input type="text"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                value={nombreEstab} onChange={e => setNombreEstab(e.target.value.toUpperCase())}
+                placeholder="CLINICA EJEMPLO" autoFocus
+                onKeyDown={e => e.key === 'Enter' && guardarEstab()} />
+              <p className="text-xs text-gray-400 mt-1">Se guardará en mayúsculas</p>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => { setShowModalEstab(false); setEditandoEstab(null); setNombreEstab(''); }}
+                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 font-semibold transition-colors">Cancelar</button>
+              <button onClick={guardarEstab} disabled={guardandoEstab}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-sm font-bold shadow-sm shadow-blue-200 transition-all">
+                <Save size={14} /> {guardandoEstab ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL AUTORIZACIÓN ── */}
       {mostrarAutorizacion && medicoAEliminar && (
         <AutorizacionModal
           accion="Eliminar Médico Referente"

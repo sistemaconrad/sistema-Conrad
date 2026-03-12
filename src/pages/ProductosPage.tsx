@@ -183,107 +183,106 @@ export const ProductosPage: React.FC<ProductosPageProps> = ({ onBack }) => {
     : [];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg">
-        <div className="container mx-auto px-4 py-6">
-          <button onClick={onBack} className="flex items-center gap-2 text-white hover:text-blue-100 mb-4 transition-colors">
-            <ArrowLeft size={20} />
-            Volver al Dashboard
+    <div className="min-h-screen" style={{ background: '#f0f4f8' }}>
+
+      {/* ── HEADER ── */}
+      <header className="text-white shadow-xl" style={{ background: 'linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#1d4ed8 100%)' }}>
+        <div className="container mx-auto px-6 py-4 flex items-center gap-4">
+          <button onClick={onBack} className="bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl p-2 transition-colors">
+            <ArrowLeft size={18} />
           </button>
-          <h1 className="text-3xl font-bold">Gestión de Productos</h1>
-          <p className="text-blue-100 mt-2">Catálogo de estudios y servicios</p>
+          <div className="flex items-center gap-3">
+            <div className="bg-white/10 rounded-xl p-2 border border-white/20">
+              <Save size={20} />
+            </div>
+            <div>
+              <h1 className="text-xl font-black tracking-tight">Gestión de Productos</h1>
+              <p className="text-blue-200 text-xs">Catálogo de estudios y servicios</p>
+            </div>
+          </div>
         </div>
       </header>
 
-      <div className="container mx-auto p-4">
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Estudios */}
-          <div className="card">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Estudios</h2>
-              <button onClick={() => abrirModalEstudio()} className="btn-primary flex items-center gap-2">
-                <Plus size={18} />
-                Nuevo
+      <div className="container mx-auto px-4 py-5 max-w-6xl">
+        <div className="grid md:grid-cols-2 gap-5">
+
+          {/* ── ESTUDIOS ── */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50/60">
+              <div>
+                <p className="font-black text-gray-800">Estudios</p>
+                <p className="text-xs text-gray-400 mt-0.5">{estudios.filter(e => e.activo).length} activos</p>
+              </div>
+              <button onClick={() => abrirModalEstudio()}
+                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm shadow-blue-200 transition-all">
+                <Plus size={14} /> Nuevo
               </button>
             </div>
-            
-            <div className="space-y-2">
+            <div className="divide-y divide-gray-50 max-h-[480px] overflow-y-auto">
               {estudios.filter(e => e.activo).map(estudio => (
-                <div key={estudio.id} className="flex justify-between items-center p-3 bg-gray-50 rounded hover:bg-gray-100">
-                  <div className="flex-1">
-                    <span className="font-medium">{estudio.nombre}</span>
-                    <span className="ml-3 text-sm text-gray-600">
-                      Comisión: <span className="font-semibold text-green-700">{estudio.porcentaje_comision || 0}%</span>
-                    </span>
+                <div key={estudio.id} className="flex items-center justify-between px-5 py-3 hover:bg-blue-50/30 transition-colors group">
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm">{estudio.nombre}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Comisión: <span className="font-bold text-emerald-600">{estudio.porcentaje_comision || 0}%</span>
+                    </p>
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => abrirModalEstudio(estudio)} className="text-blue-600 hover:text-blue-800">
-                      <Edit2 size={18} />
-                    </button>
-                    <button onClick={() => eliminarEstudio(estudio.id)} className="text-red-600 hover:text-red-800">
-                      <Trash2 size={18} />
-                    </button>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => abrirModalEstudio(estudio)}
+                      className="p-1.5 text-blue-500 hover:bg-blue-100 rounded-lg transition-colors"><Edit2 size={14} /></button>
+                    <button onClick={() => eliminarEstudio(estudio.id)}
+                      className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14} /></button>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Sub-Estudios */}
-          <div className="card">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Sub-Estudios</h2>
-              <button onClick={() => abrirModalSubEstudio()} className="btn-primary flex items-center gap-2">
-                <Plus size={18} />
-                Nuevo
+          {/* ── SUB-ESTUDIOS ── */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50/60">
+              <div>
+                <p className="font-black text-gray-800">Sub-Estudios</p>
+                <p className="text-xs text-gray-400 mt-0.5">{subEstudiosFiltrados.length} mostrados</p>
+              </div>
+              <button onClick={() => abrirModalSubEstudio()}
+                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm shadow-blue-200 transition-all">
+                <Plus size={14} /> Nuevo
               </button>
             </div>
 
-            <div className="mb-4 space-y-3">
-              <div>
-                <label className="label">Filtrar por Estudio</label>
-                <select 
-                  className="input-field"
-                  value={estudioSeleccionado}
-                  onChange={(e) => setEstudioSeleccionado(e.target.value)}
-                >
-                  <option value="">Todos</option>
-                  {estudios.filter(e => e.activo).map(e => (
-                    <option key={e.id} value={e.id}>{e.nombre}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="label">🔍 Buscar Sub-Estudio</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  placeholder="Buscar por nombre..."
-                  value={busqueda}
-                  onChange={(e) => setBusqueda(e.target.value)}
-                />
-              </div>
+            {/* Filtros */}
+            <div className="px-5 py-3 border-b border-gray-100 space-y-2 bg-gray-50/40">
+              <select
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-400 focus:border-blue-400 bg-white"
+                value={estudioSeleccionado} onChange={(e) => setEstudioSeleccionado(e.target.value)}>
+                <option value="">Todos los estudios</option>
+                {estudios.filter(e => e.activo).map(e => (
+                  <option key={e.id} value={e.id}>{e.nombre}</option>
+                ))}
+              </select>
+              <input type="text"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                placeholder="Buscar sub-estudio..."
+                value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
             </div>
-            
-            <div className="space-y-2 max-h-96 overflow-y-auto">
+
+            <div className="divide-y divide-gray-50 max-h-[380px] overflow-y-auto">
               {subEstudiosFiltrados.map(sub => (
-                <div key={sub.id} className="p-3 bg-gray-50 rounded hover:bg-gray-100">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="font-medium">{sub.nombre}</span>
-                    <div className="flex gap-2">
-                      <button onClick={() => abrirModalSubEstudio(sub)} className="text-blue-600 hover:text-blue-800">
-                        <Edit2 size={18} />
-                      </button>
-                      <button onClick={() => eliminarSubEstudio(sub.id)} className="text-red-600 hover:text-red-800">
-                        <Trash2 size={18} />
-                      </button>
+                <div key={sub.id} className="px-5 py-3 hover:bg-blue-50/30 transition-colors group">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold text-gray-900 text-sm">{sub.nombre}</p>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <button onClick={() => abrirModalSubEstudio(sub)}
+                        className="p-1.5 text-blue-500 hover:bg-blue-100 rounded-lg transition-colors"><Edit2 size={14} /></button>
+                      <button onClick={() => eliminarSubEstudio(sub.id)}
+                        className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14} /></button>
                     </div>
                   </div>
-                  <div className="text-sm text-gray-600 grid grid-cols-3 gap-2">
-                    <div>Normal: Q{sub.precio_normal}</div>
-                    <div>Social: Q{sub.precio_social}</div>
-                    <div>Especial: Q{sub.precio_especial}</div>
+                  <div className="flex gap-3 mt-1.5">
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">Normal: Q{sub.precio_normal}</span>
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Social: Q{sub.precio_social}</span>
+                    <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">Especial: Q{sub.precio_especial}</span>
                   </div>
                 </div>
               ))}
@@ -292,128 +291,92 @@ export const ProductosPage: React.FC<ProductosPageProps> = ({ onBack }) => {
         </div>
       </div>
 
-      {/* Modal Estudio */}
+      {/* ── MODAL ESTUDIO ── */}
       {showModalEstudio && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold">{editando ? 'Editar' : 'Nuevo'} Estudio</h3>
-              <button onClick={cerrarModalEstudio}><X size={24} /></button>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full">
+            <div className="flex justify-between items-center mb-5">
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-100 rounded-xl p-2"><Save size={16} className="text-blue-600" /></div>
+                <h3 className="text-base font-black text-gray-900">{editando ? 'Editar' : 'Nuevo'} Estudio</h3>
+              </div>
+              <button onClick={cerrarModalEstudio} className="text-gray-300 hover:text-gray-500 p-1 rounded-lg hover:bg-gray-100"><X size={18} /></button>
             </div>
-            
-            <div className="mb-4">
-              <label className="label">Nombre del Estudio</label>
-              <input
-                type="text"
-                className="input-field"
-                value={nombreEstudio}
-                onChange={(e) => setNombreEstudio(e.target.value)}
-                placeholder="Ej: Rayos X"
-              />
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Nombre del Estudio *</label>
+                <input type="text"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  value={nombreEstudio} onChange={(e) => setNombreEstudio(e.target.value)} placeholder="Ej: Rayos X" autoFocus />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Porcentaje de Comisión (%)</label>
+                <input type="number" step="0.01" min="0" max="100"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  value={porcentajeComision} onChange={(e) => setPorcentajeComision(e.target.value)} placeholder="Ej: 15" />
+                <p className="text-xs text-gray-400 mt-1">Si es 0% no aparecerá en comisiones</p>
+              </div>
             </div>
-
-            <div className="mb-4">
-              <label className="label">Porcentaje de Comisión (%)</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                max="100"
-                className="input-field"
-                value={porcentajeComision}
-                onChange={(e) => setPorcentajeComision(e.target.value)}
-                placeholder="Ej: 15"
-              />
-              <p className="text-xs text-gray-600 mt-1">
-                Si es 0%, no aparecerá en el reporte de comisiones
-              </p>
-            </div>
-
-            <div className="flex gap-3 justify-end">
-              <button onClick={cerrarModalEstudio} className="btn-secondary">Cancelar</button>
-              <button onClick={guardarEstudio} className="btn-primary flex items-center gap-2">
-                <Save size={18} />
-                Guardar
+            <div className="flex gap-3 mt-6">
+              <button onClick={cerrarModalEstudio}
+                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 font-semibold transition-colors">Cancelar</button>
+              <button onClick={guardarEstudio}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-sm shadow-blue-200 transition-all">
+                <Save size={14} /> Guardar
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Sub-Estudio */}
+      {/* ── MODAL SUB-ESTUDIO ── */}
       {showModalSubEstudio && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold">{editando ? 'Editar' : 'Nuevo'} Sub-Estudio</h3>
-              <button onClick={cerrarModalSubEstudio}><X size={24} /></button>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full">
+            <div className="flex justify-between items-center mb-5">
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-100 rounded-xl p-2"><Save size={16} className="text-blue-600" /></div>
+                <h3 className="text-base font-black text-gray-900">{editando ? 'Editar' : 'Nuevo'} Sub-Estudio</h3>
+              </div>
+              <button onClick={cerrarModalSubEstudio} className="text-gray-300 hover:text-gray-500 p-1 rounded-lg hover:bg-gray-100"><X size={18} /></button>
             </div>
-            
             <div className="space-y-4">
               <div>
-                <label className="label">Estudio</label>
-                <select 
-                  className="input-field"
-                  value={estudioSeleccionado}
-                  onChange={(e) => setEstudioSeleccionado(e.target.value)}
-                >
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Estudio *</label>
+                <select
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  value={estudioSeleccionado} onChange={(e) => setEstudioSeleccionado(e.target.value)}>
                   <option value="">Seleccione...</option>
-                  {estudios.filter(e => e.activo).map(e => (
-                    <option key={e.id} value={e.id}>{e.nombre}</option>
-                  ))}
+                  {estudios.filter(e => e.activo).map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
                 </select>
               </div>
-
               <div>
-                <label className="label">Nombre del Sub-Estudio</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  value={nombreSubEstudio}
-                  onChange={(e) => setNombreSubEstudio(e.target.value)}
-                  placeholder="Ej: Rayos X de Tórax"
-                />
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Nombre del Sub-Estudio *</label>
+                <input type="text"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  value={nombreSubEstudio} onChange={(e) => setNombreSubEstudio(e.target.value)} placeholder="Ej: Rayos X de Tórax" />
               </div>
-
-              <div>
-                <label className="label">Precio Normal (Q)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input-field"
-                  value={precioNormal}
-                  onChange={(e) => setPrecioNormal(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="label">Precio Social (Q)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input-field"
-                  value={precioSocial}
-                  onChange={(e) => setPrecioSocial(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="label">Precio Especial (Q)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input-field"
-                  value={precioEspecial}
-                  onChange={(e) => setPrecioEspecial(e.target.value)}
-                />
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: 'Normal (Q)', val: precioNormal, set: setPrecioNormal, color: 'gray' },
+                  { label: 'Social (Q)', val: precioSocial, set: setPrecioSocial, color: 'green' },
+                  { label: 'Especial (Q)', val: precioEspecial, set: setPrecioEspecial, color: 'purple' },
+                ].map(f => (
+                  <div key={f.label}>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">{f.label}</label>
+                    <input type="number" step="0.01"
+                      className={`w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-center focus:ring-2 focus:ring-${f.color}-400 focus:border-${f.color}-400`}
+                      value={f.val} onChange={(e) => f.set(e.target.value)} />
+                  </div>
+                ))}
               </div>
             </div>
-
-            <div className="flex gap-3 justify-end mt-6">
-              <button onClick={cerrarModalSubEstudio} className="btn-secondary">Cancelar</button>
-              <button onClick={guardarSubEstudio} className="btn-primary flex items-center gap-2">
-                <Save size={18} />
-                Guardar
+            <div className="flex gap-3 mt-6">
+              <button onClick={cerrarModalSubEstudio}
+                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 font-semibold transition-colors">Cancelar</button>
+              <button onClick={guardarSubEstudio}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-sm shadow-blue-200 transition-all">
+                <Save size={14} /> Guardar
               </button>
             </div>
           </div>
