@@ -292,9 +292,9 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       alert('Debe agregar al menos un estudio');
       return;
     }
-    // ✅ Validar establecimiento (ya viene del modal, pero verificar que no esté vacío)
-    if (esServicioMovil && !establecimientoMovil.trim()) {
-      alert('El establecimiento es requerido para servicios móviles.\n\nPor favor, crea un nuevo paciente e ingresa el establecimiento.');
+    // ✅ Servicio móvil: requiere al menos médico O establecimiento
+    if (esServicioMovil && !establecimientoMovil.trim() && !medicoActual) {
+      alert('Para servicios móviles ingresa al menos un médico o un establecimiento.');
       return;
     }
 
