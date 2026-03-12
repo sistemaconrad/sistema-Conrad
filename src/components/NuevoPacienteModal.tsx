@@ -97,7 +97,6 @@ setDireccionMedico(medico.direccion);
 const handleEstablecimientoChange = async (nombreEstablecimiento: string) => {
 setEstablecimientoMovil(nombreEstablecimiento);
 
-```
 // Si el establecimiento no existe en la lista, agregarlo a la BD
 const existe = establecimientos.some(e => e.nombre.toLowerCase() === nombreEstablecimiento.toLowerCase());
 if (!existe && nombreEstablecimiento.trim()) {
@@ -118,7 +117,6 @@ if (!existe && nombreEstablecimiento.trim()) {
     console.error('Error al guardar establecimiento:', error);
   }
 }
-```
 
 };
 
@@ -158,7 +156,6 @@ alert(‘Por favor complete todos los campos obligatorios del paciente:\n- Nombr
 return;
 }
 
-```
 const tieneMedico = nombreMedico.trim() !== '';
 
 // ✅ Para servicios móviles: establecimiento es obligatorio SOLO si no hay médico
@@ -227,7 +224,6 @@ if (tieneMedico && !sinInformacion) {
 const sinInfoParaImprimir = !tieneMedico || sinInformacion;
 onSave(paciente, medico, sinInfoParaImprimir, esServicioMovil, establecimientoMovil.trim(), sinOrdenMedica);
 resetForm();
-```
 
 };
 
@@ -248,7 +244,6 @@ return (
 </button>
 </div>
 
-```
     <div className="p-6 grid md:grid-cols-2 gap-6">
       {/* Sección Paciente */}
       <div className="card">
@@ -371,7 +366,6 @@ return (
               </label>
             </div>
           )}
-```
 
 {esServicioMovil && (
 <div className="space-y-3">
@@ -381,7 +375,6 @@ return (
 </p>
 </div>
 
-```
               {/* MÉDICO con búsqueda en tiempo real */}
               <div>
                 <label className="label">👨‍⚕️ Médico Referente (opcional)</label>
