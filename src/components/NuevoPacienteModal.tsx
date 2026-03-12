@@ -19,7 +19,7 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
   //  SIMPLIFICADO: Un solo campo de nombre
   const [nombrePaciente, setNombrePaciente] = useState('');
   const [edadPaciente, setEdadPaciente] = useState('');
-  const [tipoEdad, setTipoEdad] = useState<'aos' | 'meses' | 'das'>('aos');
+  const [tipoEdad, setTipoEdad] = useState<'anios' | 'meses' | 'dias'>('anios');
   const [telefonoPaciente, setTelefonoPaciente] = useState('');
   const [departamentoPaciente, setDepartamentoPaciente] = useState('');
   const [municipioPaciente, setMunicipioPaciente] = useState('');
@@ -176,7 +176,7 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
 
     let edadEnAnios = parseInt(edadPaciente);
     if (tipoEdad === 'meses') edadEnAnios = Math.floor(edadEnAnios / 12);
-    else if (tipoEdad === 'das') edadEnAnios = Math.floor(edadEnAnios / 365);
+    else if (tipoEdad === 'dias') edadEnAnios = Math.floor(edadEnAnios / 365);
 
     const paciente: Paciente = {
       nombre: nombrePaciente.trim(),
@@ -186,7 +186,7 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
       segundo_apellido: undefined,
       edad: edadEnAnios || 0,
       edad_valor: parseInt(edadPaciente),
-      edad_tipo: tipoEdad,
+      edad_tipo: tipoEdad === 'anios' ? ('a\u00f1os' as any) : tipoEdad === 'dias' ? ('d\u00edas' as any) : 'meses',
       telefono: telefonoPaciente,
       departamento: departamentoPaciente,
       municipio: municipioPaciente
@@ -264,16 +264,16 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
               <div>
                 <label className="label">Edad <span className="text-red-500">*</span></label>
                 <div className="flex gap-2 mb-2">
-                  <button type="button" onClick={() => setTipoEdad('das')}
-                    className={`px-3 py-1 rounded text-sm ${tipoEdad === 'das' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
+                  <button type="button" onClick={() => setTipoEdad('dias')}
+                    className={`px-3 py-1 rounded text-sm ${tipoEdad === 'dias' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
                     Das
                   </button>
                   <button type="button" onClick={() => setTipoEdad('meses')}
                     className={`px-3 py-1 rounded text-sm ${tipoEdad === 'meses' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
                     Meses
                   </button>
-                  <button type="button" onClick={() => setTipoEdad('aos')}
-                    className={`px-3 py-1 rounded text-sm ${tipoEdad === 'aos' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
+                  <button type="button" onClick={() => setTipoEdad('anios')}
+                    className={`px-3 py-1 rounded text-sm ${tipoEdad === 'anios' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
                     Aos
                   </button>
                 </div>
@@ -284,7 +284,7 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                   onChange={(e) => setEdadPaciente(e.target.value.replace(/\D/g, ''))}
                   placeholder={`Edad en ${tipoEdad}`}
                   min="0"
-                  max={tipoEdad === 'aos' ? '120' : tipoEdad === 'meses' ? '1440' : '43800'}
+                  max={tipoEdad === 'anios' ? '120' : tipoEdad === 'meses' ? '1440' : '43800'}
                 />
               </div>
 
@@ -446,98 +446,4 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                           setEstablecimientoMovil(e.target.value);
                           const q = e.target.value.toLowerCase();
                           const el = document.getElementById('lista-estab-movil');
-                          if (el) {
-                            el.querySelectorAll('button[data-nombre]').forEach((btn: any) => {
-                              btn.style.display = btn.dataset.nombre.toLowerCase().includes(q) ? '' : 'none';
-                            });
-                          }
-                        }}
-                        placeholder=" Escribir o buscar establecimiento..."
-                      />
-                      {establecimientos.length > 0 && (
-                        <div id="lista-estab-movil" className="border border-green-200 rounded-lg bg-green-50 max-h-44 overflow-y-auto">
-                          {establecimientos.map(est => (
-                            <button
-                              key={est.id}
-                              type="button"
-                              data-nombre={est.nombre}
-                              onClick={() => setEstablecimientoMovil(est.nombre)}
-                              className={`w-full text-left px-3 py-2 hover:bg-green-100 text-sm border-b border-green-100 last:border-0 transition-colors ${establecimientoMovil === est.nombre ? 'bg-green-200 font-semibold' : ''}`}
-                            >
-                              {est.nombre}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      
-                      <p className="text-xs text-orange-600">
-                        * Nombre del lugar donde se realizar el servicio movil
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {!esServicioMovil && (
-                <>
-                  {esReferente && !sinInformacion ? (
-                    <Autocomplete
-                      label="Nombre del Medico"
-                      options={medicosReferentes.map(m => ({ id: m.id || '', nombre: m.nombre }))}
-                      value={nombreMedico}
-                      onChange={handleMedicoReferenteChange}
-                      placeholder="Buscar medico referente"
-                      disabled={sinInformacion}
-                      required={!sinInformacion}
-                    />
-                  ) : (
-                    <div>
-                      <label className="label">Nombre {!sinInformacion && <span className="text-red-500">*</span>}</label>
-                      <input type="text" className="input-field" value={nombreMedico}
-                        onChange={(e) => setNombreMedico(e.target.value)}
-                        placeholder="Nombre del medico" disabled={sinInformacion} />
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="label">Numero de Telefono {!sinInformacion && <span className="text-red-500">*</span>}</label>
-                    <input type="tel" className="input-field" value={telefonoMedico}
-                      onChange={(e) => setTelefonoMedico(e.target.value.replace(/\D/g, ''))}
-                      placeholder="12345678"
-                      disabled={sinInformacion || (esReferente && medicoSeleccionado !== null)}
-                      maxLength={8} />
-                  </div>
-
-                  <Autocomplete label="Departamento" options={departamentosGuatemala} value={departamentoMedico}
-                    onChange={(val) => { setDepartamentoMedico(val); setMunicipioMedico(''); }}
-                    placeholder="Seleccione departamento"
-                    disabled={sinInformacion || (esReferente && medicoSeleccionado !== null)}
-                    required={!sinInformacion} />
-
-                  <Autocomplete label="Municipio" options={municipiosMedicoFiltrados} value={municipioMedico}
-                    onChange={setMunicipioMedico} placeholder="Seleccione municipio"
-                    disabled={sinInformacion || !departamentoMedico || (esReferente && medicoSeleccionado !== null)}
-                    required={!sinInformacion} />
-
-                  <div>
-                    <label className="label">Direccion {!sinInformacion && <span className="text-red-500">*</span>}</label>
-                    <textarea className="input-field" value={direccionMedico}
-                      onChange={(e) => setDireccionMedico(e.target.value)}
-                      placeholder="Direccion completa"
-                      disabled={sinInformacion || (esReferente && medicoSeleccionado !== null)}
-                      rows={3} />
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="sticky bottom-0 bg-gray-50 px-6 py-4 flex justify-end gap-3 border-t">
-          <button onClick={handleCancelar} className="btn-secondary">Cancelar</button>
-          <button onClick={handleGuardar} className="btn-primary">Guardar</button>
-        </div>
-      </div>
-    </div>
-  );
-};
+          
