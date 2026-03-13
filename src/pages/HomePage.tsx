@@ -242,31 +242,35 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     }
   };
 
+  const doLimpiar = () => {
+    setPacienteActual(null);
+    setMedicoActual(null);
+    setSinInfoMedico(false);
+    setSinOrdenMedicaConsulta(false);
+    setEsServicioMovil(false);
+    setEstablecimientoMovil('');
+    setTipoCobro('normal');
+    setJustificacionEspecial('');
+    setShowJustificacion(false);
+    setEstudioSeleccionado('');
+    setSubEstudioSeleccionado('');
+    setDescripcion([]);
+    setRequiereFactura(false);
+    setNit('');
+    setFormaPago('efectivo');
+    setNumeroFactura('');
+    setNumeroTransferencia('');
+    setNumeroVoucher('');
+    setConsultaGuardada(null);
+    setGuardando(false);
+    setNumeroPacienteGuardado(null);
+    setPagosMultiples([{ forma_pago: 'efectivo', monto: 0 }]);
+  };
+
   const handleLimpiar = () => {
-    if (confirm('¿Está seguro de que desea limpiar toda la información?')) {
-      setPacienteActual(null);
-      setMedicoActual(null);
-      setSinInfoMedico(false);
-      setSinOrdenMedicaConsulta(false);
-      setEsServicioMovil(false);
-      setEstablecimientoMovil('');
-      setTipoCobro('normal');
-      setJustificacionEspecial('');
-      setShowJustificacion(false);
-      setEstudioSeleccionado('');
-      setSubEstudioSeleccionado('');
-      setDescripcion([]);
-      setRequiereFactura(false);
-      setNit('');
-      setFormaPago('efectivo');
-      setNumeroFactura('');
-      setNumeroTransferencia('');
-      setNumeroVoucher('');
-      setConsultaGuardada(null);
-      setGuardando(false);
-      setNumeroPacienteGuardado(null);
-      setPagosMultiples([{ forma_pago: 'efectivo', monto: 0 }]);
-    }
+    // Si ya fue guardada, limpiar directo sin confirmar
+    if (consultaGuardada) { doLimpiar(); return; }
+    if (confirm('Desea limpiar toda la informacion?')) { doLimpiar(); }
   };
 
   const validarPagosMultiples = (): boolean => {

@@ -651,9 +651,11 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
     const total = consulta.detalle_consultas.reduce((sum: number, d: any) => sum + d.precio, 0);
 
     const tieneReferente = consulta.medicos?.es_referente === true;
-    const medicoLabel = consulta.sin_informacion_medico
-      ? 'Sin información'
-      : (consulta.medicos?.nombre || consulta.medico_recomendado || 'N/A');
+    const medicoLabel = consulta.es_servicio_movil
+      ? (consulta.movil_establecimiento || consulta.medicos?.nombre || consulta.medico_recomendado || 'Sin información')
+      : consulta.sin_informacion_medico
+        ? 'Sin información'
+        : (consulta.medicos?.nombre || consulta.medico_recomendado || 'N/A');
     const esSinOrden = consulta.sin_orden_medica === true;
 
     return (

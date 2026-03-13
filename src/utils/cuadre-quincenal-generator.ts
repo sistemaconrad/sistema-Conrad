@@ -116,7 +116,7 @@ export const generarCuadreQuincenal = async (datos: DatosCuadreQuincenal) => {
     let totalGeneral = 0;
     consultas.forEach(consulta => {
       const pacienteNombre = consulta.pacientes?.nombre || 'Sin nombre';
-      const fecha = format(new Date(consulta.fecha), 'dd/MM/yy');
+      const fecha = format(new Date(consulta.fecha + 'T12:00:00'), 'dd/MM/yy');
       
       // ✅ CAMBIO PRINCIPAL: Obtener estudios desde detalle_consultas
       const detalles = consulta.detalle_consultas || [];
@@ -126,7 +126,7 @@ export const generarCuadreQuincenal = async (datos: DatosCuadreQuincenal) => {
       const totalConsulta = detalles.reduce((sum: number, detalle: any) => sum + (detalle.precio || 0), 0);
 
       // Determinar si es inhábil (fin de semana)
-      const fechaObj = new Date(consulta.fecha);
+      const fechaObj = new Date(consulta.fecha + 'T12:00:00');
       const esInhabil = fechaObj.getDay() === 0 || fechaObj.getDay() === 6;
 
       const dataRow = worksheet.getRow(currentRow);
@@ -316,11 +316,11 @@ export const generarCuadreQuincenalMoviles = async (datos: DatosCuadreQuincenal)
     let totalGeneral = 0;
     consultas.forEach(consulta => {
       const pacienteNombre = consulta.pacientes?.nombre || 'Sin nombre';
-      const fecha = format(new Date(consulta.fecha), 'dd/MM/yy');
+      const fecha = format(new Date(consulta.fecha + 'T12:00:00'), 'dd/MM/yy');
       const detalles = consulta.detalle_consultas || [];
       const estudiosTexto = detalles.map((d: any) => d.sub_estudios?.nombre || 'Estudio').join(', ');
       const totalConsulta = detalles.reduce((sum: number, d: any) => sum + (d.precio || 0), 0);
-      const fechaObj = new Date(consulta.fecha);
+      const fechaObj = new Date(consulta.fecha + 'T12:00:00');
       const esInhabil = fechaObj.getDay() === 0 || fechaObj.getDay() === 6;
 
       const border = { top: { style: 'thin' as const }, left: { style: 'thin' as const }, bottom: { style: 'thin' as const }, right: { style: 'thin' as const } };
