@@ -16,15 +16,15 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
   onClose,
   onSave
 }) => {
-  // ✅ SIMPLIFICADO: Un solo campo de nombre
+  //  SIMPLIFICADO: Un solo campo de nombre
   const [nombrePaciente, setNombrePaciente] = useState('');
   const [edadPaciente, setEdadPaciente] = useState('');
-  const [tipoEdad, setTipoEdad] = useState<'años' | 'meses' | 'días'>('años');
+  const [tipoEdad, setTipoEdad] = useState<'anios' | 'meses' | 'dias'>('anios');
   const [telefonoPaciente, setTelefonoPaciente] = useState('');
   const [departamentoPaciente, setDepartamentoPaciente] = useState('');
   const [municipioPaciente, setMunicipioPaciente] = useState('');
 
-  // Estado del médico
+  // Estado del medico
   const [esReferente, setEsReferente] = useState(true);
   const [sinInformacion, setSinInformacion] = useState(false);
   const [sinOrdenMedica, setSinOrdenMedica] = useState(false);
@@ -42,6 +42,7 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      resetForm();
       cargarMedicosReferentes();
       cargarEstablecimientos();
     }
@@ -57,7 +58,7 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
       if (error) throw error;
       setMedicosReferentes(data || []);
     } catch (error) {
-      console.error('Error al cargar médicos referentes:', error);
+      console.error('Error al cargar medicos referentes:', error);
     }
   };
 
@@ -133,6 +134,7 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
   const resetForm = () => {
     setNombrePaciente('');
     setEdadPaciente('');
+    setTipoEdad('anios');
     setTelefonoPaciente('');
     setDepartamentoPaciente('');
     setMunicipioPaciente('');
@@ -151,29 +153,32 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
 
   const handleGuardar = () => {
     if (!nombrePaciente.trim() || !edadPaciente || !telefonoPaciente.trim() || !departamentoPaciente || !municipioPaciente) {
-      alert('Por favor complete todos los campos obligatorios del paciente:\n- Nombre\n- Edad\n- Teléfono\n- Departamento\n- Municipio');
+      alert('Por favor complete todos los campos obligatorios del paciente:\n- Nombre\n- Edad\n- Telefono\n- Departamento\n- Municipio');
       return;
     }
 
     const tieneMedico = nombreMedico.trim() !== '';
 
-    // ✅ Para servicios móviles: establecimiento es obligatorio SOLO si no hay médico
+    //  Para servicios moviles: establecimiento es obligatorio SOLO si no hay medico
     if (esServicioMovil && !tieneMedico && !establecimientoMovil.trim()) {
-      alert('Para Servicios Móviles debe ingresar al menos:\n- Un médico referente, O\n- El nombre del establecimiento\n\n(Preferiblemente ambos)');
+      alert('Para Servicios Moviles debe ingresar al menos:\n- Un medico referente, O\n- El nombre del establecimiento\n\n(Preferiblemente ambos)');
       return;
     }
 
     if (tieneMedico && !sinInformacion && !esServicioMovil) {
-      // ✅ Solo validar campos completos si NO es servicio móvil
-      if (!telefonoMedico.trim() || !departamentoMedico || !municipioMedico || !direccionMedico.trim()) {
-        alert('Por favor complete todos los campos del médico o marque "Sin información"');
-        return;
+      // Si es referente ya seleccionado de la lista, no validar campos adicionales
+      const referenteSeleccionado = esReferente && medicoSeleccionado !== null;
+      if (!referenteSeleccionado) {
+        if (!telefonoMedico.trim() || !departamentoMedico || !municipioMedico || !direccionMedico.trim()) {
+          alert('Por favor complete todos los campos del medico o marque "Sin informacion"');
+          return;
+        }
       }
     }
 
     let edadEnAnios = parseInt(edadPaciente);
     if (tipoEdad === 'meses') edadEnAnios = Math.floor(edadEnAnios / 12);
-    else if (tipoEdad === 'días') edadEnAnios = Math.floor(edadEnAnios / 365);
+    else if (tipoEdad === 'dias') edadEnAnios = Math.floor(edadEnAnios / 365);
 
     const paciente: Paciente = {
       nombre: nombrePaciente.trim(),
@@ -183,7 +188,7 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
       segundo_apellido: undefined,
       edad: edadEnAnios || 0,
       edad_valor: parseInt(edadPaciente),
-      edad_tipo: tipoEdad,
+      edad_tipo: tipoEdad === 'anios' ? ('a\u00f1os' as any) : tipoEdad === 'dias' ? ('d\u00edas' as any) : 'meses',
       telefono: telefonoPaciente,
       departamento: departamentoPaciente,
       municipio: municipioPaciente
@@ -192,10 +197,10 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
     let medico: Medico | null = null;
     if (tieneMedico && !sinInformacion) {
       if ((esReferente || esServicioMovil) && medicoSeleccionado) {
-        // ✅ Médico seleccionado de la lista
+        //  Medico seleccionado de la lista
         medico = medicoSeleccionado;
       } else if (esServicioMovil && !medicoSeleccionado) {
-        // ✅ Servicio móvil con nombre manual (no está en la lista)
+        //  Servicio movil con nombre manual (no esta en la lista)
         medico = {
           nombre: nombreMedico,
           telefono: telefonoMedico || '',
@@ -205,7 +210,7 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
           es_referente: false
         };
       } else {
-        // ✅ Médico no referente con datos completos
+        //  Medico no referente con datos completos
         medico = {
           nombre: nombreMedico,
           telefono: telefonoMedico,
@@ -240,12 +245,12 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
         </div>
 
         <div className="p-6 grid md:grid-cols-2 gap-6">
-          {/* Sección Paciente */}
+          {/* Seccin Paciente */}
           <div className="card">
             <h3 className="text-xl font-semibold mb-4 text-blue-700">Datos del Paciente</h3>
 
             <div className="space-y-4">
-              {/* ✅ CAMPO ÚNICO DE NOMBRE */}
+              {/*  CAMPO NICO DE NOMBRE */}
               <div>
                 <label className="label">Nombre Completo <span className="text-red-500">*</span></label>
                 <input
@@ -253,7 +258,7 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                   className="input-field"
                   value={nombrePaciente}
                   onChange={(e) => setNombrePaciente(e.target.value)}
-                  placeholder="Ej: Juan Carlos Pérez García"
+                  placeholder="Ej: Juan Carlos Perez Garcia"
                   autoFocus
                 />
               </div>
@@ -261,16 +266,16 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
               <div>
                 <label className="label">Edad <span className="text-red-500">*</span></label>
                 <div className="flex gap-2 mb-2">
-                  <button type="button" onClick={() => setTipoEdad('días')}
-                    className={`px-3 py-1 rounded text-sm ${tipoEdad === 'días' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
+                  <button type="button" onClick={() => setTipoEdad('dias')}
+                    className={`px-3 py-1 rounded text-sm ${tipoEdad === 'dias' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
                     Días
                   </button>
                   <button type="button" onClick={() => setTipoEdad('meses')}
                     className={`px-3 py-1 rounded text-sm ${tipoEdad === 'meses' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
                     Meses
                   </button>
-                  <button type="button" onClick={() => setTipoEdad('años')}
-                    className={`px-3 py-1 rounded text-sm ${tipoEdad === 'años' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
+                  <button type="button" onClick={() => setTipoEdad('anios')}
+                    className={`px-3 py-1 rounded text-sm ${tipoEdad === 'anios' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
                     Años
                   </button>
                 </div>
@@ -279,14 +284,14 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                   className="input-field"
                   value={edadPaciente}
                   onChange={(e) => setEdadPaciente(e.target.value.replace(/\D/g, ''))}
-                  placeholder={`Edad en ${tipoEdad}`}
+                  placeholder={tipoEdad === "anios" ? "Edad en años" : tipoEdad === "meses" ? "Edad en meses" : "Edad en días"}
                   min="0"
-                  max={tipoEdad === 'años' ? '120' : tipoEdad === 'meses' ? '1440' : '43800'}
+                  max={tipoEdad === 'anios' ? '120' : tipoEdad === 'meses' ? '1440' : '43800'}
                 />
               </div>
 
               <div>
-                <label className="label">Número de Teléfono <span className="text-red-500">*</span></label>
+                <label className="label">Numero de Telefono <span className="text-red-500">*</span></label>
                 <input
                   type="tel"
                   className="input-field"
@@ -318,9 +323,9 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
             </div>
           </div>
 
-          {/* Sección Médico */}
+          {/* Seccin Medico */}
           <div className="card">
-            <h3 className="text-xl font-semibold mb-4 text-green-700">Datos del Médico</h3>
+            <h3 className="text-xl font-semibold mb-4 text-green-700">Datos del Medico</h3>
 
             <div className="space-y-4">
               <div className="flex gap-4 flex-wrap">
@@ -340,24 +345,24 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                   <input type="radio" checked={esServicioMovil}
                     onChange={() => { setEsServicioMovil(true); setEsReferente(false); setMedicoSeleccionado(null); setNombreMedico(''); setTelefonoMedico(''); setDepartamentoMedico(''); setMunicipioMedico(''); setDireccionMedico(''); }}
                     className="mr-2" disabled={sinInformacion} />
-                  <span className="text-purple-700 font-medium">📱 Servicio Móvil</span>
+                  <span className="text-purple-700 font-medium"> Servicio Movil</span>
                 </label>
               </div>
 
               <div className="flex items-center">
                 <input type="checkbox" id="sinInfo" checked={sinInformacion}
                   onChange={(e) => handleSinInformacionChange(e.target.checked)} className="mr-2" />
-                <label htmlFor="sinInfo" className="text-sm font-medium text-gray-700">Sin información</label>
+                <label htmlFor="sinInfo" className="text-sm font-medium text-gray-700">Sin informacion</label>
               </div>
 
-              {/* Sin orden médica — solo si hay médico y no es sin información */}
+              {/* Sin orden medica  solo si hay medico y no es sin informacion */}
               {!sinInformacion && !esServicioMovil && (
                 <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${sinOrdenMedica ? 'bg-amber-50 border-amber-300' : 'border-gray-200'}`}>
                   <input type="checkbox" id="sinOrden" checked={sinOrdenMedica}
                     onChange={(e) => setSinOrdenMedica(e.target.checked)} className="mr-1" />
                   <label htmlFor="sinOrden" className="text-sm font-medium text-gray-700 cursor-pointer flex items-center gap-1.5">
-                    📋 Sin orden médica
-                    {sinOrdenMedica && <span className="text-xs text-amber-600 font-normal">— No genera comisión</span>}
+                     Sin orden medica
+                    {sinOrdenMedica && <span className="text-xs text-amber-600 font-normal"> No genera comisin</span>}
                   </label>
                 </div>
               )}
@@ -366,13 +371,13 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                 <div className="space-y-3">
                   <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
                     <p className="text-sm text-purple-800">
-                      <strong>📱 Servicio Móvil:</strong> Este registro no cuenta como paciente regular ni genera comisión. Solo se registran estudios RX con precio personalizado.
+                      <strong> Servicio Movil:</strong> Este registro no cuenta como paciente regular ni genera comisin. Solo se registran estudios RX con precio personalizado.
                     </p>
                   </div>
                   
-                  {/* MÉDICO con búsqueda en tiempo real */}
+                  {/* MDICO con bsqueda en tiempo real */}
                   <div>
-                    <label className="label">👨‍⚕️ Médico Referente (opcional)</label>
+                    <label className="label"> Medico Referente (opcional)</label>
                     <div className="space-y-1">
                       {nombreMedico ? (
                         <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5">
@@ -381,14 +386,14 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                             setNombreMedico(''); setMedicoSeleccionado(null);
                             setTelefonoMedico(''); setDepartamentoMedico('');
                             setMunicipioMedico(''); setDireccionMedico('');
-                          }} className="text-red-400 hover:text-red-600 text-xs font-bold ml-2">✕ Quitar</button>
+                          }} className="text-red-400 hover:text-red-600 text-xs font-bold ml-2"> Quitar</button>
                         </div>
                       ) : (
                         <div className="relative">
                           <input
                             type="text"
                             className="input-field pr-8"
-                            placeholder="🔍 Buscar médico por nombre..."
+                            placeholder=" Buscar medico por nombre..."
                             onChange={(e) => {
                               const q = e.target.value.toLowerCase();
                               const el = document.getElementById('lista-medicos-movil');
@@ -426,15 +431,15 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                     </div>
                   </div>
 
-                  {/* ✅ Campo de texto simple para establecimiento */}
+                  {/*  Campo de texto simple para establecimiento */}
                   <div>
                     <label className="label">
-                      🏥 Establecimiento / Lugar 
+                       Establecimiento / Lugar 
                       {!nombreMedico && <span className="text-red-500"> *</span>}
-                      {nombreMedico && <span className="text-gray-500 text-xs ml-1">(opcional si hay médico)</span>}
+                      {nombreMedico && <span className="text-gray-500 text-xs ml-1">(opcional si hay medico)</span>}
                     </label>
                     <div className="space-y-2">
-                      {/* Búsqueda + lista siempre visible */}
+                      {/* Bsqueda + lista siempre visible */}
                       <input
                         type="text"
                         className="input-field"
@@ -449,7 +454,7 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                             });
                           }
                         }}
-                        placeholder="🔍 Escribir o buscar establecimiento..."
+                        placeholder=" Escribir o buscar establecimiento..."
                       />
                       {establecimientos.length > 0 && (
                         <div id="lista-estab-movil" className="border border-green-200 rounded-lg bg-green-50 max-h-44 overflow-y-auto">
@@ -468,7 +473,7 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                       )}
                       
                       <p className="text-xs text-orange-600">
-                        * Nombre del lugar donde se realizará el servicio móvil
+                        * Nombre del lugar donde se realizar el servicio movil
                       </p>
                     </div>
                   </div>
@@ -479,11 +484,11 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                 <>
                   {esReferente && !sinInformacion ? (
                     <Autocomplete
-                      label="Nombre del Médico"
+                      label="Nombre del Medico"
                       options={medicosReferentes.map(m => ({ id: m.id || '', nombre: m.nombre }))}
                       value={nombreMedico}
                       onChange={handleMedicoReferenteChange}
-                      placeholder="Buscar médico referente"
+                      placeholder="Buscar medico referente"
                       disabled={sinInformacion}
                       required={!sinInformacion}
                     />
@@ -492,12 +497,12 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                       <label className="label">Nombre {!sinInformacion && <span className="text-red-500">*</span>}</label>
                       <input type="text" className="input-field" value={nombreMedico}
                         onChange={(e) => setNombreMedico(e.target.value)}
-                        placeholder="Nombre del médico" disabled={sinInformacion} />
+                        placeholder="Nombre del medico" disabled={sinInformacion} />
                     </div>
                   )}
 
                   <div>
-                    <label className="label">Número de Teléfono {!sinInformacion && <span className="text-red-500">*</span>}</label>
+                    <label className="label">Numero de Telefono {!sinInformacion && <span className="text-red-500">*</span>}</label>
                     <input type="tel" className="input-field" value={telefonoMedico}
                       onChange={(e) => setTelefonoMedico(e.target.value.replace(/\D/g, ''))}
                       placeholder="12345678"
@@ -517,10 +522,10 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                     required={!sinInformacion} />
 
                   <div>
-                    <label className="label">Dirección {!sinInformacion && <span className="text-red-500">*</span>}</label>
+                    <label className="label">Direccion {!sinInformacion && <span className="text-red-500">*</span>}</label>
                     <textarea className="input-field" value={direccionMedico}
                       onChange={(e) => setDireccionMedico(e.target.value)}
-                      placeholder="Dirección completa"
+                      placeholder="Direccion completa"
                       disabled={sinInformacion || (esReferente && medicoSeleccionado !== null)}
                       rows={3} />
                   </div>

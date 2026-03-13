@@ -330,7 +330,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       let siguienteNumero = null;
 
       if (!esServicioMovil) {
-        const fechaHoy = format(new Date(), 'yyyy-MM-dd');
+        const fechaHoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Guatemala' });
         const { data: ultimaConsulta } = await supabase
           .from('consultas')
           .select('numero_paciente')
@@ -362,7 +362,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           sin_informacion_medico: sinInfoMedico,
           sin_orden_medica: sinOrdenMedicaConsulta,
           justificacion_especial: ((tipoCobro === 'normal' && !esHorarioNormal()) || (tipoCobro === 'personalizado' && !esServicioMovil)) ? justificacionEspecial : null,
-          fecha: format(new Date(), 'yyyy-MM-dd'),
+          fecha: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Guatemala' }),
           es_servicio_movil: esServicioMovil,
           // ✅ ELIMINADO: movil_incluye_placas, movil_precio_placas, movil_incluye_informe, movil_precio_informe
           movil_establecimiento: esServicioMovil ? establecimientoMovil : null,
@@ -496,8 +496,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               </div>
             </div>
             <div className="text-right">
-              <p className="text-white font-semibold text-sm">{format(new Date(), "EEEE, dd 'de' MMMM yyyy")}</p>
-              <p className="text-blue-300 text-xs font-mono mt-0.5">{format(new Date(), 'HH:mm')}</p>
+              <p className="text-white font-semibold text-sm">{new Date().toLocaleDateString('es-GT', { timeZone: 'America/Guatemala', weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</p>
+              <p className="text-blue-300 text-xs font-mono mt-0.5">{new Date().toLocaleTimeString('es-GT', { timeZone: 'America/Guatemala', hour: '2-digit', minute: '2-digit' })}</p>
             </div>
           </div>
         </div>

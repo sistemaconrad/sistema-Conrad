@@ -1,319 +1,224 @@
 import React from 'react';
-import { Activity, Package, LogOut, FileText, Users, Banknote, UserCog, Stethoscope, Calendar } from 'lucide-react';
+import { Activity, Package, LogOut, Users, Banknote, UserCog, Stethoscope, Calendar, ChevronRight, LayoutGrid } from 'lucide-react';
 
 interface DashboardPageProps {
   onNavigateToModule: (module: string) => void;
   onLogout: () => void;
 }
 
-export const DashboardPage: React.FC<DashboardPageProps> = ({ 
-  onNavigateToModule, 
-  onLogout 
-}) => {
-  // ✅ Obtener rol del usuario
+export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateToModule, onLogout }) => {
   const rolUsuario = localStorage.getItem('rolUsuarioConrad') || 'secretaria';
   const nombreUsuario = localStorage.getItem('nombreUsuarioConrad') || 'Usuario';
 
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('rolUsuarioConrad'); // ✅ Limpiar rol
+    localStorage.removeItem('rolUsuarioConrad');
     onLogout();
   };
 
-  const handleModuleClick = (moduleId: string) => {
-    onNavigateToModule(moduleId);
-  };
-
-  // ✅ Definir qué módulos puede ver cada rol
   const permisosPorRol: { [key: string]: string[] } = {
-    'admin': ['sanatorio', 'inventario', 'contabilidad', 'personal', 'doctores', 'visitadoras'],
+    'admin':      ['sanatorio', 'inventario', 'contabilidad', 'personal', 'doctores', 'visitadoras'],
     'secretaria': ['sanatorio', 'inventario', 'visitadoras'],
     'visitadora': ['visitadoras'],
-    'doctor': ['doctores']
+    'doctor':     ['doctores'],
   };
 
   const modulosPermitidos = permisosPorRol[rolUsuario] || permisosPorRol['secretaria'];
 
-  const modules = [
+  const getRolLabel = (rol: string) => ({ admin:'Administrador', secretaria:'Secretaria', doctor:'Doctor', visitadora:'Visitadora' }[rol] || 'Usuario');
+
+  interface ModuleDef {
+    id: string; name: string; description: string; icon: any;
+    bg: string; accent: string; iconBg: string; tag?: string;
+  }
+
+  const modules: ModuleDef[] = [
     {
-      id: 'sanatorio',
-      name: 'Centro de Diagnóstico',
-      description: 'Gestión de consultas, pacientes y estudios médicos',
+      id: 'sanatorio', name: 'Centro de Diagnóstico',
+      description: 'Consultas, pacientes y estudios médicos',
       icon: Activity,
-      color: 'blue',
-      gradient: 'from-blue-500 to-blue-600'
+      bg: 'linear-gradient(135deg,#1d4ed8 0%,#2563eb 60%,#3b82f6 100%)',
+      accent: '#93c5fd', iconBg: 'rgba(255,255,255,0.18)',
     },
     {
-      id: 'inventario',
-      name: 'Inventario',
-      description: 'Control de productos, stock y suministros',
+      id: 'inventario', name: 'Inventario',
+      description: 'Productos, stock y suministros',
       icon: Package,
-      color: 'green',
-      gradient: 'from-green-500 to-green-600',
-      disabled: false
+      bg: 'linear-gradient(135deg,#059669 0%,#10b981 60%,#34d399 100%)',
+      accent: '#6ee7b7', iconBg: 'rgba(255,255,255,0.18)',
     },
     {
-      id: 'contabilidad',
-      name: 'Contabilidad',
-      description: 'Gestión financiera, ingresos y gastos',
+      id: 'contabilidad', name: 'Contabilidad',
+      description: 'Finanzas, ingresos y gastos',
       icon: Banknote,
-      color: 'emerald',
-      gradient: 'from-emerald-500 to-emerald-600',
-      disabled: false
+      bg: 'linear-gradient(135deg,#0891b2 0%,#06b6d4 60%,#22d3ee 100%)',
+      accent: '#a5f3fc', iconBg: 'rgba(255,255,255,0.18)',
     },
     {
-      id: 'personal',
-      name: 'Recursos Humanos',
-      description: 'Gestión de personal, nómina y asistencia',
+      id: 'personal', name: 'Recursos Humanos',
+      description: 'Personal, nómina y asistencia',
       icon: UserCog,
-      color: 'indigo',
-      gradient: 'from-indigo-500 to-indigo-600',
-      disabled: false
+      bg: 'linear-gradient(135deg,#7c3aed 0%,#8b5cf6 60%,#a78bfa 100%)',
+      accent: '#c4b5fd', iconBg: 'rgba(255,255,255,0.18)',
     },
     {
-      id: 'doctores',
-      name: 'Módulo de Doctores',
-      description: 'Informes médicos y gestión de estudios',
+      id: 'doctores', name: 'Módulo de Doctores',
+      description: 'Informes médicos y estudios',
       icon: Stethoscope,
-      color: 'blue',
-      gradient: 'from-blue-500 to-indigo-600',
-      disabled: false
+      bg: 'linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#1d4ed8 100%)',
+      accent: '#93c5fd', iconBg: 'rgba(255,255,255,0.18)',
     },
     {
-      id: 'visitadoras',
-      name: 'Visitadoras Médicas',
-      description: 'Gestión de visitadoras médicas',
+      id: 'visitadoras', name: 'Visitadoras Médicas',
+      description: 'Visitas, comisiones y referentes',
       icon: Users,
-      color: 'pink',
-      gradient: 'from-pink-500 to-pink-600',
-      disabled: false
-    }
+      bg: 'linear-gradient(135deg,#be185d 0%,#ec4899 60%,#f9a8d4 100%)',
+      accent: '#fce7f3', iconBg: 'rgba(255,255,255,0.18)',
+    },
   ];
 
-  // ✅ Filtrar módulos según permisos del rol
   const modulosFiltrados = modules.filter(m => modulosPermitidos.includes(m.id));
 
-  // ✅ Obtener etiqueta del rol
-  const getRolLabel = (rol: string) => {
-    const labels: { [key: string]: string } = {
-      'admin': 'Administrador',
-      'secretaria': 'Secretaria',
-      'doctor': 'Doctor'
-    };
-    return labels[rol] || 'Usuario';
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Header */}
-      <header className="bg-white shadow-md">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">CONRAD - Sistema de Gestión</h1>
-            <div className="flex items-center gap-3 mt-1">
-              <p className="text-sm text-gray-600">Panel Principal</p>
-              <span className="text-gray-300">•</span>
-              <p className="text-sm font-medium text-blue-600">{nombreUsuario}</p>
-              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-semibold rounded">
-                {getRolLabel(rolUsuario)}
-              </span>
+    <div className="min-h-screen" style={{ background: 'linear-gradient(160deg,#f0f4f8 0%,#e8edf5 100%)' }}>
+
+      {/* ── HEADER ── */}
+      <header className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-30">
+        <div className="container mx-auto px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-2 shadow-sm shadow-blue-200">
+              <LayoutGrid size={20} className="text-white" />
+            </div>
+            <div>
+              <p className="font-black text-gray-900 leading-none text-base">CONRAD</p>
+              <p className="text-gray-400 text-xs mt-0.5">Sistema de Gestión</p>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-          >
-            <LogOut size={18} />
-            Cerrar Sesión
-          </button>
+          <div className="flex items-center gap-3">
+            <div className="text-right hidden sm:block">
+              <p className="text-sm font-bold text-gray-800">{nombreUsuario}</p>
+              <p className="text-xs text-gray-400">{getRolLabel(rolUsuario)}</p>
+            </div>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-sm shadow-sm">
+              {nombreUsuario.charAt(0).toUpperCase()}
+            </div>
+            <button onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-bold shadow-sm shadow-red-200 transition-all">
+              <LogOut size={15} /> Salir
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* Módulos */}
-      <div className="container mx-auto px-4 py-12">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-800 mb-2">Selecciona un Módulo</h2>
-          <p className="text-gray-600">Elige el área que deseas gestionar</p>
+      <div className="container mx-auto px-4 py-8 max-w-5xl">
+
+        {/* ── Bienvenida ── */}
+        <div className="mb-8">
+          <p className="text-2xl font-black text-gray-900">Bienvenido, {nombreUsuario} 👋</p>
+          <p className="text-gray-400 text-sm mt-1">Selecciona el módulo que deseas gestionar</p>
         </div>
-      {/* Botón de Resumen del Día - Solo Admin */}
-{rolUsuario === 'admin' && (
-  <div className="mb-6">
-    <button
-      onClick={() => handleModuleClick('resumen')}
-      className="w-full bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white rounded-xl shadow-2xl p-8 transition-all duration-300 hover:scale-105"
-    >
-      <div className="flex items-center gap-4">
-        <div className="bg-white bg-opacity-20 w-16 h-16 rounded-lg flex items-center justify-center">
-          <Calendar size={32} />
-        </div>
-        <div className="text-left flex-1">
-          <h3 className="text-2xl font-bold">📊 Resumen del Día</h3>
-          <p className="text-indigo-100 mt-1">Vista general, actividades y códigos de autorización</p>
-        </div>
-        <div className="text-sm font-semibold px-4 py-2 bg-white bg-opacity-20 rounded-full">
-          Solo Admin →
-        </div>
-      </div>
-    </button>
-  </div>
-)}
-        <div className="grid md:grid-cols-2 lg:grid-cols-2 gap-6 max-w-4xl mx-auto">
-          {modulosFiltrados.map((module) => {
-            const Icon = module.icon;
+
+        {/* ── Resumen del Día (solo admin) ── */}
+        {rolUsuario === 'admin' && (
+          <button onClick={() => onNavigateToModule('resumen')}
+            className="w-full mb-6 text-left rounded-2xl overflow-hidden shadow-lg shadow-indigo-200/50 transition-all hover:shadow-xl hover:shadow-indigo-200/70 hover:-translate-y-0.5 group"
+            style={{ background: 'linear-gradient(135deg,#1e1b4b 0%,#3730a3 50%,#6366f1 100%)' }}>
+            <div className="px-6 py-5 flex items-center gap-5">
+              <div className="bg-white/15 border border-white/20 rounded-2xl p-3.5 backdrop-blur-sm shrink-0">
+                <Calendar size={26} className="text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="text-white font-black text-lg">📊 Resumen del Día</p>
+                <p className="text-indigo-200 text-sm mt-0.5">Vista general, actividades y códigos de autorización</p>
+              </div>
+              <div className="flex items-center gap-2 bg-white/15 border border-white/20 rounded-xl px-4 py-2 text-white text-sm font-bold group-hover:bg-white/25 transition-colors">
+                Abrir <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </div>
+          </button>
+        )}
+
+        {/* ── Grid de módulos ── */}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {modulosFiltrados.map(mod => {
+            const Icon = mod.icon;
             return (
-              <button
-                key={module.id}
-                onClick={() => !module.disabled && handleModuleClick(module.id)}
-                disabled={module.disabled}
-                className={`
-                  relative overflow-hidden rounded-xl shadow-lg transition-all duration-300
-                  ${module.disabled 
-                    ? 'opacity-50 cursor-not-allowed bg-gray-300' 
-                    : `bg-gradient-to-br ${module.gradient} hover:scale-105 hover:shadow-2xl cursor-pointer`
-                  }
-                  p-8 text-left text-white group
-                `}
-              >
-                {/* Icono de fondo */}
-                <div className="absolute top-0 right-0 opacity-10 transform translate-x-6 -translate-y-6">
-                  <Icon size={120} />
-                </div>
-
-                {/* Contenido */}
-                <div className="relative z-10">
-                  <div className="bg-white bg-opacity-20 w-16 h-16 rounded-lg flex items-center justify-center mb-4">
-                    <Icon size={32} />
+              <button key={mod.id}
+                onClick={() => onNavigateToModule(mod.id)}
+                className="text-left rounded-2xl overflow-hidden shadow-md transition-all duration-200 hover:shadow-xl hover:-translate-y-1 group"
+                style={{ background: mod.bg }}>
+                {/* Decorative blob */}
+                <div className="relative overflow-hidden px-5 pt-5 pb-4">
+                  <div className="absolute -right-4 -top-4 opacity-10">
+                    <Icon size={96} className="text-white" />
                   </div>
-                  
-                  <h3 className="text-2xl font-bold mb-2">{module.name}</h3>
-                  <p className="text-white text-opacity-90">{module.description}</p>
-                  
-                  {module.disabled && (
-                    <div className="mt-4 inline-block bg-white bg-opacity-30 px-3 py-1 rounded-full text-sm">
-                      Próximamente
+                  <div className="relative z-10">
+                    <div className="rounded-xl p-3 w-fit mb-4" style={{ background: mod.iconBg, border: '1px solid rgba(255,255,255,0.2)' }}>
+                      <Icon size={22} className="text-white" />
                     </div>
-                  )}
-
-                  {!module.disabled && (
-                    <div className="mt-4 flex items-center text-sm font-semibold group-hover:translate-x-2 transition-transform">
-                      Abrir módulo →
-                    </div>
-                  )}
+                    <p className="font-black text-white text-base leading-tight">{mod.name}</p>
+                    <p className="mt-1.5 text-sm leading-snug" style={{ color: mod.accent }}>{mod.description}</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between px-5 py-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.1)' }}>
+                  <span className="text-xs font-bold text-white/70">Abrir módulo</span>
+                  <ChevronRight size={16} className="text-white/60 group-hover:translate-x-0.5 transition-transform" />
                 </div>
               </button>
             );
           })}
         </div>
 
-        {/* Información adicional */}
-        <div className="mt-12 text-center">
-          <div className="bg-white rounded-lg shadow-md p-6 max-w-2xl mx-auto">
-            <h3 className="text-lg font-bold text-gray-800 mb-2">📊 Estado del Sistema</h3>
-            <div className="grid grid-cols-3 gap-4 mt-4">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-blue-600">{modulosFiltrados.length}</div>
-                <div className="text-sm text-gray-600">Módulos Disponibles</div>
+        {/* ── Footer info ── */}
+        <div className="mt-10 flex items-center justify-between text-xs text-gray-400">
+          <span>{modulosFiltrados.length} módulos disponibles · {getRolLabel(rolUsuario)}</span>
+          <button
+            onClick={() => { const m = document.getElementById('dev-modal'); if (m) m.style.display='flex'; }}
+            className="font-mono hover:text-gray-600 transition-colors">&lt;/&gt;</button>
+        </div>
+      </div>
+
+      {/* ── Modal dev ── */}
+      <div id="dev-modal" className="fixed inset-0 bg-black/50 items-center justify-center z-50" style={{ display:'none' }}
+        onClick={e => { if (e.target === e.currentTarget) { const m = document.getElementById('dev-modal'); if(m) m.style.display='none'; } }}>
+        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm mx-4 relative">
+          <button onClick={() => { const m = document.getElementById('dev-modal'); if(m) m.style.display='none'; }}
+            className="absolute top-4 right-4 text-gray-300 hover:text-gray-500 w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100">✕</button>
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-blue-200">
+              <span className="text-white text-lg font-black">&lt;/&gt;</span>
+            </div>
+            <p className="font-black text-gray-900 text-lg">Desarrollado por</p>
+            <p className="text-gray-600 mt-1">Jonnathan David Franco Hernández</p>
+          </div>
+          <div className="space-y-3">
+            <div className="bg-gray-50 rounded-xl p-3.5 flex items-center gap-3">
+              <div className="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center shrink-0">
+                <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/>
+                  <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/>
+                </svg>
               </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-green-600">0</div>
-                <div className="text-sm text-gray-600">Próximamente</div>
+              <div>
+                <p className="text-xs text-gray-400">EMAIL</p>
+                <p className="text-sm font-semibold text-gray-800">aguilarhz20001@gmail.com</p>
               </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-purple-600">100%</div>
-                <div className="text-sm text-gray-600">Operativo</div>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3.5 flex items-center gap-3">
+              <div className="w-9 h-9 bg-green-100 rounded-xl flex items-center justify-center shrink-0">
+                <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/>
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">TELÉFONO / WHATSAPP</p>
+                <p className="text-sm font-semibold text-gray-800">3658-3824</p>
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Botón Developer Info - Discreto en esquina */}
-        <button
-          onClick={() => {
-            const modal = document.getElementById('dev-info-modal');
-            if (modal) modal.style.display = 'flex';
-          }}
-          className="fixed bottom-4 right-4 w-10 h-10 bg-gray-200 hover:bg-gray-300 rounded-full flex items-center justify-center text-gray-600 hover:text-gray-800 transition-all shadow-md text-xs"
-          title="Información del desarrollador"
-        >
-          {'</>'}
-        </button>
-
-        {/* Modal Developer Info */}
-        <div
-          id="dev-info-modal"
-          className="fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50"
-          style={{ display: 'none' }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              const modal = document.getElementById('dev-info-modal');
-              if (modal) modal.style.display = 'none';
-            }
-          }}
-        >
-          <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md mx-4 relative">
-            <button
-              onClick={() => {
-                const modal = document.getElementById('dev-info-modal');
-                if (modal) modal.style.display = 'none';
-              }}
-              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700"
-            >
-              ✕
-            </button>
-
-            <div className="text-center mb-6">
-              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-white text-2xl font-bold">{'</>'}</span>
-              </div>
-              <h2 className="text-2xl font-bold text-gray-800">Desarrollado por</h2>
-              <p className="text-xl text-gray-700 mt-2">Jonnathan David Franco Hernández</p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/>
-                      <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">EMAIL</p>
-                    <p className="text-sm font-medium text-gray-800">aguilarhz20001@gmail.com</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">TELÉFONO / WHATSAPP</p>
-                    <p className="text-sm font-medium text-gray-800">3658-3824</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 pt-6 border-t border-gray-200 text-center">
-              <p className="text-sm text-gray-500">
-                Hecho con <span className="text-red-500">❤</span> en Guatemala
-              </p>
-              <p className="text-xs text-gray-400 mt-1">
-                © 2026 Jonnathan Franco. Todos los derechos reservados.
-              </p>
-            </div>
-
-            <div className="mt-4 text-center">
-              <p className="text-xs text-gray-500 font-mono">
-                React • Vite • Supabase • PostgreSQL • Leaflet • jsPDF
-              </p>
-            </div>
+          <div className="mt-5 pt-5 border-t border-gray-100 text-center">
+            <p className="text-xs text-gray-400">Hecho con <span className="text-red-400">❤</span> en Guatemala</p>
+            <p className="text-xs text-gray-300 mt-1 font-mono">React · Vite · Supabase · PostgreSQL</p>
           </div>
         </div>
       </div>

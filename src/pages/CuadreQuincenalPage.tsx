@@ -20,12 +20,18 @@ export const CuadreQuincenalPage: React.FC<CuadreQuincenalPageProps> = ({ onBack
   ];
 
   const getFechas = () => {
-    const fechaInicio = quincena === 1
-      ? new Date(anio, mes - 1, 1)
-      : new Date(anio, mes - 1, 16);
-    const fechaFin = quincena === 1
-      ? new Date(anio, mes - 1, 15, 23, 59, 59)
-      : new Date(anio, mes - 1 + 1, 0, 23, 59, 59);
+    // Guatemala es UTC-6, entonces el inicio del dia GT = T06:00:00Z, fin = T05:59:59Z del dia siguiente
+    const diaInicio = quincena === 1 ? 1 : 16;
+    const diaFin = quincena === 1 ? 15 : new Date(anio, mes, 0).getDate(); // ultimo dia del mes
+
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const fechaInicioStr = `${anio}-${pad(mes)}-${pad(diaInicio)}`;
+    const fechaFinStr = `${anio}-${pad(mes)}-${pad(diaFin)}`;
+
+    // UTC equivalents: GT midnight = 06:00 UTC, GT end of day = next day 05:59:59 UTC
+    const fechaInicio = new Date(`${fechaInicioStr}T06:00:00.000Z`);
+    const fechaFin = new Date(`${fechaFinStr}T05:59:59.999Z`);
+    fechaFin.setDate(fechaFin.getDate() + 1); // +1 day since GT end-of-day is next UTC day
     return { fechaInicio, fechaFin };
   };
 

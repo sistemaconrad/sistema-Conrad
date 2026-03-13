@@ -28,6 +28,7 @@ export const ReferentesPage: React.FC<ReferentesPageProps> = ({ onBack }) => {
   const [showModal, setShowModal] = useState(false);
   const [editando, setEditando] = useState(false);
   const [medicoEditando, setMedicoEditando] = useState<Medico | null>(null);
+  const [pendingMunicipio, setPendingMunicipio] = useState<string | null>(null);
   const [mostrarAutorizacion, setMostrarAutorizacion] = useState(false);
   const [medicoAEliminar, setMedicoAEliminar] = useState<Medico | null>(null);
   const [filtroNombre, setFiltroNombre] = useState('');
@@ -68,9 +69,11 @@ export const ReferentesPage: React.FC<ReferentesPageProps> = ({ onBack }) => {
 
   const abrirModalEditar = (m: Medico) => {
     setEditando(true); setMedicoEditando(m);
-    setNombre(m.nombre); setTelefono(m.telefono); setDepartamento(m.departamento);
-    setMunicipio(m.municipio); setDireccion(m.direccion);
+    setNombre(m.nombre); setTelefono(m.telefono); setDireccion(m.direccion);
     setReferencia(m.referencia || ''); setHorario(m.horario || ''); setEspecial(m.especial || '');
+    setMunicipio('');
+    setPendingMunicipio(m.municipio);
+    setDepartamento(m.departamento);
     setShowModal(true);
   };
 
@@ -81,17 +84,26 @@ export const ReferentesPage: React.FC<ReferentesPageProps> = ({ onBack }) => {
   };
 
   const guardarMedico = async () => {
-    if (!nombre || !telefono || !departamento || !municipio || !direccion) { alert('Complete todos los campos'); return; }
+    if (!nombre || !departamento || !municipio) { alert('Complete los campos: Nombre, Departamento y Municipio'); return; }
     try {
       if (editando && medicoEditando) {
-        await supabase.from('medicos').update({ nombre, telefono, departamento, municipio, direccion, referencia: referencia || null, horario: horario || null, especial: especial || null }).eq('id', medicoEditando.id);
-        alert('Médico actualizado');
+        const { error } = await supabase.from('medicos').update({
+          nombre, telefono, departamento, municipio, direccion,
+          referencia: referencia || null, horario: horario || null, especial: especial || null
+        }).eq('id', medicoEditando.id);
+        if (error) throw error;
+        alert('Medico actualizado');
       } else {
-        await supabase.from('medicos').insert([{ nombre, telefono, departamento, municipio, direccion, referencia: referencia || null, horario: horario || null, especial: especial || null, es_referente: true, activo: true }]);
-        alert('Médico agregado');
+        const { error } = await supabase.from('medicos').insert([{
+          nombre, telefono, departamento, municipio, direccion,
+          referencia: referencia || null, horario: horario || null, especial: especial || null,
+          es_referente: true, activo: true
+        }]);
+        if (error) throw error;
+        alert('Medico agregado');
       }
       cerrarModal(); cargarMedicos();
-    } catch (e) { alert('Error al guardar médico'); }
+    } catch (e: any) { alert('Error al guardar: ' + (e?.message || JSON.stringify(e))); }
   };
 
   const solicitarEliminarMedico = (m: Medico) => { setMedicoAEliminar(m); setMostrarAutorizacion(true); };
@@ -161,6 +173,14 @@ export const ReferentesPage: React.FC<ReferentesPageProps> = ({ onBack }) => {
     ? municipiosGuatemala.filter(m => m.departamento_id === filtroDepartamento) : municipiosGuatemala;
   const municipiosFiltradosFormulario = departamento
     ? municipiosGuatemala.filter(m => m.departamento_id === departamento) : [];
+
+  // Set municipio after departamento options are ready
+  useEffect(() => {
+    if (pendingMunicipio && municipiosFiltradosFormulario.length > 0) {
+      setMunicipio(pendingMunicipio);
+      setPendingMunicipio(null);
+    }
+  }, [municipiosFiltradosFormulario, pendingMunicipio]);
 
   const exportarExcel = async () => {
     try {
