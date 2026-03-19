@@ -192,235 +192,169 @@ export const MovimientosPage: React.FC<MovimientosPageProps> = ({ onBack }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <button onClick={onBack} className="text-blue-600 hover:text-blue-700 mb-2 flex items-center gap-2">
-            <ArrowLeft size={20} />
-            Volver al Inventario
+    <div className="min-h-screen bg-slate-50">
+
+      {/* ── HEADER ── */}
+      <div style={{background:'linear-gradient(135deg,#0f172a 0%,#064e3b 50%,#065f46 100%)'}}>
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <button onClick={onBack} className="flex items-center gap-2 text-emerald-200 hover:text-white mb-4 text-sm font-medium transition-colors group">
+            <ArrowLeft size={15} className="group-hover:-translate-x-1 transition-transform" /> Volver al Inventario
           </button>
-          <h1 className="text-2xl font-bold">Movimientos de Inventario</h1>
+          <div className="flex items-center gap-4">
+            <div className="bg-white/10 rounded-2xl p-3 border border-white/10">
+              <Plus size={22} className="text-emerald-200" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black text-white tracking-tight">Movimientos de Inventario</h1>
+              <p className="text-emerald-300 text-sm mt-0.5">Registro de entradas, salidas, ajustes y mermas</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Formulario de registro */}
+      <div className="max-w-7xl mx-auto px-6 py-6">
+        <div className="grid lg:grid-cols-3 gap-6">
+
+          {/* ── Formulario ── */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow p-6 sticky top-4">
-              <h2 className="text-xl font-bold mb-4">Registrar Movimiento</h2>
-
-              <form onSubmit={handleRegistrarMovimiento} className="space-y-4">
-                {/* Tipo de movimiento */}
-                <div>
-                  <label className="label">Tipo de Movimiento *</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setTipoMovimiento('entrada')}
-                      className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
-                        tipoMovimiento === 'entrada'
-                          ? 'border-green-500 bg-green-50 text-green-700'
-                          : 'border-gray-200 hover:border-green-300'
-                      }`}
-                    >
-                      📥 Entrada
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTipoMovimiento('salida')}
-                      className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
-                        tipoMovimiento === 'salida'
-                          ? 'border-red-500 bg-red-50 text-red-700'
-                          : 'border-gray-200 hover:border-red-300'
-                      }`}
-                    >
-                      📤 Salida
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTipoMovimiento('ajuste')}
-                      className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
-                        tipoMovimiento === 'ajuste'
-                          ? 'border-blue-500 bg-blue-50 text-blue-700'
-                          : 'border-gray-200 hover:border-blue-300'
-                      }`}
-                    >
-                      ⚙️ Ajuste
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTipoMovimiento('merma')}
-                      className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
-                        tipoMovimiento === 'merma'
-                          ? 'border-orange-500 bg-orange-50 text-orange-700'
-                          : 'border-gray-200 hover:border-orange-300'
-                      }`}
-                    >
-                      ❌ Merma
-                    </button>
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden sticky top-4">
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2.5">
+                <div className="bg-emerald-50 rounded-xl p-2"><Plus size={14} className="text-emerald-600" /></div>
+                <span className="text-sm font-black text-slate-800">Registrar Movimiento</span>
+              </div>
+              <div className="p-5">
+                <form onSubmit={handleRegistrarMovimiento} className="space-y-4">
+                  {/* Tipo */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Tipo de Movimiento *</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: 'entrada', label: '📥 Entrada',  active: 'border-emerald-500 bg-emerald-50 text-emerald-700' },
+                        { id: 'salida',  label: '📤 Salida',   active: 'border-red-500 bg-red-50 text-red-700'             },
+                        { id: 'ajuste',  label: '⚙️ Ajuste',   active: 'border-blue-500 bg-blue-50 text-blue-700'          },
+                        { id: 'merma',   label: '❌ Merma',    active: 'border-orange-500 bg-orange-50 text-orange-700'    },
+                      ].map(t => (
+                        <button key={t.id} type="button" onClick={() => setTipoMovimiento(t.id as any)}
+                          className={`p-2.5 rounded-xl border-2 text-xs font-bold transition-all ${tipoMovimiento === t.id ? t.active : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                {/* Producto */}
-                <div>
-                  <label className="label">Producto *</label>
-                  <select
-                    value={productoId}
-                    onChange={(e) => setProductoId(e.target.value)}
-                    className="input-field"
-                    required
-                  >
-                    <option value="">Seleccione un producto</option>
-                    {productos.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.codigo ? `${p.codigo} - ` : ''}{p.nombre} (Stock: {p.stock_actual})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  {/* Producto */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">Producto *</label>
+                    <select value={productoId} onChange={(e) => setProductoId(e.target.value)} required
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400 outline-none bg-white">
+                      <option value="">Seleccione un producto</option>
+                      {productos.map(p => (
+                        <option key={p.id} value={p.id}>{p.codigo ? `${p.codigo} - ` : ''}{p.nombre} (Stock: {p.stock_actual})</option>
+                      ))}
+                    </select>
+                  </div>
 
-                {/* Cantidad */}
-                <div>
-                  <label className="label">
-                    Cantidad * {tipoMovimiento === 'ajuste' && '(Stock final)'}
-                  </label>
-                  <input
-                    type="number"
-                    value={cantidad}
-                    onChange={(e) => setCantidad(e.target.value)}
-                    className="input-field"
-                    min="1"
-                    required
-                  />
-                </div>
+                  {/* Cantidad */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">
+                      Cantidad * {tipoMovimiento === 'ajuste' && <span className="text-blue-400">(Stock final)</span>}
+                    </label>
+                    <input type="number" value={cantidad} onChange={(e) => setCantidad(e.target.value)} min="1" required
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400 outline-none" />
+                  </div>
 
-                {/* Motivo */}
-                <div>
-                  <label className="label">Motivo</label>
-                  <textarea
-                    value={motivo}
-                    onChange={(e) => setMotivo(e.target.value)}
-                    className="input-field"
-                    rows={2}
-                    placeholder="Ej: Compra mensual, Consumo paciente, etc."
-                  />
-                </div>
+                  {/* Motivo */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">Motivo</label>
+                    <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={2}
+                      placeholder="Ej: Compra mensual, Consumo paciente..."
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400 outline-none resize-none" />
+                  </div>
 
-                {/* Campos adicionales para entrada */}
-                {tipoMovimiento === 'entrada' && (
-                  <>
-                    <div>
-                      <label className="label">Proveedor</label>
-                      <select
-                        value={proveedorId}
-                        onChange={(e) => setProveedorId(e.target.value)}
-                        className="input-field"
-                      >
-                        <option value="">Seleccione proveedor</option>
-                        {proveedores.map(p => (
-                          <option key={p.id} value={p.id}>{p.nombre}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="label">Costo Unitario</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={costoUnitario}
-                        onChange={(e) => setCostoUnitario(e.target.value)}
-                        className="input-field"
-                        placeholder="0.00"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="label">No. Factura</label>
-                      <input
-                        type="text"
-                        value={numeroFactura}
-                        onChange={(e) => setNumeroFactura(e.target.value)}
-                        className="input-field"
-                        placeholder="Ej: F-12345"
-                      />
-                    </div>
-                  </>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full btn-primary flex items-center justify-center gap-2"
-                >
-                  {loading ? 'Procesando...' : (
+                  {tipoMovimiento === 'entrada' && (
                     <>
-                      <Plus size={20} />
-                      Registrar Movimiento
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">Proveedor</label>
+                        <select value={proveedorId} onChange={(e) => setProveedorId(e.target.value)}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400 outline-none bg-white">
+                          <option value="">Seleccione proveedor</option>
+                          {proveedores.map(p => (<option key={p.id} value={p.id}>{p.nombre}</option>))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">Costo Unitario</label>
+                        <input type="number" step="0.01" value={costoUnitario} onChange={(e) => setCostoUnitario(e.target.value)} placeholder="0.00"
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400 outline-none" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">No. Factura</label>
+                        <input type="text" value={numeroFactura} onChange={(e) => setNumeroFactura(e.target.value)} placeholder="Ej: F-12345"
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400 outline-none" />
+                      </div>
                     </>
                   )}
-                </button>
-              </form>
+
+                  <button type="submit" disabled={loading}
+                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white py-3 rounded-xl font-bold text-sm shadow-sm transition-all disabled:opacity-50">
+                    {loading ? 'Procesando...' : <><Plus size={15} /> Registrar Movimiento</>}
+                  </button>
+                </form>
+              </div>
             </div>
           </div>
 
-          {/* Historial de movimientos */}
+          {/* ── Historial ── */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-6 border-b">
-                <h2 className="text-xl font-bold">Historial de Movimientos</h2>
-                <p className="text-sm text-gray-600 mt-1">Últimos 20 movimientos registrados</p>
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="bg-slate-100 rounded-xl p-2"><Plus size={14} className="text-slate-500 rotate-45" /></div>
+                  <span className="text-sm font-black text-slate-800">Historial de Movimientos</span>
+                </div>
+                <span className="text-xs text-slate-400 bg-slate-50 px-3 py-1 rounded-lg">Últimos {movimientos.length}</span>
               </div>
-
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cantidad</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Motivo</th>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      {['Fecha','Producto','Tipo','Cantidad','Stock','Motivo'].map(h => (
+                        <th key={h} className="px-4 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-wider">{h}</th>
+                      ))}
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="divide-y divide-slate-50">
                     {movimientos.map((mov) => (
-                      <tr key={mov.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {new Date(mov.fecha).toLocaleDateString()}
+                      <tr key={mov.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3 text-xs font-mono text-slate-500 whitespace-nowrap">
+                          {new Date(mov.fecha + 'T12:00:00').toLocaleDateString('es-GT')}
                         </td>
-                        <td className="px-6 py-4 text-sm">
-                          <div className="font-medium">{mov.productos_inventario?.nombre}</div>
-                          <div className="text-gray-500">{mov.productos_inventario?.codigo}</div>
+                        <td className="px-4 py-3">
+                          <p className="font-bold text-slate-800 text-xs">{mov.productos_inventario?.nombre}</p>
+                          {mov.productos_inventario?.codigo && <p className="text-xs text-slate-400 font-mono">{mov.productos_inventario.codigo}</p>}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 inline-flex items-center gap-1 text-xs font-semibold rounded-full ${getTipoColor(mov.tipo_movimiento)}`}>
-                            {getTipoIcon(mov.tipo_movimiento)}
-                            {mov.tipo_movimiento}
+                        <td className="px-4 py-3">
+                          <span className={`px-2.5 py-1 rounded-xl text-xs font-black inline-flex items-center gap-1 ${getTipoColor(mov.tipo_movimiento)}`}>
+                            {getTipoIcon(mov.tipo_movimiento)} {mov.tipo_movimiento}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <span className={mov.tipo_movimiento === 'entrada' || mov.tipo_movimiento === 'ajuste' ? 'text-green-600' : 'text-red-600'}>
-                            {mov.tipo_movimiento === 'entrada' ? '+' : mov.tipo_movimiento === 'salida' || mov.tipo_movimiento === 'merma' ? '-' : '='}{mov.cantidad}
+                        <td className="px-4 py-3">
+                          <span className={`text-base font-black ${mov.tipo_movimiento === 'entrada' || mov.tipo_movimiento === 'ajuste' ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {mov.tipo_movimiento === 'entrada' ? '+' : mov.tipo_movimiento === 'ajuste' ? '=' : '-'}{mov.cantidad}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {mov.stock_anterior} → <span className="font-bold">{mov.stock_nuevo}</span>
+                        <td className="px-4 py-3 text-xs text-slate-500">
+                          <span>{mov.stock_anterior}</span>
+                          <span className="text-slate-300 mx-1">→</span>
+                          <span className="font-black text-slate-700">{mov.stock_nuevo}</span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-500">
-                          {mov.motivo || '-'}
-                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-500 max-w-[150px] truncate">{mov.motivo || '—'}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-
                 {movimientos.length === 0 && (
-                  <div className="text-center py-12 text-gray-500">
-                    No hay movimientos registrados
+                  <div className="py-12 text-center">
+                    <p className="text-sm text-slate-400">No hay movimientos registrados</p>
                   </div>
                 )}
               </div>
@@ -429,7 +363,6 @@ export const MovimientosPage: React.FC<MovimientosPageProps> = ({ onBack }) => {
         </div>
       </div>
 
-      {/* Toast */}
       {toast && <Toast {...toast} onClose={hideToast} />}
     </div>
   );

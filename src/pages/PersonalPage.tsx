@@ -15,12 +15,14 @@ import { EmpleadosPage } from './EmpleadosPage';
 import { AsistenciaPage } from './AsistenciaPage';
 import { NominaPage } from './NominaPage';
 import { ConfiguracionPage } from './ConfiguracionPage';
+import { AusenciasPage } from './AusenciasPage';
+import { ReportesPersonalPage } from './ReportesPersonalPage';
 
 interface PersonalPageProps {
   onBack: () => void;
 }
 
-type Vista = 'dashboard' | 'empleados' | 'asistencia' | 'nomina' | 'configuracion';
+type Vista = 'dashboard' | 'empleados' | 'asistencia' | 'nomina' | 'configuracion' | 'ausencias' | 'reportes';
 
 export const PersonalPage: React.FC<PersonalPageProps> = ({ onBack }) => {
   const [vistaActual, setVistaActual] = useState<Vista>('dashboard');
@@ -90,29 +92,34 @@ export const PersonalPage: React.FC<PersonalPageProps> = ({ onBack }) => {
     return <ConfiguracionPage onBack={() => setVistaActual('dashboard')} />;
   }
 
+  if (vistaActual === 'ausencias') {
+    return <AusenciasPage onBack={() => setVistaActual('dashboard')} />;
+  }
+
+  if (vistaActual === 'reportes') {
+    return <ReportesPersonalPage onBack={() => setVistaActual('dashboard')} />;
+  }
+
   if (vistaActual !== 'dashboard') {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <header className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg">
-          <div className="max-w-7xl mx-auto px-4 py-6">
-            <button 
-              onClick={() => setVistaActual('dashboard')} 
-              className="text-white hover:text-indigo-100 mb-4 flex items-center gap-2"
-            >
-              <ArrowLeft size={20} />
-              Volver al Dashboard
+      <div className="min-h-screen bg-slate-50">
+        <div style={{background:'linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#312e81 100%)'}}>
+          <div className="max-w-7xl mx-auto px-6 py-6">
+            <button onClick={() => setVistaActual('dashboard')}
+              className="flex items-center gap-2 text-indigo-200 hover:text-white mb-4 text-sm font-medium transition-colors group">
+              <ArrowLeft size={15} className="group-hover:-translate-x-1 transition-transform" /> Volver
             </button>
-            <h1 className="text-3xl font-bold">
-              {vistaActual === 'empleados' && '👥 Gestión de Empleados'}
-              {vistaActual === 'asistencia' && '⏰ Control de Asistencia'}
-              {vistaActual === 'nomina' && '💰 Nómina'}
+            <h1 className="text-2xl font-black text-white tracking-tight">
+              {vistaActual === 'empleados' && 'Gestión de Empleados'}
+              {vistaActual === 'asistencia' && 'Control de Asistencia'}
+              {vistaActual === 'nomina' && 'Nómina'}
             </h1>
           </div>
-        </header>
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-8 text-center">
-            <p className="text-blue-900 text-lg">🚧 Módulo en desarrollo</p>
-            <p className="text-blue-700 mt-2">Próximamente disponible</p>
+        </div>
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-10 text-center">
+            <p className="text-indigo-800 font-black text-lg">🚧 Módulo en desarrollo</p>
+            <p className="text-indigo-600 mt-2 text-sm">Próximamente disponible</p>
           </div>
         </div>
       </div>
@@ -121,128 +128,94 @@ export const PersonalPage: React.FC<PersonalPageProps> = ({ onBack }) => {
 
   // DASHBOARD PRINCIPAL
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <button 
-            onClick={onBack} 
-            className="text-white hover:text-indigo-100 mb-4 flex items-center gap-2 transition-colors"
-          >
-            <ArrowLeft size={20} />
-            Volver al Dashboard
+    <div className="min-h-screen bg-slate-50">
+
+      {/* ── HEADER ── */}
+      <div style={{background:'linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#312e81 100%)'}}>
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <button onClick={onBack} className="flex items-center gap-2 text-indigo-200 hover:text-white mb-5 text-sm font-medium transition-colors group">
+            <ArrowLeft size={15} className="group-hover:-translate-x-1 transition-transform" /> Volver al Dashboard
           </button>
-          <h1 className="text-3xl font-bold">👥 Gestión de Personal</h1>
-          <p className="text-indigo-100 mt-2">Recursos Humanos y Nómina</p>
-        </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Estadísticas */}
-        <div className="grid md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <Users className="text-indigo-600" size={32} />
+          <div className="flex items-center gap-4">
+            <div className="bg-white/10 rounded-2xl p-3 border border-white/10">
+              <Users size={24} className="text-indigo-200" />
             </div>
-            <p className="text-gray-600 text-sm mb-1">Total Empleados</p>
-            <p className="text-3xl font-bold text-gray-900">{estadisticas.totalEmpleados}</p>
+            <div>
+              <h1 className="text-2xl font-black text-white tracking-tight">Recursos Humanos</h1>
+              <p className="text-indigo-300 text-sm mt-0.5">Gestión de personal y nómina</p>
+            </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <Clock className="text-green-600" size={32} />
-            </div>
-            <p className="text-gray-600 text-sm mb-1">Activos</p>
-            <p className="text-3xl font-bold text-green-600">
-              {estadisticas.empleadosActivos}
-            </p>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <Calendar className="text-orange-600" size={32} />
-            </div>
-            <p className="text-gray-600 text-sm mb-1">Ausencias Hoy</p>
-            <p className="text-3xl font-bold text-orange-600">
-              {estadisticas.ausenciasHoy}
-            </p>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <DollarSign className="text-blue-600" size={32} />
-            </div>
-            <p className="text-gray-600 text-sm mb-1">Nómina Mensual</p>
-            <p className="text-2xl font-bold text-blue-600">
-              Q {estadisticas.totalNomina.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
-            </p>
+          {/* KPI Strip */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
+            {[
+              { label: 'Total Empleados', val: estadisticas.totalEmpleados,  icon: <Users size={16} className="text-indigo-300" />,   color: 'text-white'       },
+              { label: 'Activos',         val: estadisticas.empleadosActivos, icon: <Clock size={16} className="text-emerald-300" />,  color: 'text-emerald-300' },
+              { label: 'Ausencias Hoy',   val: estadisticas.ausenciasHoy,     icon: <Calendar size={16} className="text-amber-300" />, color: estadisticas.ausenciasHoy > 0 ? 'text-amber-300' : 'text-white' },
+              { label: 'Nómina Mensual',  val: `Q ${estadisticas.totalNomina.toLocaleString('es-GT',{minimumFractionDigits:2})}`, icon: <DollarSign size={16} className="text-blue-300" />, color: 'text-blue-200' },
+            ].map((s, i) => (
+              <div key={i} className="bg-white/10 border border-white/10 rounded-2xl p-4 backdrop-blur-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-indigo-300 uppercase tracking-wide">{s.label}</span>
+                  {s.icon}
+                </div>
+                <p className={`text-2xl font-black ${s.color}`}>{s.val}</p>
+              </div>
+            ))}
           </div>
         </div>
+      </div>
 
-        {/* Menú de Acciones */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <button 
-            onClick={() => setVistaActual('empleados')}
-            className="bg-white rounded-lg shadow-lg p-8 hover:shadow-xl transition-all hover:-translate-y-1 text-left"
-          >
-            <Users className="text-indigo-600 mb-4" size={40} />
-            <h3 className="text-xl font-bold mb-2">Empleados</h3>
-            <p className="text-gray-600">Gestionar personal y datos</p>
-          </button>
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
 
-          <button 
-            onClick={() => setVistaActual('asistencia')}
-            className="bg-white rounded-lg shadow-lg p-8 hover:shadow-xl transition-all hover:-translate-y-1 text-left"
-          >
-            <Clock className="text-green-600 mb-4" size={40} />
-            <h3 className="text-xl font-bold mb-2">Asistencia</h3>
-            <p className="text-gray-600">Control de horarios</p>
-          </button>
+        {/* ── Módulos ── */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[
+            { vista: 'empleados',     label: 'Empleados',     desc: 'Gestionar personal y datos',    icon: Users,      grad: 'from-indigo-600 to-violet-600',  shadow: 'shadow-indigo-200'  },
+            { vista: 'asistencia',    label: 'Asistencia',    desc: 'Control de horarios',           icon: Clock,      grad: 'from-emerald-600 to-teal-600',   shadow: 'shadow-emerald-200' },
+            { vista: 'nomina',        label: 'Nómina',        desc: 'Calcular y generar pagos',      icon: DollarSign, grad: 'from-blue-600 to-cyan-600',      shadow: 'shadow-blue-200'    },
+            { vista: 'configuracion', label: 'Configuración', desc: 'Departamentos y puestos',       icon: Settings,   grad: 'from-violet-600 to-purple-600',  shadow: 'shadow-violet-200'  },
+            { vista: 'ausencias',     label: 'Ausencias',     desc: 'Permisos y vacaciones',         icon: Calendar,   grad: 'from-amber-500 to-orange-500',   shadow: 'shadow-amber-200'   },
+            { vista: 'reportes',      label: 'Reportes',      desc: 'Reportes de RR.HH.',            icon: FileText,   grad: 'from-violet-700 to-indigo-700',  shadow: 'shadow-violet-200'  },
+          ].map((item, i) => {
+            const Icon = item.icon;
+            return (
+              <button key={i}
+                onClick={() => item.vista && setVistaActual(item.vista as Vista)}
+                className={`bg-gradient-to-br ${item.grad} text-white rounded-2xl p-6 text-left shadow-lg ${item.shadow} hover:shadow-xl transition-all hover:-translate-y-1 group relative overflow-hidden`}>
+                <div className="absolute -right-3 -bottom-3 opacity-10"><Icon size={80} /></div>
+                <div className="bg-white/20 rounded-xl p-3 w-fit mb-4 border border-white/20">
+                  <Icon size={20} className="text-white" />
+                </div>
+                <p className="font-black text-lg leading-tight">{item.label}</p>
+                <p className="text-white/70 text-sm mt-1">{item.desc}</p>
 
-          <button 
-            onClick={() => setVistaActual('nomina')}
-            className="bg-white rounded-lg shadow-lg p-8 hover:shadow-xl transition-all hover:-translate-y-1 text-left"
-          >
-            <DollarSign className="text-blue-600 mb-4" size={40} />
-            <h3 className="text-xl font-bold mb-2">Nómina</h3>
-            <p className="text-gray-600">Calcular y generar pagos</p>
-          </button>
-
-          <button 
-            onClick={() => setVistaActual('configuracion')}
-            className="bg-white rounded-lg shadow-lg p-8 hover:shadow-xl transition-all hover:-translate-y-1 text-left"
-          >
-            <Settings className="text-purple-600 mb-4" size={40} />
-            <h3 className="text-xl font-bold mb-2">Configuración</h3>
-            <p className="text-gray-600">Departamentos y puestos</p>
-          </button>
-
-          <button className="bg-white rounded-lg shadow-lg p-8 hover:shadow-xl transition-all hover:-translate-y-1 text-left">
-            <Calendar className="text-orange-600 mb-4" size={40} />
-            <h3 className="text-xl font-bold mb-2">Ausencias</h3>
-            <p className="text-gray-600">Permisos y vacaciones</p>
-          </button>
-
-          <button className="bg-white rounded-lg shadow-lg p-8 hover:shadow-xl transition-all hover:-translate-y-1 text-left">
-            <FileText className="text-gray-600 mb-4" size={40} />
-            <h3 className="text-xl font-bold mb-2">Reportes</h3>
-            <p className="text-gray-600">Reportes de RR.HH.</p>
-          </button>
+              </button>
+            );
+          })}
         </div>
 
-        {/* Información adicional */}
-        <div className="mt-8 bg-indigo-50 border border-indigo-200 rounded-lg p-6">
-          <h3 className="font-semibold text-indigo-900 mb-3 flex items-center gap-2">
-            <TrendingUp size={20} />
-            Sistema de Recursos Humanos
-          </h3>
-          <ul className="text-sm text-indigo-800 space-y-2">
-            <li>• <strong>Empleados:</strong> Gestión completa del personal</li>
-            <li>• <strong>Asistencia:</strong> Control de entradas y salidas</li>
-            <li>• <strong>Nómina:</strong> Cálculo flexible de salarios</li>
-            <li>• <strong>Reportes:</strong> Exportación a Excel disponible</li>
+        {/* ── Info ── */}
+        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="bg-indigo-100 rounded-lg p-1.5"><TrendingUp size={13} className="text-indigo-600" /></div>
+            <span className="text-xs font-black text-indigo-800 uppercase tracking-wide">Sistema de Recursos Humanos</span>
+          </div>
+          <ul className="space-y-1.5">
+            {[
+              ['Empleados', 'Gestión completa del personal'],
+              ['Asistencia', 'Control de entradas y salidas'],
+              ['Nómina', 'Cálculo flexible de salarios'],
+              ['Reportes', 'Exportación a Excel disponible'],
+            ].map(([k, v], i) => (
+              <li key={i} className="flex items-start gap-2 text-xs text-indigo-700">
+                <div className="w-1 h-1 rounded-full bg-indigo-400 mt-1.5 shrink-0" />
+                <span><strong>{k}:</strong> {v}</span>
+              </li>
+            ))}
           </ul>
         </div>
+
       </div>
     </div>
   );

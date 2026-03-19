@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, Edit2, Search, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Search, Calendar, ChevronDown, ChevronUp, TrendingDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -197,18 +197,23 @@ export const GastosPage: React.FC<GastosPageProps> = ({ onBack }) => {
   const totalGastos = gastosFiltrados.reduce((sum, g) => sum + g.monto, 0);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <button onClick={onBack} className="text-white hover:text-red-100 mb-4 flex items-center gap-2">
-            <ArrowLeft size={20} />
-            Volver a Contabilidad
+    <div className="min-h-screen bg-slate-50">
+      <div style={{background:'linear-gradient(135deg,#0f172a 0%,#064e3b 50%,#065f46 100%)'}}>
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <button onClick={onBack} className="flex items-center gap-2 text-emerald-200 hover:text-white mb-4 text-sm font-medium transition-colors group">
+            <ArrowLeft size={15} className="group-hover:-translate-x-1 transition-transform" /> Volver a Contabilidad
           </button>
-          <h1 className="text-3xl font-bold">📉 Gestión de Gastos</h1>
-          <p className="text-red-100 mt-2">Registro y control de gastos operativos</p>
+          <div className="flex items-center gap-4">
+            <div className="bg-white/10 rounded-2xl p-3 border border-white/10">
+              <TrendingDown size={24} className="text-red-200" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black text-white tracking-tight">Gastos</h1>
+              <p className="text-emerald-300 text-sm mt-0.5">Registro y control de gastos operativos</p>
+            </div>
+          </div>
         </div>
-      </header>
+      </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Controles */}

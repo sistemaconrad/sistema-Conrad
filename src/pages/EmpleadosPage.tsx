@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Search, Edit2, Trash2, User, Phone, Mail, Briefcase, Upload, FileText, X, Download, Settings } from 'lucide-react';
+import { ArrowLeft, Plus, Search, Edit2, Trash2, User, Users, Phone, Mail, Briefcase, Upload, FileText, X, Download, Settings } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { format } from 'date-fns';
 
@@ -219,18 +219,23 @@ export const EmpleadosPage: React.FC<EmpleadosPageProps> = ({ onBack }) => {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <button onClick={onBack} className="text-white hover:text-indigo-100 mb-4 flex items-center gap-2">
-            <ArrowLeft size={20} />
-            Volver a Personal
+    <div className="min-h-screen bg-slate-50">
+      <div style={{background:'linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#312e81 100%)'}}>
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <button onClick={onBack} className="flex items-center gap-2 text-indigo-200 hover:text-white mb-4 text-sm font-medium transition-colors group">
+            <ArrowLeft size={15} className="group-hover:-translate-x-1 transition-transform" /> Volver
           </button>
-          <h1 className="text-3xl font-bold">👥 Gestión de Empleados</h1>
-          <p className="text-indigo-100 mt-2">Registro y administración de personal</p>
+          <div className="flex items-center gap-4">
+            <div className="bg-white/10 rounded-2xl p-3 border border-white/10">
+              <Users size={24} className="text-indigo-200" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black text-white tracking-tight">Gestión de Empleados</h1>
+              <p className="text-indigo-300 text-sm mt-0.5">Registro y administración del personal</p>
+            </div>
+          </div>
         </div>
-      </header>
+      </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Controles */}

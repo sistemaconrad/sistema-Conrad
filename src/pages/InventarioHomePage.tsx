@@ -93,159 +93,159 @@ export const InventarioHomePage: React.FC<InventarioHomePageProps> = ({ onNaviga
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-green-600 to-green-700 text-white">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center gap-4 mb-4">
-            <button 
-              onClick={() => window.location.reload()} 
-              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-            >
-              <ArrowLeft size={24} />
-            </button>
+    <div className="min-h-screen bg-slate-50">
+
+      {/* ── HEADER ── */}
+      <div style={{background:'linear-gradient(135deg,#0f172a 0%,#064e3b 50%,#065f46 100%)'}}>
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <button onClick={() => window.location.reload()}
+            className="flex items-center gap-2 text-emerald-200 hover:text-white mb-5 text-sm font-medium transition-colors group">
+            <ArrowLeft size={15} className="group-hover:-translate-x-1 transition-transform" /> Volver
+          </button>
+          <div className="flex items-center gap-4 mb-6">
+            <div className="bg-white/10 rounded-2xl p-3 border border-white/10">
+              <Package size={24} className="text-emerald-200" />
+            </div>
             <div>
-              <h1 className="text-3xl font-bold">Módulo de Inventario</h1>
-              <p className="text-green-100">Control de productos y suministros</p>
+              <h1 className="text-2xl font-black text-white tracking-tight">Módulo de Inventario</h1>
+              <p className="text-emerald-300 text-sm mt-0.5">Control de productos y suministros</p>
             </div>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-green-100 text-sm">Total Productos</p>
-                  <p className="text-3xl font-bold">{stats.totalProductos}</p>
+          {/* KPI Strip */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { label: 'Total Productos',   val: stats.totalProductos,              icon: <Package size={18} className="text-emerald-300" />,       sub: 'activos' },
+              { label: 'Stock Bajo',        val: stats.productosBajos,              icon: <AlertTriangle size={18} className="text-yellow-300" />,   sub: 'requieren atención', warn: stats.productosBajos > 0 },
+              { label: 'Valor Total',       val: `Q ${stats.valorTotal.toFixed(2)}`,icon: <TrendingUp size={18} className="text-emerald-300" />,     sub: 'en inventario' },
+              { label: 'Movimientos Hoy',   val: stats.movimientosHoy,              icon: <Activity size={18} className="text-emerald-300" />,       sub: 'hoy' },
+            ].map((s, i) => (
+              <div key={i} className="bg-white/10 border border-white/10 rounded-2xl p-4 backdrop-blur-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-emerald-200 uppercase tracking-wide">{s.label}</span>
+                  {s.icon}
                 </div>
-                <Package className="text-white/50" size={40} />
+                <p className={`text-2xl font-black ${s.warn ? 'text-yellow-300' : 'text-white'}`}>{s.val}</p>
+                <p className="text-xs text-emerald-300/70 mt-0.5">{s.sub}</p>
               </div>
-            </div>
-
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-green-100 text-sm">Stock Bajo</p>
-                  <p className="text-3xl font-bold text-yellow-300">{stats.productosBajos}</p>
-                </div>
-                <AlertTriangle className="text-yellow-300/50" size={40} />
-              </div>
-            </div>
-
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-green-100 text-sm">Valor Total</p>
-                  <p className="text-3xl font-bold">Q {stats.valorTotal.toFixed(2)}</p>
-                </div>
-                <TrendingUp className="text-white/50" size={40} />
-              </div>
-            </div>
-
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-green-100 text-sm">Movimientos Hoy</p>
-                  <p className="text-3xl font-bold">{stats.movimientosHoy}</p>
-                </div>
-                <Activity className="text-white/50" size={40} />
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Contenido */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Menú de navegación */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+
+        {/* ── Nav módulos ── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {menuItems.map((item) => {
             const Icon = item.icon;
+            const styles: any = {
+              productos:    { bg: 'from-blue-600 to-indigo-600',   shadow: 'shadow-blue-200'   },
+              movimientos:  { bg: 'from-emerald-600 to-teal-600',  shadow: 'shadow-emerald-200' },
+              proveedores:  { bg: 'from-violet-600 to-purple-600', shadow: 'shadow-violet-200' },
+              reportes:     { bg: 'from-orange-500 to-amber-500',  shadow: 'shadow-orange-200'  },
+            };
+            const s = styles[item.id] || { bg: 'from-slate-600 to-slate-700', shadow: '' };
             return (
-              <button
-                key={item.id}
-                onClick={() => onNavigate(item.id)}
-                className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-all hover:scale-105"
-              >
-                <div className={`w-12 h-12 bg-${item.color}-100 rounded-lg flex items-center justify-center mb-4`}>
-                  <Icon className={`text-${item.color}-600`} size={24} />
+              <button key={item.id} onClick={() => onNavigate(item.id)}
+                className={`bg-gradient-to-br ${s.bg} text-white rounded-2xl p-5 text-left shadow-lg ${s.shadow} hover:shadow-xl transition-all hover:-translate-y-1 group relative overflow-hidden`}>
+                <div className="absolute -right-3 -bottom-3 opacity-10"><Icon size={72} /></div>
+                <div className="bg-white/20 rounded-xl p-2.5 w-fit mb-3 border border-white/20">
+                  <Icon size={18} className="text-white" />
                 </div>
-                <h3 className="font-bold text-lg mb-1">{item.name}</h3>
-                <p className="text-sm text-gray-600">{item.description}</p>
+                <p className="font-black text-base">{item.name}</p>
+                <p className="text-xs text-white/70 mt-0.5">{item.description}</p>
               </button>
             );
           })}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Productos con stock bajo */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-800">⚠️ Stock Bajo</h2>
-              <button 
-                onClick={() => onNavigate('productos')}
-                className="text-sm text-blue-600 hover:text-blue-700"
-              >
-                Ver todos →
-              </button>
-            </div>
-            
-            {productosStockBajo.length > 0 ? (
-              <div className="space-y-3">
-                {productosStockBajo.map((producto) => (
-                  <div key={producto.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-800">{producto.nombre}</p>
-                      <p className="text-sm text-gray-600">{producto.codigo}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-red-600">{producto.stock_actual}</p>
-                      <p className="text-xs text-gray-500">Min: {producto.stock_minimo}</p>
-                    </div>
-                  </div>
-                ))}
+        <div className="grid lg:grid-cols-2 gap-5">
+
+          {/* ── Stock Bajo ── */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="bg-amber-50 rounded-xl p-2"><AlertTriangle size={14} className="text-amber-500" /></div>
+                <span className="text-sm font-black text-slate-800">Stock Bajo</span>
+                {stats.productosBajos > 0 && (
+                  <span className="bg-red-100 text-red-700 text-xs font-black px-2 py-0.5 rounded-full">{stats.productosBajos}</span>
+                )}
               </div>
-            ) : (
-              <p className="text-gray-500 text-center py-8">✅ Todos los productos tienen stock adecuado</p>
-            )}
+              <button onClick={() => onNavigate('productos')}
+                className="text-xs text-emerald-600 hover:text-emerald-700 font-bold transition-colors">Ver todos →</button>
+            </div>
+            <div className="p-4">
+              {productosStockBajo.length > 0 ? (
+                <div className="space-y-2">
+                  {productosStockBajo.map((producto) => (
+                    <div key={producto.id} className="flex items-center justify-between px-4 py-3 bg-red-50 border border-red-100 rounded-xl">
+                      <div>
+                        <p className="text-sm font-bold text-slate-800">{producto.nombre}</p>
+                        <p className="text-xs text-slate-400 font-mono">{producto.codigo}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-black text-red-600">{producto.stock_actual}</p>
+                        <p className="text-xs text-slate-400">mín: {producto.stock_minimo}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-8 text-center">
+                  <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                    <Package size={20} className="text-emerald-500" />
+                  </div>
+                  <p className="text-sm text-slate-400 font-medium">Todos los productos tienen stock adecuado</p>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Movimientos recientes */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-800">📋 Movimientos Recientes</h2>
-              <button 
-                onClick={() => onNavigate('movimientos')}
-                className="text-sm text-blue-600 hover:text-blue-700"
-              >
-                Ver historial →
-              </button>
-            </div>
-
-            {movimientosRecientes.length > 0 ? (
-              <div className="space-y-3">
-                {movimientosRecientes.map((mov) => (
-                  <div key={mov.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-800">{mov.productos_inventario?.nombre}</p>
-                      <p className="text-sm text-gray-600">
-                        {mov.tipo_movimiento === 'entrada' ? '📥 Entrada' : 
-                         mov.tipo_movimiento === 'salida' ? '📤 Salida' : 
-                         mov.tipo_movimiento === 'ajuste' ? '⚙️ Ajuste' : '❌ Merma'}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className={`font-bold ${mov.tipo_movimiento === 'entrada' ? 'text-green-600' : 'text-red-600'}`}>
-                        {mov.tipo_movimiento === 'entrada' ? '+' : '-'}{mov.cantidad}
-                      </p>
-                      <p className="text-xs text-gray-500">{new Date(mov.fecha).toLocaleDateString()}</p>
-                    </div>
-                  </div>
-                ))}
+          {/* ── Movimientos Recientes ── */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="bg-emerald-50 rounded-xl p-2"><Activity size={14} className="text-emerald-600" /></div>
+                <span className="text-sm font-black text-slate-800">Movimientos Recientes</span>
               </div>
-            ) : (
-              <p className="text-gray-500 text-center py-8">No hay movimientos registrados</p>
-            )}
+              <button onClick={() => onNavigate('movimientos')}
+                className="text-xs text-emerald-600 hover:text-emerald-700 font-bold transition-colors">Ver historial →</button>
+            </div>
+            <div className="p-4">
+              {movimientosRecientes.length > 0 ? (
+                <div className="space-y-2">
+                  {movimientosRecientes.map((mov) => {
+                    const isEntrada = mov.tipo_movimiento === 'entrada';
+                    const tipos: any = { entrada: '📥', salida: '📤', ajuste: '⚙️', merma: '❌' };
+                    return (
+                      <div key={mov.id} className="flex items-center justify-between px-4 py-3 bg-slate-50 rounded-xl border border-slate-100">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">{tipos[mov.tipo_movimiento] || '📦'}</span>
+                          <div>
+                            <p className="text-sm font-bold text-slate-800">{mov.productos_inventario?.nombre}</p>
+                            <p className="text-xs text-slate-400 capitalize">{mov.tipo_movimiento}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-lg font-black ${isEntrada ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {isEntrada ? '+' : '-'}{mov.cantidad}
+                          </p>
+                          <p className="text-xs text-slate-400">{new Date(mov.fecha + 'T12:00:00').toLocaleDateString('es-GT')}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="py-8 text-center">
+                  <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                    <Activity size={20} className="text-slate-300" />
+                  </div>
+                  <p className="text-sm text-slate-400 font-medium">No hay movimientos registrados</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

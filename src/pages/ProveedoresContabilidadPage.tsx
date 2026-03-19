@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, Edit2, Search, Phone, Mail } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Search, Phone, Mail, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface ProveedoresContabilidadPageProps {
@@ -127,18 +127,23 @@ export const ProveedoresContabilidadPage: React.FC<ProveedoresContabilidadPagePr
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <button onClick={onBack} className="text-white hover:text-purple-100 mb-4 flex items-center gap-2">
-            <ArrowLeft size={20} />
-            Volver a Contabilidad
+    <div className="min-h-screen bg-slate-50">
+      <div style={{background:'linear-gradient(135deg,#0f172a 0%,#064e3b 50%,#065f46 100%)'}}>
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <button onClick={onBack} className="flex items-center gap-2 text-emerald-200 hover:text-white mb-4 text-sm font-medium transition-colors group">
+            <ArrowLeft size={15} className="group-hover:-translate-x-1 transition-transform" /> Volver a Contabilidad
           </button>
-          <h1 className="text-3xl font-bold">👥 Catálogo de Proveedores</h1>
-          <p className="text-purple-100 mt-2">Gestión de proveedores y contactos</p>
+          <div className="flex items-center gap-4">
+            <div className="bg-white/10 rounded-2xl p-3 border border-white/10">
+              <Users size={24} className="text-amber-200" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black text-white tracking-tight">Proveedores</h1>
+              <p className="text-emerald-300 text-sm mt-0.5">Catálogo de proveedores</p>
+            </div>
+          </div>
         </div>
-      </header>
+      </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Controles */}

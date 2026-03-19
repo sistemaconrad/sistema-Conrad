@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Edit2, Trash2, Briefcase, Building } from 'lucide-react';
+import { ArrowLeft, Plus, Edit2, Trash2, Briefcase, Building, Settings } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface ConfiguracionPageProps {
@@ -74,17 +74,23 @@ export const ConfiguracionPage: React.FC<ConfiguracionPageProps> = ({ onBack }) 
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <button onClick={onBack} className="text-white hover:text-purple-100 mb-4 flex items-center gap-2">
-            <ArrowLeft size={20} />
-            Volver a Personal
+    <div className="min-h-screen bg-slate-50">
+      <div style={{background:'linear-gradient(135deg,#0f172a 0%,#2e1065 50%,#5b21b6 100%)'}}>
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <button onClick={onBack} className="flex items-center gap-2 text-violet-200 hover:text-white mb-4 text-sm font-medium transition-colors group">
+            <ArrowLeft size={15} className="group-hover:-translate-x-1 transition-transform" /> Volver
           </button>
-          <h1 className="text-3xl font-bold">⚙️ Configuración de Personal</h1>
-          <p className="text-purple-100 mt-2">Gestión de departamentos y puestos</p>
+          <div className="flex items-center gap-4">
+            <div className="bg-white/10 rounded-2xl p-3 border border-white/10">
+              <Settings size={24} className="text-violet-200" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black text-white tracking-tight">Configuración</h1>
+              <p className="text-violet-300 text-sm mt-0.5">Departamentos, puestos y parámetros</p>
+            </div>
+          </div>
         </div>
-      </header>
+      </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid md:grid-cols-2 gap-6">

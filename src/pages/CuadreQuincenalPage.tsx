@@ -139,164 +139,157 @@ export const CuadreQuincenalPage: React.FC<CuadreQuincenalPageProps> = ({ onBack
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg">
-        <div className="container mx-auto px-4 py-6">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 text-white hover:text-purple-100 mb-4 transition-colors"
-          >
-            <ArrowLeft size={20} />
-            Volver
+
+      {/* ── HEADER ── */}
+      <div className="bg-gradient-to-r from-[#0f172a] via-[#1e1b4b] to-[#312e81] text-white shadow-xl">
+        <div className="max-w-4xl mx-auto px-6 py-6">
+          <button onClick={onBack} className="flex items-center gap-2 text-indigo-200 hover:text-white mb-4 text-sm font-medium transition-colors group">
+            <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Volver
           </button>
-          <div className="flex items-center gap-3">
-            <Calendar size={32} />
+          <div className="flex items-center gap-4">
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3">
+              <Calendar size={28} className="text-indigo-200" />
+            </div>
             <div>
-              <h1 className="text-3xl font-bold">Cuadre Quincenal</h1>
-              <p className="text-purple-100 mt-1">Estados de cuenta por médico referente</p>
+              <h1 className="text-2xl font-black tracking-tight">Estado de Cuenta Quincenal</h1>
+              <p className="text-indigo-300 text-sm mt-0.5">Generación de cuadres por médico referente</p>
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
-      {/* Content */}
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg shadow-md p-6 max-w-2xl mx-auto">
-          <h2 className="text-xl font-bold text-gray-800 mb-6">Generar Cuadre Quincenal</h2>
+      <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
 
-          <div className="space-y-6">
-            {/* Selector de Mes */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Mes
-              </label>
-              <select
-                value={mes}
-                onChange={(e) => setMes(parseInt(e.target.value))}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              >
-                {meses.map((nombre, idx) => (
-                  <option key={idx} value={idx + 1}>
-                    {nombre}
-                  </option>
-                ))}
-              </select>
+        {/* ── CARD PRINCIPAL ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+
+          {/* Título card */}
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+            <div className="bg-indigo-50 rounded-xl p-2"><Calendar size={16} className="text-indigo-600" /></div>
+            <h2 className="text-base font-black text-gray-900">Configurar Quincena</h2>
+          </div>
+
+          <div className="px-6 py-6 space-y-6">
+
+            {/* Mes y Año */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Mes</label>
+                <select
+                  value={mes}
+                  onChange={(e) => setMes(parseInt(e.target.value))}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 bg-white"
+                >
+                  {meses.map((m, i) => (<option key={i} value={i + 1}>{m}</option>))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Año</label>
+                <select
+                  value={anio}
+                  onChange={(e) => setAnio(parseInt(e.target.value))}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 bg-white"
+                >
+                  {[2024, 2025, 2026, 2027].map(a => (<option key={a} value={a}>{a}</option>))}
+                </select>
+              </div>
             </div>
 
-            {/* Selector de Año */}
+            {/* Selector Quincena */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Año
-              </label>
-              <input
-                type="number"
-                value={anio}
-                onChange={(e) => setAnio(parseInt(e.target.value))}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                min="2020"
-                max="2030"
-              />
-            </div>
-
-            {/* Selector de Quincena */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Quincena
-              </label>
-              <div className="grid grid-cols-2 gap-4">
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Quincena</label>
+              <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => setQuincena(1)}
-                  className={`p-4 rounded-lg border-2 transition-all ${
+                  className={`relative p-4 rounded-xl border-2 transition-all text-left ${
                     quincena === 1
-                      ? 'border-purple-600 bg-purple-50 text-purple-700'
-                      : 'border-gray-300 hover:border-purple-300'
+                      ? 'border-indigo-500 bg-indigo-50 shadow-sm shadow-indigo-100'
+                      : 'border-gray-200 hover:border-gray-300 bg-white'
                   }`}
                 >
-                  <div className="font-bold">1ra Quincena</div>
-                  <div className="text-sm text-gray-600">Del 1 al 15</div>
+                  {quincena === 1 && <div className="absolute top-3 right-3 w-2 h-2 rounded-full bg-indigo-500" />}
+                  <div className={`text-sm font-black ${quincena === 1 ? 'text-indigo-700' : 'text-gray-700'}`}>1ra Quincena</div>
+                  <div className={`text-xs mt-0.5 ${quincena === 1 ? 'text-indigo-400' : 'text-gray-400'}`}>Del 1 al 15</div>
                 </button>
                 <button
                   onClick={() => setQuincena(2)}
-                  className={`p-4 rounded-lg border-2 transition-all ${
+                  className={`relative p-4 rounded-xl border-2 transition-all text-left ${
                     quincena === 2
-                      ? 'border-purple-600 bg-purple-50 text-purple-700'
-                      : 'border-gray-300 hover:border-purple-300'
+                      ? 'border-indigo-500 bg-indigo-50 shadow-sm shadow-indigo-100'
+                      : 'border-gray-200 hover:border-gray-300 bg-white'
                   }`}
                 >
-                  <div className="font-bold">2da Quincena</div>
-                  <div className="text-sm text-gray-600">Del 16 al fin de mes</div>
+                  {quincena === 2 && <div className="absolute top-3 right-3 w-2 h-2 rounded-full bg-indigo-500" />}
+                  <div className={`text-sm font-black ${quincena === 2 ? 'text-indigo-700' : 'text-gray-700'}`}>2da Quincena</div>
+                  <div className={`text-xs mt-0.5 ${quincena === 2 ? 'text-indigo-400' : 'text-gray-400'}`}>Del 16 al fin de mes</div>
                 </button>
               </div>
             </div>
 
             {/* Resumen */}
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-              <h3 className="font-semibold text-purple-800 mb-2">Resumen</h3>
-              <p className="text-sm text-gray-700">
-                Se generará el cuadre de la <strong>{quincena === 1 ? 'primera' : 'segunda'} quincena</strong> de{' '}
-                <strong>{meses[mes - 1]} {anio}</strong>
+            <div className="bg-gradient-to-r from-indigo-50 to-violet-50 border border-indigo-100 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                <h3 className="text-xs font-black text-indigo-700 uppercase tracking-wide">Resumen del período</h3>
+              </div>
+              <p className="text-sm text-gray-700 font-semibold">
+                {quincena === 1 ? `1 al 15` : `16 al ${new Date(anio, mes, 0).getDate()}`} de {meses[mes - 1]} {anio}
               </p>
-              <p className="text-sm text-gray-600 mt-2">
-                📅 Periodo: {quincena === 1 ? '1-15' : '16-fin de mes'} de {meses[mes - 1]}
-              </p>
-              <p className="text-sm text-gray-600">
-                👨‍⚕️ Solo pacientes con médico y estado de cuenta pendiente
-              </p>
+              <p className="text-xs text-gray-500 mt-1">Incluye consultas con forma de pago: Estado de Cuenta</p>
+              <p className="text-xs text-gray-500">Agrupado por médico referente</p>
             </div>
 
-            {/* Botón Generar Estado de Cuenta */}
-            <button
-              onClick={generarReporte}
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-colors disabled:bg-gray-400"
-            >
-              {loading ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  Generando...
-                </>
-              ) : (
-                <>
-                  <Download size={20} />
-                  Generar Cuadre Quincenal
-                </>
-              )}
-            </button>
+            {/* Botones */}
+            <div className="space-y-3 pt-1">
+              <button
+                onClick={generarReporte}
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white py-3 rounded-xl font-bold text-sm shadow-sm shadow-indigo-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />Generando...</>
+                ) : (
+                  <><Download size={16} />Generar Estado de Cuenta Referentes</>
+                )}
+              </button>
 
-            {/* Botón Generar Servicios Móviles */}
-            <button
-              onClick={generarReporteMoviles}
-              disabled={loadingMoviles}
-              className="w-full flex items-center justify-center gap-2 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-400"
-            >
-              {loadingMoviles ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  Generando...
-                </>
-              ) : (
-                <>
-                  <Smartphone size={20} />
-                  Generar Reporte Servicios Móviles
-                </>
-              )}
-            </button>
+              <button
+                onClick={generarReporteMoviles}
+                disabled={loadingMoviles}
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white py-3 rounded-xl font-bold text-sm shadow-sm shadow-purple-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loadingMoviles ? (
+                  <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />Generando...</>
+                ) : (
+                  <><Smartphone size={16} />Generar Estado de Cuenta Servicios Móviles</>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Info adicional */}
-        <div className="mt-6 max-w-2xl mx-auto">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-semibold text-blue-800 mb-2">ℹ️ Información</h4>
-            <ul className="text-sm text-blue-700 space-y-1">
-              <li>• El cuadre incluye pacientes con médico referente o recomendado</li>
-              <li>• Solo muestra estados de cuenta pendientes de pago</li>
-              <li>• Se genera un reporte separado por cada médico</li>
-              <li>• El archivo Excel incluye logo CONRAD y formato profesional</li>
-              <li>• El reporte de móviles incluye <strong>todos</strong> los servicios móviles del período agrupados por médico</li>
-            </ul>
+        {/* ── INFO CARD ── */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+            <div className="bg-blue-50 rounded-xl p-2"><Calendar size={16} className="text-blue-500" /></div>
+            <h4 className="text-sm font-black text-gray-900">Información importante</h4>
           </div>
+          <ul className="px-6 py-4 space-y-2.5">
+            {[
+              'Solo incluye consultas con forma de pago "Estado de Cuenta"',
+              'Los servicios regulares se agrupan por médico referente',
+              'Los servicios móviles se agrupan por establecimiento',
+              'Se generan hojas separadas por cada médico/establecimiento',
+              'Las consultas anuladas no se incluyen en el reporte'
+            ].map((txt, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-sm text-gray-600">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 flex-shrink-0" />
+                {txt}
+              </li>
+            ))}
+          </ul>
         </div>
+
       </div>
     </div>
   );

@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Edit2, Trash2, Save, X, FileSpreadsheet, Building2, Users, Search, MapPin, Phone } from 'lucide-react';
+const getFechaGuatemala = () =>
+  new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Guatemala' }))
+    .toLocaleDateString('en-CA');
+
 import { supabase } from '../lib/supabase';
 import { Autocomplete } from '../components/Autocomplete';
 import { departamentosGuatemala, municipiosGuatemala } from '../data/guatemala';
@@ -120,6 +124,7 @@ export const ReferentesPage: React.FC<ReferentesPageProps> = ({ onBack }) => {
         p_modulo: 'sanatorio', p_accion: 'eliminar', p_tipo_registro: 'medico_referente',
         p_registro_id: medicoAEliminar.id,
         p_detalles: { nombre: medicoAEliminar.nombre, departamento: medicoAEliminar.departamento },
+        p_fecha: getFechaGuatemala(),
         p_requirio_autorizacion: true
       });
       alert('✅ Médico eliminado'); cargarMedicos();

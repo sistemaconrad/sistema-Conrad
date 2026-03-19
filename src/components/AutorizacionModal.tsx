@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, Shield, CheckCircle, AlertTriangle } from 'lucide-react';
+const getFechaGuatemala = () =>
+  new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Guatemala' }))
+    .toLocaleDateString('en-CA');
+
 import { supabase } from '../lib/supabase';
 
 interface AutorizacionModalProps {
@@ -41,8 +45,9 @@ export const AutorizacionModal: React.FC<AutorizacionModalProps> = ({
         p_rol: rol,
         p_modulo: 'sistema',
         p_accion: accion.toLowerCase().replace(/\s+/g, '_'),
-        p_tipo_registro: 'autorizacion',
+        p_tipo_registro: 'token_autorizacion',
         p_detalles: { descripcion: detalles },
+        p_fecha: getFechaGuatemala(),
         p_requirio_autorizacion: false,
         p_token_usado: 'ADMIN_BYPASS'
       });
@@ -93,8 +98,9 @@ export const AutorizacionModal: React.FC<AutorizacionModalProps> = ({
         p_rol: rol,
         p_modulo: 'sistema',
         p_accion: accion.toLowerCase().replace(/\s+/g, '_'),
-        p_tipo_registro: 'autorizacion',
-        p_detalles: { descripcion: detalles },
+        p_tipo_registro: 'token_autorizacion',
+        p_detalles: { descripcion: detalles, token_usado: codigoUsado },
+        p_fecha: getFechaGuatemala(),
         p_requirio_autorizacion: true,
         p_token_usado: codigoUsado
       });

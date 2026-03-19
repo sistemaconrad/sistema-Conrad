@@ -16,6 +16,8 @@ import { InventarioHomePage } from './pages/InventarioHomePage';
 import { ProductosInventarioPage } from './pages/ProductosInventarioPage';
 import { MovimientosPage } from './pages/MovimientosPage';
 import { ProveedoresPage } from './pages/ProveedoresPage';
+import { InventarioReportesPage } from './pages/InventarioReportesPage';
+import { DocumentosPage } from './pages/DocumentosPage';
 
 import { ComisionesPage } from './pages/ComisionesPage';
 import { ComisionesPagarPage } from './pages/ComisionesPagarPage';
@@ -117,6 +119,7 @@ function App() {
         case 'productos': return <ProductosInventarioPage onBack={() => setCurrentPage('home')} />;
         case 'movimientos': return <MovimientosPage onBack={() => setCurrentPage('home')} />;
         case 'proveedores': return <ProveedoresPage onBack={() => setCurrentPage('home')} />;
+        case 'reportes': return <InventarioReportesPage onBack={() => setCurrentPage('home')} />;
         default: return <InventarioHomePage onNavigate={setCurrentPage} />;
       }
     };
@@ -153,7 +156,25 @@ function App() {
   }
 
   if (currentModule === 'resumen') {
-    return <ResumenDiaPage onBack={handleBackToDashboard} />;
+    if (currentPage === 'usuarios') {
+      return <GestionUsuariosPage onBack={() => setCurrentPage('home')} />;
+    }
+    return <ResumenDiaPage onBack={handleBackToDashboard} onNavigate={setCurrentPage} />;
+  }
+
+  if (currentModule === 'documentos') {
+    const renderPage = () => <DocumentosPage onBack={handleBackToDashboard} />;
+    return (
+      <div>
+        <div className="fixed top-4 right-4 z-50">
+          <button onClick={handleBackToDashboard}
+            className="bg-white shadow-md px-3 py-1.5 rounded hover:bg-gray-50 transition-colors text-xs font-medium border border-gray-300">
+            ← Dashboard
+          </button>
+        </div>
+        {renderPage()}
+      </div>
+    );
   }
 
   return <DashboardPage onNavigateToModule={handleNavigateToModule} onLogout={handleLogout} />;

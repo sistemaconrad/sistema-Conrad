@@ -23,6 +23,7 @@ import { generarCuadreExcel } from '../utils/cuadre-excel-generator';
 
 interface ResumenDiaPageProps {
   onBack: () => void;
+  onNavigate?: (page: string) => void;
 }
 
 interface ResumenDatos {
@@ -43,7 +44,7 @@ interface ResumenDatos {
   actividadReciente: any[];
 }
 
-export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack }) => {
+export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNavigate }) => {
 
   // ✅ CORREGIDO: Helper para obtener fecha/hora en zona horaria de Guatemala
   const getGuatemalaTime = () => {
@@ -119,12 +120,18 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack }) => {
 
       const gastosDelDia = gastos?.reduce((sum, g) => sum + g.monto, 0) || 0;
 
+      // Buscar logs en rango UTC que corresponda al día GT (UTC-6)
+      const inicioDiaUTC = new Date(fecha + 'T06:00:00.000Z');
+      const finDiaUTC    = new Date(fecha + 'T06:00:00.000Z');
+      finDiaUTC.setDate(finDiaUTC.getDate() + 1);
+
       const { data: logs } = await supabase
         .from('log_actividad')
         .select('*')
-        .eq('fecha', fecha)
+        .gte('created_at', inicioDiaUTC.toISOString())
+        .lt('created_at',  finDiaUTC.toISOString())
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(200);
 
       const usuariosActivos = [...new Set(logs?.map(l => l.nombre_usuario) || [])] as string[];
       const accionesConAutorizacion = logs?.filter(l => l.requirio_autorizacion).length || 0;
@@ -147,7 +154,7 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack }) => {
         productosEliminados,
         usuariosActivos,
         accionesConAutorizacion,
-        actividadReciente: logs?.slice(0, 20) || []
+        actividadReciente: logs || []
       });
 
     } catch (error) {
@@ -297,238 +304,545 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack }) => {
     return colores[modulo] || 'bg-gray-100 text-gray-700';
   };
 
+  const [tabActiva, setTabActiva] = useState<'resumen' | 'auditoria'>('resumen');
+  const [filtroUsuario, setFiltroUsuario] = useState('');
+  const [filtroModulo, setFiltroModulo] = useState('');
+  const [filtroAccion, setFiltroAccion] = useState('');
+  const [logDetalle, setLogDetalle] = useState<any | null>(null);
+
+  const logsAuditoria = resumen.actividadReciente;
+  const [mostrarTokens, setMostrarTokens] = useState(false);
+
+  const logsFiltrados = logsAuditoria.filter(l => {
+    const u = !filtroUsuario || l.nombre_usuario?.toLowerCase().includes(filtroUsuario.toLowerCase());
+    const m = !filtroModulo  || l.modulo === filtroModulo;
+    const a = !filtroAccion  || l.accion?.toLowerCase().includes(filtroAccion.toLowerCase());
+    const t = mostrarTokens || (l.tipo_registro !== 'token_autorizacion' && l.tipo_registro !== 'autorizacion');
+    return u && m && a && t;
+  });
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <button onClick={onBack} className="text-white hover:text-indigo-100 mb-4 flex items-center gap-2">
-            <ArrowLeft size={20} />
-            Volver al Dashboard
+    <div className="min-h-screen bg-slate-50">
+
+      {/* ── HEADER ── */}
+      <div style={{background:'linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#312e81 100%)'}}>
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <button onClick={onBack} className="flex items-center gap-2 text-indigo-300 hover:text-white mb-5 text-sm font-medium transition-colors group">
+            <ArrowLeft size={15} className="group-hover:-translate-x-1 transition-transform" /> Volver al Dashboard
           </button>
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold flex items-center gap-3">
-                <Calendar size={32} />
-                Resumen del Día
-              </h1>
-              <p className="text-indigo-100 mt-1">Vista general de actividades y movimientos</p>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-4">
+              <div className="bg-white/10 rounded-2xl p-3 border border-white/10">
+                <Calendar size={24} className="text-indigo-200" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-black text-white tracking-tight">Resumen del Día</h1>
+                <p className="text-indigo-300 text-sm mt-0.5">Panel de actividades, movimientos y auditoría</p>
+              </div>
             </div>
-            <div className="bg-white bg-opacity-20 rounded-lg p-4 backdrop-blur-sm">
-              <input
-                type="date"
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-                className="bg-transparent text-white font-semibold text-lg border-none outline-none cursor-pointer"
-              />
+            <div className="flex items-center gap-3">
+              <div className="bg-white/10 border border-white/15 rounded-xl px-4 py-2.5 flex items-center gap-2">
+                <Calendar size={14} className="text-indigo-300" />
+                <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)}
+                  className="bg-transparent text-white font-bold text-sm border-none outline-none cursor-pointer" />
+              </div>
+              <button onClick={descargarExcelCuadre}
+                className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-emerald-900/30">
+                <FileText size={14} /> Descargar Excel
+              </button>
+              {localStorage.getItem('rolUsuarioConrad') === 'admin' && onNavigate && (
+                <button onClick={() => onNavigate('usuarios')}
+                  className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all">
+                  <Shield size={14} /> Usuarios
+                </button>
+              )}
             </div>
           </div>
-        </div>
-      </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <Calendar className="text-blue-600" size={24} />
-            <input
-              type="date"
-              className="px-4 py-2 border border-gray-300 rounded-lg"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-            />
+          {/* ── TABS ── */}
+          <div className="flex gap-1 mt-6 border-b border-white/10">
+            {([
+              { id: 'resumen',   label: 'Resumen del Día',  icon: Activity },
+              { id: 'auditoria', label: 'Auditoría',        icon: Shield   },
+            ] as const).map(tab => {
+              const Icon = tab.icon;
+              return (
+                <button key={tab.id} onClick={() => setTabActiva(tab.id)}
+                  className={`flex items-center gap-2 px-5 py-3 text-sm font-bold rounded-t-xl transition-all border-b-2 ${
+                    tabActiva === tab.id
+                      ? 'text-white border-indigo-400 bg-white/10'
+                      : 'text-indigo-300 border-transparent hover:text-white hover:bg-white/5'
+                  }`}>
+                  <Icon size={15} /> {tab.label}
+                  {tab.id === 'auditoria' && logsAuditoria.length > 0 && (
+                    <span className="bg-indigo-500 text-white text-xs px-2 py-0.5 rounded-full font-black">{logsAuditoria.length}</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
-          <button
-            onClick={descargarExcelCuadre}
-            className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center gap-2 transition-colors"
-          >
-            <FileText size={20} />
-            Descargar Excel Cuadre
-          </button>
         </div>
+      </div>
 
+      <div className="max-w-7xl mx-auto px-6 py-8">
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-16 w-16 border-4 border-indigo-600 border-t-transparent"></div>
+          <div className="flex flex-col items-center justify-center py-24 gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent" />
+            <p className="text-sm text-slate-400 font-medium">Cargando datos...</p>
           </div>
-        ) : (
+        ) : tabActiva === 'resumen' ? (
+
           <div className="space-y-6">
-            {/* Panel de Generación de Códigos */}
+
+            {/* ── Códigos Panel ── */}
             <GenerarCodigosPanel />
 
-            {/* Resumen Financiero */}
-            <div className="grid md:grid-cols-4 gap-4">
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg shadow-lg p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <Users size={24} className="opacity-80" />
-                  <TrendingUp size={20} />
+            {/* ── KPI Cards ── */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="bg-blue-50 rounded-xl p-2"><Users size={16} className="text-blue-600" /></div>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Regulares</span>
                 </div>
-                <h3 className="text-sm font-medium opacity-90">Consultas Regulares</h3>
-                <p className="text-3xl font-bold mt-2">{resumen.consultasRegulares}</p>
-                <p className="text-sm mt-2 opacity-80">Q {resumen.ingresosConsultas.toFixed(2)}</p>
+                <p className="text-3xl font-black text-slate-900">{resumen.consultasRegulares}</p>
+                <div className="mt-2 flex items-center gap-1">
+                  <TrendingUp size={13} className="text-blue-500" />
+                  <p className="text-sm text-blue-600 font-bold">Q {resumen.ingresosConsultas.toFixed(2)}</p>
+                </div>
               </div>
 
-              <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg shadow-lg p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <Activity size={24} className="opacity-80" />
-                  <TrendingUp size={20} />
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="bg-emerald-50 rounded-xl p-2"><Activity size={16} className="text-emerald-600" /></div>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Móviles</span>
                 </div>
-                <h3 className="text-sm font-medium opacity-90">Servicios Móviles</h3>
-                <p className="text-3xl font-bold mt-2">{resumen.consultasMoviles}</p>
-                <p className="text-sm mt-2 opacity-80">Q {resumen.ingresosMoviles.toFixed(2)}</p>
+                <p className="text-3xl font-black text-slate-900">{resumen.consultasMoviles}</p>
+                <div className="mt-2 flex items-center gap-1">
+                  <TrendingUp size={13} className="text-emerald-500" />
+                  <p className="text-sm text-emerald-600 font-bold">Q {resumen.ingresosMoviles.toFixed(2)}</p>
+                </div>
               </div>
 
-              <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-lg shadow-lg p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <DollarSign size={24} className="opacity-80" />
-                  <TrendingUp size={20} />
+              <div className="rounded-2xl p-5 text-white shadow-lg" style={{background:'linear-gradient(135deg,#4f46e5,#7c3aed)'}}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="bg-white/20 rounded-xl p-2"><DollarSign size={16} className="text-white" /></div>
+                  <span className="text-xs font-bold text-indigo-200 uppercase tracking-wider">Total</span>
                 </div>
-                <h3 className="text-sm font-medium opacity-90">Ingresos Totales</h3>
-                <p className="text-3xl font-bold mt-2">Q {resumen.totalIngresos.toFixed(2)}</p>
-                <p className="text-sm mt-2 opacity-80">{resumen.totalConsultas} consultas</p>
+                <p className="text-3xl font-black">Q {resumen.totalIngresos.toFixed(2)}</p>
+                <p className="text-sm text-indigo-200 mt-2 font-medium">{resumen.totalConsultas} consultas totales</p>
               </div>
 
-              <div className={`${resumen.ingresoNeto >= 0 ? 'bg-gradient-to-br from-emerald-500 to-emerald-600' : 'bg-gradient-to-br from-red-500 to-red-600'} text-white rounded-lg shadow-lg p-6`}>
-                <div className="flex items-center justify-between mb-2">
-                  <DollarSign size={24} className="opacity-80" />
-                  {resumen.ingresoNeto >= 0 ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
+              <div className={`rounded-2xl p-5 text-white shadow-lg ${resumen.ingresoNeto >= 0 ? '' : ''}`}
+                style={{background: resumen.ingresoNeto >= 0 ? 'linear-gradient(135deg,#059669,#0d9488)' : 'linear-gradient(135deg,#dc2626,#e11d48)'}}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="bg-white/20 rounded-xl p-2">
+                    {resumen.ingresoNeto >= 0 ? <TrendingUp size={16} className="text-white" /> : <TrendingDown size={16} className="text-white" />}
+                  </div>
+                  <span className="text-xs font-bold text-white/70 uppercase tracking-wider">Neto</span>
                 </div>
-                <h3 className="text-sm font-medium opacity-90">Ingreso Neto</h3>
-                <p className="text-3xl font-bold mt-2">Q {resumen.ingresoNeto.toFixed(2)}</p>
-                <p className="text-sm mt-2 opacity-80">Gastos: Q {resumen.gastosDelDia.toFixed(2)}</p>
+                <p className="text-3xl font-black">Q {resumen.ingresoNeto.toFixed(2)}</p>
+                <p className="text-sm text-white/70 mt-2 font-medium">Gastos: Q {resumen.gastosDelDia.toFixed(2)}</p>
               </div>
             </div>
 
-            {/* Actividad General */}
+            {/* ── Detalle operativo ── */}
             <div className="grid md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <Users className="text-indigo-600" size={24} />
-                  <h3 className="font-bold text-lg">Pacientes</h3>
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2.5">
+                  <div className="bg-indigo-50 rounded-lg p-1.5"><Users size={14} className="text-indigo-600" /></div>
+                  <span className="text-sm font-black text-slate-800">Pacientes</span>
                 </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Nuevos registrados:</span>
-                    <span className="font-bold text-xl text-indigo-600">{resumen.pacientesNuevos}</span>
+                <div className="p-5 space-y-3">
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-sm text-slate-500">Nuevos registrados</span>
+                    <span className="text-lg font-black text-indigo-600">{resumen.pacientesNuevos}</span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Total atendidos:</span>
-                    <span className="font-bold text-xl">{resumen.totalConsultas}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <Package className="text-green-600" size={24} />
-                  <h3 className="font-bold text-lg">Inventario</h3>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between items-center">
-                    <span className="flex items-center gap-2"><PlusCircle size={16} className="text-green-600" />Agregados:</span>
-                    <span className="font-bold">{resumen.productosAgregados}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="flex items-center gap-2"><Edit size={16} className="text-blue-600" />Editados:</span>
-                    <span className="font-bold">{resumen.productosEditados}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="flex items-center gap-2"><Trash2 size={16} className="text-red-600" />Eliminados:</span>
-                    <span className="font-bold">{resumen.productosEliminados}</span>
+                  <div className="flex justify-between items-center py-1 border-t border-slate-50">
+                    <span className="text-sm text-slate-500">Total atendidos</span>
+                    <span className="text-lg font-black text-slate-800">{resumen.totalConsultas}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <Shield className="text-orange-600" size={24} />
-                  <h3 className="font-bold text-lg">Seguridad</h3>
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2.5">
+                  <div className="bg-emerald-50 rounded-lg p-1.5"><Package size={14} className="text-emerald-600" /></div>
+                  <span className="text-sm font-black text-slate-800">Inventario</span>
                 </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Usuarios activos:</span>
-                    <span className="font-bold text-xl text-orange-600">{resumen.usuariosActivos.length}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Autorizaciones:</span>
-                    <span className="font-bold text-xl">{resumen.accionesConAutorizacion}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Usuarios Activos */}
-            {resumen.usuariosActivos.length > 0 && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                  <Users size={20} />
-                  Usuarios que trabajaron hoy
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {resumen.usuariosActivos.map((usuario, idx) => (
-                    <span key={idx} className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-medium">
-                      {usuario}
-                    </span>
+                <div className="p-5 space-y-3">
+                  {[
+                    { icon: <PlusCircle size={13} className="text-emerald-500" />, label: 'Agregados',  val: resumen.productosAgregados,  color: 'text-emerald-600' },
+                    { icon: <Edit        size={13} className="text-blue-500"    />, label: 'Editados',   val: resumen.productosEditados,   color: 'text-blue-600'   },
+                    { icon: <Trash2      size={13} className="text-red-500"     />, label: 'Eliminados', val: resumen.productosEliminados, color: 'text-red-600'    },
+                  ].map((row, i) => (
+                    <div key={i} className={`flex justify-between items-center py-1 ${i > 0 ? 'border-t border-slate-50' : ''}`}>
+                      <span className="text-sm text-slate-500 flex items-center gap-1.5">{row.icon}{row.label}</span>
+                      <span className={`text-lg font-black ${row.color}`}>{row.val}</span>
+                    </div>
                   ))}
                 </div>
               </div>
-            )}
 
-            {/* Log de Actividad Reciente */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="bg-gradient-to-r from-gray-800 to-gray-900 text-white p-6">
-                <h3 className="font-bold text-xl flex items-center gap-2">
-                  <FileText size={24} />
-                  Actividad Reciente (Últimas 20 acciones)
-                </h3>
-              </div>
-
-              <div className="max-h-96 overflow-y-auto">
-                {resumen.actividadReciente.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500">
-                    <Activity size={48} className="mx-auto mb-4 opacity-50" />
-                    <p>No hay actividad registrada para este día</p>
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2.5">
+                  <div className="bg-orange-50 rounded-lg p-1.5"><Shield size={14} className="text-orange-600" /></div>
+                  <span className="text-sm font-black text-slate-800">Seguridad</span>
+                </div>
+                <div className="p-5 space-y-3">
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-sm text-slate-500">Usuarios activos</span>
+                    <span className="text-lg font-black text-orange-600">{resumen.usuariosActivos.length}</span>
                   </div>
-                ) : (
-                  <div className="divide-y">
-                    {resumen.actividadReciente.map((log, idx) => (
-                      <div key={idx} className="p-4 hover:bg-gray-50 transition-colors">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start gap-3 flex-1">
-                            <div className="mt-1">{getIconoAccion(log.accion)}</div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="font-medium text-gray-900">{log.nombre_usuario}</span>
-                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${getColorModulo(log.modulo)}`}>
-                                  {log.modulo}
-                                </span>
-                                {log.requirio_autorizacion && (
-                                  <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs font-medium flex items-center gap-1">
-                                    <Shield size={12} />
-                                    Autorizado
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-sm text-gray-600">
-                                <span className="font-medium capitalize">{log.accion}</span>
-                                {' '}{log.tipo_registro}
-                                {log.detalles?.descripcion && ` • ${log.detalles.descripcion}`}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="text-xs text-gray-500 flex items-center gap-1 ml-4">
-                            <Clock size={12} />
-                            {log.hora}
-                          </div>
-                        </div>
-                      </div>
+                  <div className="flex justify-between items-center py-1 border-t border-slate-50">
+                    <span className="text-sm text-slate-500">Con autorización</span>
+                    <span className="text-lg font-black text-slate-800">{resumen.accionesConAutorizacion}</span>
+                  </div>
+                </div>
+                {resumen.usuariosActivos.length > 0 && (
+                  <div className="px-5 pb-4 flex flex-wrap gap-1.5">
+                    {resumen.usuariosActivos.map((u, i) => (
+                      <span key={i} className="px-2.5 py-1 bg-orange-50 text-orange-700 border border-orange-100 rounded-lg text-xs font-bold">{u}</span>
                     ))}
                   </div>
                 )}
               </div>
             </div>
+
+            {/* ── Actividad Reciente ── */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="bg-slate-100 rounded-lg p-1.5"><Activity size={14} className="text-slate-600" /></div>
+                  <span className="text-sm font-black text-slate-800">Actividad Reciente</span>
+                </div>
+                <span className="text-xs text-slate-400 font-medium bg-slate-50 px-3 py-1 rounded-lg">Últimas {resumen.actividadReciente.length} acciones</span>
+              </div>
+              <div className="max-h-[480px] overflow-y-auto divide-y divide-slate-50">
+                {resumen.actividadReciente.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <Activity size={36} className="mx-auto mb-3 text-slate-200" />
+                    <p className="text-sm text-slate-400">Sin actividad registrada</p>
+                  </div>
+                ) : resumen.actividadReciente.map((log, idx) => (
+                  <div key={idx} className="px-5 py-4 hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setLogDetalle(log)}>
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 shrink-0">{getIconoAccion(log.accion)}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="text-sm font-black text-slate-900">{log.nombre_usuario}</span>
+                          <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${getColorModulo(log.modulo)}`}>{log.modulo}</span>
+                          {log.requirio_autorizacion && (
+                            <span className="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-100 rounded-lg text-xs font-bold flex items-center gap-1">
+                              <Shield size={10} /> Autorizado
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-slate-600">
+                          <span className="font-semibold capitalize">{log.accion}</span>
+                          {' — '}{log.tipo_registro}
+                          {log.detalles?.descripcion && <span className="text-slate-400"> · {log.detalles.descripcion}</span>}
+                        </p>
+                        {log.detalles && Object.keys(log.detalles).filter(k => k !== 'descripcion').length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-1">
+                            {Object.entries(log.detalles).filter(([k]) => k !== 'descripcion').slice(0, 4).map(([k, v]) => (
+                              <span key={k} className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-mono">
+                                {k}: {String(v).substring(0, 30)}{String(v).length > 30 ? '…' : ''}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-xs text-slate-400 flex items-center gap-1 shrink-0 font-mono">
+                        <Clock size={11} />{log.hora}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+
+        ) : (
+          /* ═══════════════ TAB AUDITORÍA ═══════════════ */
+          <div className="space-y-5">
+
+            {/* Filtros */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="bg-indigo-50 rounded-lg p-1.5"><Shield size={14} className="text-indigo-600" /></div>
+                <span className="text-sm font-black text-slate-800">Filtrar registros</span>
+                {(filtroUsuario || filtroModulo || filtroAccion) && (
+                  <div className="ml-auto flex items-center gap-3">
+                    <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer select-none">
+                      <input type="checkbox" checked={mostrarTokens} onChange={e => setMostrarTokens(e.target.checked)}
+                        className="rounded" />
+                      Mostrar tokens de autorización
+                    </label>
+                    {(filtroUsuario || filtroModulo || filtroAccion) && (
+                      <button onClick={() => { setFiltroUsuario(''); setFiltroModulo(''); setFiltroAccion(''); }}
+                        className="text-xs text-red-500 hover:text-red-700 font-bold flex items-center gap-1">
+                        <AlertCircle size={12} /> Limpiar filtros
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Usuario</label>
+                  <input type="text" placeholder="Buscar usuario..." value={filtroUsuario}
+                    onChange={e => setFiltroUsuario(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-300 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Módulo</label>
+                  <select value={filtroModulo} onChange={e => setFiltroModulo(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-300 outline-none bg-white">
+                    <option value="">Todos</option>
+                    {['sanatorio','inventario','contabilidad','personal','doctores','sistema'].map(m => (
+                      <option key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Acción</label>
+                  <input type="text" placeholder="crear, editar, eliminar..." value={filtroAccion}
+                    onChange={e => setFiltroAccion(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-300 outline-none" />
+                </div>
+              </div>
+            </div>
+
+            {/* Stats de auditoría */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: 'Total registros', val: logsAuditoria.length,                                                          color: 'text-slate-800',  bg: 'bg-slate-50'   },
+                { label: 'Con autorización', val: logsAuditoria.filter(l => l.requirio_autorizacion).length,                    color: 'text-amber-700',  bg: 'bg-amber-50'   },
+                { label: 'Eliminaciones',    val: logsAuditoria.filter(l => l.accion?.toLowerCase() === 'eliminar').length,     color: 'text-red-700',    bg: 'bg-red-50'     },
+                { label: 'Usuarios únicos',  val: new Set(logsAuditoria.map(l => l.nombre_usuario)).size,                       color: 'text-indigo-700', bg: 'bg-indigo-50'  },
+              ].map((s, i) => (
+                <div key={i} className={`${s.bg} rounded-2xl p-4 border border-slate-100`}>
+                  <p className={`text-2xl font-black ${s.color}`}>{s.val}</p>
+                  <p className="text-xs text-slate-500 font-medium mt-1">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Tabla de auditoría */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <span className="text-sm font-black text-slate-800">
+                  {logsFiltrados.length} registro{logsFiltrados.length !== 1 ? 's' : ''}
+                  {logsFiltrados.length !== logsAuditoria.length && <span className="text-indigo-500"> (filtrado)</span>}
+                </span>
+                <div className="flex items-center gap-3">
+                  <button onClick={cargarResumen} className="flex items-center gap-1.5 text-xs text-indigo-500 hover:text-indigo-700 font-bold transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+                    Recargar
+                  </button>
+                  <span className="text-xs text-slate-400">Clic en fila para ver detalles</span>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      <th className="text-left px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-wider">Hora</th>
+                      <th className="text-left px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-wider">Usuario</th>
+                      <th className="text-left px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-wider">Módulo</th>
+                      <th className="text-left px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-wider">Acción</th>
+                      <th className="text-left px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-wider">Tipo</th>
+                      <th className="text-left px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-wider">Descripción</th>
+                      <th className="text-left px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-wider">Auth</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {logsFiltrados.length === 0 ? (
+                      <tr><td colSpan={7} className="text-center py-10 text-slate-400 text-sm">No hay registros con los filtros aplicados</td></tr>
+                    ) : logsFiltrados.map((log, idx) => (
+                      <tr key={idx} onClick={() => setLogDetalle(log)}
+                        className={`cursor-pointer transition-colors hover:bg-indigo-50/50 ${log.accion?.toLowerCase() === 'eliminar' ? 'bg-red-50/30' : ''}`}>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-500 whitespace-nowrap">
+                          <span className="flex items-center gap-1"><Clock size={11} />{log.hora}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="font-bold text-slate-800">{log.nombre_usuario}</span>
+                          {log.usuario && <span className="block text-xs text-slate-400 font-mono">{log.usuario}</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${getColorModulo(log.modulo)}`}>{log.modulo}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="flex items-center gap-1.5">{getIconoAccion(log.accion)}<span className="font-semibold capitalize text-slate-700">{log.accion}</span></span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 text-xs">{log.tipo_registro}</td>
+                        <td className="px-4 py-3 text-slate-500 text-xs max-w-[200px] truncate">{log.detalles?.descripcion || '—'}</td>
+                        <td className="px-4 py-3">
+                          {log.requirio_autorizacion
+                            ? <span className="flex items-center gap-1 text-amber-600 font-bold text-xs"><CheckCircle size={12} />Sí</span>
+                            : <span className="text-slate-300 text-xs">—</span>
+                          }
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
       </div>
+
+      {/* ── Modal detalle log ── */}
+      {logDetalle && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setLogDetalle(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100"
+              style={{background:'linear-gradient(135deg,#1e1b4b,#312e81)'}}>
+              <div className="flex items-center gap-3">
+                <div className="bg-white/15 rounded-xl p-2"><FileText size={16} className="text-white" /></div>
+                <div>
+                  <p className="text-white font-black text-sm">Detalle del Registro</p>
+                  <p className="text-indigo-200 text-xs">{logDetalle.hora} · {logDetalle.nombre_usuario}</p>
+                </div>
+              </div>
+              <button onClick={() => setLogDetalle(null)} className="text-indigo-200 hover:text-white p-1.5 rounded-lg hover:bg-white/10">✕</button>
+            </div>
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Usuario',   val: logDetalle.nombre_usuario },
+                  { label: 'Login',     val: logDetalle.usuario        },
+                  { label: 'Rol',       val: logDetalle.rol            },
+                  { label: 'Módulo',    val: logDetalle.modulo         },
+                  { label: 'Acción',    val: logDetalle.accion         },
+                  { label: 'Tipo',      val: logDetalle.tipo_registro  },
+                  { label: 'Hora',      val: logDetalle.hora           },
+                  { label: 'Fecha',     val: logDetalle.fecha          },
+                ].map((row, i) => row.val && (
+                  <div key={i} className="bg-slate-50 rounded-xl p-3">
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-wide mb-0.5">{row.label}</p>
+                    <p className="text-sm font-semibold text-slate-800">{row.val}</p>
+                  </div>
+                ))}
+              </div>
+              {logDetalle.requirio_autorizacion && (
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 flex items-center gap-2">
+                  <Shield size={16} className="text-amber-600" />
+                  <div>
+                    <p className="text-xs font-black text-amber-700">Requirió autorización</p>
+                    {logDetalle.token_usado && <p className="text-xs text-amber-600 font-mono">Token: {logDetalle.token_usado}</p>}
+                  </div>
+                </div>
+              )}
+              {logDetalle.detalles && (
+                <div className="space-y-3">
+                  {/* Cambio antes/después */}
+                  {logDetalle.detalles.antes && logDetalle.detalles.despues && (
+                    <div>
+                      <p className="text-xs font-black text-slate-400 uppercase tracking-wide mb-2">Cambios realizados</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-red-50 border border-red-100 rounded-xl p-3">
+                          <p className="text-xs font-black text-red-400 uppercase tracking-wide mb-2 flex items-center gap-1">
+                            <span>←</span> Antes
+                          </p>
+                          {Object.entries(logDetalle.detalles.antes).map(([k, v]) => (
+                            <div key={k} className="mb-1.5">
+                              <p className="text-xs text-red-400 font-bold capitalize">{k}</p>
+                              <p className="text-xs text-red-700 font-semibold break-words">{String(v) || '—'}</p>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+                          <p className="text-xs font-black text-emerald-400 uppercase tracking-wide mb-2 flex items-center gap-1">
+                            <span>→</span> Después
+                          </p>
+                          {Object.entries(logDetalle.detalles.despues).map(([k, v]) => {
+                            const cambiado = String(logDetalle.detalles.antes[k]) !== String(v);
+                            return (
+                              <div key={k} className="mb-1.5">
+                                <p className="text-xs text-emerald-400 font-bold capitalize">{k}</p>
+                                <p className={`text-xs font-semibold break-words ${cambiado ? 'text-emerald-700 font-black' : 'text-emerald-600'}`}>
+                                  {String(v) || '—'} {cambiado && <span className="text-emerald-400">✓</span>}
+                                </p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      {/* Resumen de qué cambió */}
+                      <div className="mt-2 bg-slate-50 border border-slate-100 rounded-xl p-3">
+                        <p className="text-xs font-black text-slate-400 uppercase tracking-wide mb-1.5">Campos modificados</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {Object.entries(logDetalle.detalles.despues)
+                            .filter(([k, v]) => String(logDetalle.detalles.antes[k]) !== String(v))
+                            .map(([k]) => (
+                              <span key={k} className="bg-indigo-100 text-indigo-700 text-xs font-black px-2.5 py-1 rounded-lg capitalize">{k}</span>
+                            ))}
+                          {Object.entries(logDetalle.detalles.despues)
+                            .filter(([k, v]) => String(logDetalle.detalles.antes[k]) !== String(v)).length === 0 && (
+                            <span className="text-xs text-slate-400">Sin cambios detectados</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Precio anterior/nuevo */}
+                  {logDetalle.detalles.precio_anterior !== undefined && (
+                    <div>
+                      <p className="text-xs font-black text-slate-400 uppercase tracking-wide mb-2">Cambio de precio</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-center">
+                          <p className="text-xs text-red-400 font-bold mb-1">← Precio anterior</p>
+                          <p className="text-xl font-black text-red-600">Q {Number(logDetalle.detalles.precio_anterior).toFixed(2)}</p>
+                        </div>
+                        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-center">
+                          <p className="text-xs text-emerald-400 font-bold mb-1">→ Precio nuevo</p>
+                          <p className="text-xl font-black text-emerald-600">Q {Number(logDetalle.detalles.precio_nuevo).toFixed(2)}</p>
+                        </div>
+                      </div>
+                      {logDetalle.detalles.justificacion && (
+                        <div className="mt-2 bg-amber-50 border border-amber-100 rounded-xl p-3">
+                          <p className="text-xs font-black text-amber-500 uppercase tracking-wide mb-1">Justificación</p>
+                          <p className="text-xs text-amber-700">{logDetalle.detalles.justificacion}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Otros campos del detalle (sin antes/despues ni precio) */}
+                  {!logDetalle.detalles.antes && logDetalle.detalles.precio_anterior === undefined && (
+                    <div>
+                      <p className="text-xs font-black text-slate-400 uppercase tracking-wide mb-2">Información adicional</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {Object.entries(logDetalle.detalles)
+                          .filter(([k]) => k !== 'descripcion')
+                          .map(([k, v]) => (
+                          <div key={k} className="bg-slate-50 rounded-xl p-3">
+                            <p className="text-xs font-black text-slate-400 capitalize mb-0.5">{k.replace(/_/g,' ')}</p>
+                            <p className="text-sm font-semibold text-slate-700 break-words">{String(v)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* JSON raw toggle */}
+                  <details className="mt-1">
+                    <summary className="text-xs text-slate-400 cursor-pointer hover:text-slate-600 font-semibold">Ver JSON completo</summary>
+                    <pre className="mt-2 bg-slate-900 text-emerald-400 text-xs p-4 rounded-xl overflow-x-auto font-mono leading-relaxed">
+                      {JSON.stringify(logDetalle.detalles, null, 2)}
+                    </pre>
+                  </details>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

@@ -60,111 +60,98 @@ export const ProductosInventarioPage: React.FC<ProductosInventarioPageProps> = (
   if (loading) return <LoadingSpinner fullScreen text="Cargando productos..." />;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
+    <div className="min-h-screen bg-slate-50">
+
+      {/* ── HEADER ── */}
+      <div style={{background:'linear-gradient(135deg,#0f172a 0%,#064e3b 50%,#065f46 100%)'}}>
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <button onClick={onBack} className="flex items-center gap-2 text-emerald-200 hover:text-white mb-4 text-sm font-medium transition-colors group">
+            <ArrowLeft size={15} className="group-hover:-translate-x-1 transition-transform" /> Volver al Inventario
+          </button>
+          <div className="flex items-center gap-4">
+            <div className="bg-white/10 rounded-2xl p-3 border border-white/10">
+              <Search size={22} className="text-emerald-200" />
+            </div>
             <div>
-              <button onClick={onBack} className="text-blue-600 hover:text-blue-700 mb-2 flex items-center gap-2">
-                <ArrowLeft size={20} />
-                Volver al Inventario
-              </button>
-              <h1 className="text-2xl font-bold">Catálogo de Productos</h1>
+              <h1 className="text-2xl font-black text-white tracking-tight">Catálogo de Productos</h1>
+              <p className="text-emerald-300 text-sm mt-0.5">{productosFiltrados.length} productos · {productosFiltrados.filter(p => p.stock_actual <= p.stock_minimo).length} con stock bajo</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="bg-white rounded-lg shadow p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="max-w-7xl mx-auto px-6 py-6 space-y-5">
+
+        {/* ── Filtros ── */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          <div className="grid md:grid-cols-2 gap-3">
             <div className="relative">
-              <Search className="absolute left-3 top-3 text-gray-400" size={20} />
-              <input
-                type="text"
-                placeholder="Buscar por nombre o código..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
+              <Search size={15} className="absolute left-3.5 top-3 text-slate-400" />
+              <input type="text" placeholder="Buscar por nombre o código..."
+                value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none" />
             </div>
-
-            <select
-              value={categoriaFiltro}
-              onChange={(e) => setCategoriaFiltro(e.target.value)}
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
+            <select value={categoriaFiltro} onChange={(e) => setCategoriaFiltro(e.target.value)}
+              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 outline-none bg-white">
               <option value="todas">Todas las categorías</option>
-              {categorias.map(cat => (
-                <option key={cat.id} value={cat.id}>{cat.nombre}</option>
-              ))}
+              {categorias.map(cat => (<option key={cat.id} value={cat.id}>{cat.nombre}</option>))}
             </select>
-          </div>
-
-          <div className="mt-4 flex items-center gap-4 text-sm text-gray-600">
-            <span>📦 {productosFiltrados.length} productos</span>
-            <span>⚠️ {productosFiltrados.filter(p => p.stock_actual <= p.stock_minimo).length} con stock bajo</span>
           </div>
         </div>
 
-        {/* Tabla */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio Compra</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicación</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {productosFiltrados.map((producto) => (
-                <tr key={producto.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-mono">
-                    {producto.codigo || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{producto.nombre}</div>
-                    {producto.descripcion && (
-                      <div className="text-sm text-gray-500">{producto.descripcion}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {producto.categorias_inventario?.nombre || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      producto.stock_actual <= producto.stock_minimo
-                        ? 'bg-red-100 text-red-800'
-                        : producto.stock_actual <= (producto.stock_minimo * 1.5)
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-green-100 text-green-800'
-                    }`}>
-                      {producto.stock_actual} {producto.unidad_medida}
-                    </span>
-                    <div className="text-xs text-gray-500 mt-1">Mín: {producto.stock_minimo}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    Q {producto.precio_compra.toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {producto.ubicacion || '-'}
-                  </td>
+        {/* ── Tabla ── */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100">
+                  {['Código','Producto','Categoría','Stock','Precio Compra','Ubicación'].map(h => (
+                    <th key={h} className="px-5 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-wider">{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {productosFiltrados.length === 0 && (
-            <div className="text-center py-12 text-gray-500">
-              No se encontraron productos
-            </div>
-          )}
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {productosFiltrados.map((producto) => {
+                  const stockBajo = producto.stock_actual <= producto.stock_minimo;
+                  const stockMedio = !stockBajo && producto.stock_actual <= producto.stock_minimo * 1.5;
+                  return (
+                    <tr key={producto.id} className={`hover:bg-slate-50 transition-colors ${stockBajo ? 'bg-red-50/30' : ''}`}>
+                      <td className="px-5 py-3.5">
+                        <span className="font-mono text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-lg">{producto.codigo || '—'}</span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <p className="font-bold text-slate-800">{producto.nombre}</p>
+                        {producto.descripcion && <p className="text-xs text-slate-400 mt-0.5">{producto.descripcion}</p>}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className="text-xs bg-indigo-50 text-indigo-700 font-bold px-2.5 py-1 rounded-lg">
+                          {producto.categorias_inventario?.nombre || '—'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-black ${
+                          stockBajo  ? 'bg-red-100 text-red-700' :
+                          stockMedio ? 'bg-amber-100 text-amber-700' :
+                                       'bg-emerald-100 text-emerald-700'
+                        }`}>
+                          {producto.stock_actual} {producto.unidad_medida}
+                        </span>
+                        <p className="text-xs text-slate-400 mt-0.5">mín: {producto.stock_minimo}</p>
+                      </td>
+                      <td className="px-5 py-3.5 font-bold text-slate-700">Q {producto.precio_compra.toFixed(2)}</td>
+                      <td className="px-5 py-3.5 text-xs text-slate-500">{producto.ubicacion || '—'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {productosFiltrados.length === 0 && (
+              <div className="py-14 text-center">
+                <AlertCircle size={36} className="mx-auto mb-3 text-slate-200" />
+                <p className="text-sm text-slate-400">No se encontraron productos</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

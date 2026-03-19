@@ -143,18 +143,23 @@ export const AsistenciaPage: React.FC<AsistenciaPageProps> = ({ onBack }) => {
   const empleadosPresentes = new Set(asistencias.map(a => a.empleado_id)).size;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <button onClick={onBack} className="text-white hover:text-green-100 mb-4 flex items-center gap-2">
-            <ArrowLeft size={20} />
-            Volver a Personal
+    <div className="min-h-screen bg-slate-50">
+      <div style={{background:'linear-gradient(135deg,#0f172a 0%,#064e3b 50%,#065f46 100%)'}}>
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <button onClick={onBack} className="flex items-center gap-2 text-emerald-200 hover:text-white mb-4 text-sm font-medium transition-colors group">
+            <ArrowLeft size={15} className="group-hover:-translate-x-1 transition-transform" /> Volver
           </button>
-          <h1 className="text-3xl font-bold">⏰ Control de Asistencia</h1>
-          <p className="text-green-100 mt-2">Registro de entradas y salidas</p>
+          <div className="flex items-center gap-4">
+            <div className="bg-white/10 rounded-2xl p-3 border border-white/10">
+              <Clock size={24} className="text-emerald-200" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black text-white tracking-tight">Control de Asistencia</h1>
+              <p className="text-emerald-300 text-sm mt-0.5">Registro de entradas y salidas</p>
+            </div>
+          </div>
         </div>
-      </header>
+      </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Controles */}

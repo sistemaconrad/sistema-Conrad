@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, Building2 as Building } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Proveedor } from '../types';
 import { LoadingSpinner } from '../components/LoadingSpinner';
@@ -166,186 +166,126 @@ export const ProveedoresPage: React.FC<ProveedoresPageProps> = ({ onBack }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <button onClick={onBack} className="text-blue-600 hover:text-blue-700 mb-2 flex items-center gap-2">
-                <ArrowLeft size={20} />
-                Volver al Inventario
-              </button>
-              <h1 className="text-2xl font-bold">Proveedores</h1>
+    <div className="min-h-screen bg-slate-50">
+
+      {/* ── HEADER ── */}
+      <div style={{background:'linear-gradient(135deg,#0f172a 0%,#064e3b 50%,#065f46 100%)'}}>
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <button onClick={onBack} className="flex items-center gap-2 text-emerald-200 hover:text-white mb-4 text-sm font-medium transition-colors group">
+            <ArrowLeft size={15} className="group-hover:-translate-x-1 transition-transform" /> Volver al Inventario
+          </button>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="bg-white/10 rounded-2xl p-3 border border-white/10">
+                <Building size={22} className="text-emerald-200" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-black text-white tracking-tight">Proveedores</h1>
+                <p className="text-emerald-300 text-sm mt-0.5">{proveedores.length} proveedores registrados</p>
+              </div>
             </div>
-            <button
-              onClick={handleNuevoProveedor}
-              className="btn-primary flex items-center gap-2"
-            >
-              <Plus size={20} />
-              Nuevo Proveedor
+            <button onClick={handleNuevoProveedor}
+              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-emerald-900/30 transition-all">
+              <Plus size={15} /> Nuevo Proveedor
             </button>
           </div>
         </div>
       </div>
 
-      {/* Contenido */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contacto</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teléfono</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">NIT</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {proveedores.map((proveedor) => (
-                <tr key={proveedor.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{proveedor.nombre}</div>
-                    {proveedor.direccion && (
-                      <div className="text-sm text-gray-500">{proveedor.direccion}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {proveedor.contacto || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {proveedor.telefono || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {proveedor.email || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-mono">
-                    {proveedor.nit || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => handleEditarProveedor(proveedor)}
-                      className="text-blue-600 hover:text-blue-900 mr-3"
-                    >
-                      <Edit size={18} />
-                    </button>
-                    <button
-                      onClick={() => {
-                        setProveedorAEliminar(proveedor.id!);
-                        setShowConfirmDelete(true);
-                      }}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </td>
+      <div className="max-w-7xl mx-auto px-6 py-6">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100">
+                  {['Nombre','Contacto','Teléfono','Email','NIT','Acciones'].map(h => (
+                    <th key={h} className="px-5 py-3 text-left text-xs font-black text-slate-400 uppercase tracking-wider">{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {proveedores.length === 0 && (
-            <div className="text-center py-12 text-gray-500">
-              No hay proveedores registrados
-            </div>
-          )}
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {proveedores.map((proveedor) => (
+                  <tr key={proveedor.id} className="hover:bg-slate-50 transition-colors group">
+                    <td className="px-5 py-4">
+                      <p className="font-bold text-slate-800">{proveedor.nombre}</p>
+                      {proveedor.direccion && <p className="text-xs text-slate-400 mt-0.5">{proveedor.direccion}</p>}
+                    </td>
+                    <td className="px-5 py-4 text-sm text-slate-600">{proveedor.contacto || '—'}</td>
+                    <td className="px-5 py-4 text-sm text-slate-600 font-mono">{proveedor.telefono || '—'}</td>
+                    <td className="px-5 py-4 text-sm text-slate-600">{proveedor.email || '—'}</td>
+                    <td className="px-5 py-4 text-xs text-slate-500 font-mono">{proveedor.nit || '—'}</td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => handleEditarProveedor(proveedor)}
+                          className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"><Edit size={15} /></button>
+                        <button onClick={() => { setProveedorAEliminar(proveedor.id!); setShowConfirmDelete(true); }}
+                          className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={15} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {proveedores.length === 0 && (
+              <div className="py-14 text-center">
+                <Building size={36} className="mx-auto mb-3 text-slate-200" />
+                <p className="text-sm text-slate-400">No hay proveedores registrados</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Modal de formulario */}
+      {/* ── Modal Formulario ── */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
-            <h2 className="text-xl font-bold mb-4">
-              {proveedorSeleccionado ? 'Editar Proveedor' : 'Nuevo Proveedor'}
-            </h2>
-
-            <form onSubmit={handleGuardarProveedor} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="bg-emerald-50 rounded-xl p-2"><Building size={16} className="text-emerald-600" /></div>
+                <h2 className="text-base font-black text-slate-900">{proveedorSeleccionado ? 'Editar Proveedor' : 'Nuevo Proveedor'}</h2>
+              </div>
+              <button onClick={() => { setShowModal(false); limpiarFormulario(); }} className="text-slate-300 hover:text-slate-500 p-1 rounded-lg hover:bg-slate-100">✕</button>
+            </div>
+            <form onSubmit={handleGuardarProveedor} className="p-6">
+              <div className="grid md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-                  <label className="label">Nombre *</label>
-                  <input
-                    type="text"
-                    value={nombre}
-                    onChange={(e) => setNombre(e.target.value)}
-                    className="input-field"
-                    required
-                  />
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">Nombre *</label>
+                  <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} required
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400 outline-none" />
                 </div>
-
                 <div>
-                  <label className="label">Persona de Contacto</label>
-                  <input
-                    type="text"
-                    value={contacto}
-                    onChange={(e) => setContacto(e.target.value)}
-                    className="input-field"
-                  />
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">Persona de Contacto</label>
+                  <input type="text" value={contacto} onChange={(e) => setContacto(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400 outline-none" />
                 </div>
-
                 <div>
-                  <label className="label">Teléfono</label>
-                  <input
-                    type="text"
-                    value={telefono}
-                    onChange={(e) => setTelefono(e.target.value)}
-                    className="input-field"
-                    placeholder="12345678"
-                  />
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">Teléfono</label>
+                  <input type="text" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="12345678"
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400 outline-none" />
                 </div>
-
                 <div>
-                  <label className="label">Email</label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="input-field"
-                    placeholder="correo@ejemplo.com"
-                  />
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">Email</label>
+                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="correo@ejemplo.com"
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400 outline-none" />
                 </div>
-
                 <div>
-                  <label className="label">NIT</label>
-                  <input
-                    type="text"
-                    value={nit}
-                    onChange={(e) => setNit(e.target.value)}
-                    className="input-field"
-                    placeholder="1234567-8"
-                  />
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">NIT</label>
+                  <input type="text" value={nit} onChange={(e) => setNit(e.target.value)} placeholder="1234567-8"
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400 outline-none" />
                 </div>
-
                 <div className="md:col-span-2">
-                  <label className="label">Dirección</label>
-                  <textarea
-                    value={direccion}
-                    onChange={(e) => setDireccion(e.target.value)}
-                    className="input-field"
-                    rows={2}
-                  />
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">Dirección</label>
+                  <textarea value={direccion} onChange={(e) => setDireccion(e.target.value)} rows={2}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400 outline-none resize-none" />
                 </div>
               </div>
-
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowModal(false);
-                    limpiarFormulario();
-                  }}
-                  className="btn-secondary"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="btn-primary"
-                >
-                  {loading ? 'Guardando...' : 'Guardar'}
+              <div className="flex justify-end gap-3 mt-5 pt-5 border-t border-slate-100">
+                <button type="button" onClick={() => { setShowModal(false); limpiarFormulario(); }}
+                  className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 font-semibold transition-colors">Cancelar</button>
+                <button type="submit" disabled={loading}
+                  className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl text-sm font-bold shadow-sm transition-all disabled:opacity-50">
+                  {loading ? 'Guardando...' : 'Guardar Proveedor'}
                 </button>
               </div>
             </form>
@@ -353,23 +293,16 @@ export const ProveedoresPage: React.FC<ProveedoresPageProps> = ({ onBack }) => {
         </div>
       )}
 
-      {/* Confirm Dialog */}
       {showConfirmDelete && (
         <ConfirmDialog
           title="Eliminar Proveedor"
           message="¿Está seguro de que desea eliminar este proveedor? Esta acción no se puede deshacer."
-          confirmText="Eliminar"
-          cancelText="Cancelar"
-          type="danger"
+          confirmText="Eliminar" cancelText="Cancelar" type="danger"
           onConfirm={handleEliminarProveedor}
-          onCancel={() => {
-            setShowConfirmDelete(false);
-            setProveedorAEliminar(null);
-          }}
+          onCancel={() => { setShowConfirmDelete(false); setProveedorAEliminar(null); }}
         />
       )}
 
-      {/* Toast */}
       {toast && <Toast {...toast} onClose={hideToast} />}
     </div>
   );

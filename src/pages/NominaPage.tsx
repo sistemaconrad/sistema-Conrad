@@ -211,18 +211,23 @@ export const NominaPage: React.FC<NominaPageProps> = ({ onBack }) => {
   const totalNomina = nominas.reduce((sum, n) => sum + n.salario_neto, 0);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <button onClick={onBack} className="text-white hover:text-blue-100 mb-4 flex items-center gap-2">
-            <ArrowLeft size={20} />
-            Volver a Personal
+    <div className="min-h-screen bg-slate-50">
+      <div style={{background:'linear-gradient(135deg,#0f172a 0%,#0c2d6b 50%,#1d4ed8 100%)'}}>
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <button onClick={onBack} className="flex items-center gap-2 text-blue-200 hover:text-white mb-4 text-sm font-medium transition-colors group">
+            <ArrowLeft size={15} className="group-hover:-translate-x-1 transition-transform" /> Volver
           </button>
-          <h1 className="text-3xl font-bold">💰 Gestión de Nómina</h1>
-          <p className="text-blue-100 mt-2">Cálculo y pago de salarios</p>
+          <div className="flex items-center gap-4">
+            <div className="bg-white/10 rounded-2xl p-3 border border-white/10">
+              <DollarSign size={24} className="text-blue-200" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black text-white tracking-tight">Nómina</h1>
+              <p className="text-blue-300 text-sm mt-0.5">Cálculo y generación de pagos</p>
+            </div>
+          </div>
         </div>
-      </header>
+      </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Controles */}
@@ -278,7 +283,7 @@ export const NominaPage: React.FC<NominaPageProps> = ({ onBack }) => {
 
         {/* Resumen */}
         {nominas.length > 0 && (
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg shadow-lg p-8 mb-6">
+          <div className="rounded-2xl shadow-sm p-8 mb-6 text-white" style={{background:"linear-gradient(135deg,#1d4ed8,#0891b2)"}}>
             <div className="text-center">
               <p className="text-blue-100 text-lg mb-2">Total Nómina {meses[mes - 1]} {anio}</p>
               <p className="text-5xl font-bold">

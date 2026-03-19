@@ -1,5 +1,6 @@
-import React from 'react';
-import { Activity, Package, LogOut, Users, Banknote, UserCog, Stethoscope, Calendar, ChevronRight, LayoutGrid } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { PerfilModal } from '../components/PerfilModal';
+import { Activity, Package, LogOut, Users, Banknote, UserCog, Stethoscope, Calendar, ChevronRight, LayoutGrid, Folder } from 'lucide-react';
 
 interface DashboardPageProps {
   onNavigateToModule: (module: string) => void;
@@ -10,6 +11,22 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateToModule
   const rolUsuario = localStorage.getItem('rolUsuarioConrad') || 'secretaria';
   const nombreUsuario = localStorage.getItem('nombreUsuarioConrad') || 'Usuario';
 
+  const [showPerfil, setShowPerfil] = useState(false);
+  const [fotoUrl, setFotoUrl] = useState('');
+
+  useEffect(() => {
+    const cargarFoto = async () => {
+      const { data } = await (await import('../lib/supabase')).supabase
+        .from('perfiles_usuario')
+        .select('foto_url, nombre_completo')
+        .eq('username', localStorage.getItem('usernameConrad') || '')
+        .maybeSingle();
+      if (data?.foto_url) setFotoUrl(data.foto_url);
+      if (data?.nombre_completo) localStorage.setItem('nombreUsuarioConrad', data.nombre_completo);
+    };
+    cargarFoto();
+  }, []);
+
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
     localStorage.removeItem('rolUsuarioConrad');
@@ -17,10 +34,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateToModule
   };
 
   const permisosPorRol: { [key: string]: string[] } = {
-    'admin':      ['sanatorio', 'inventario', 'contabilidad', 'personal', 'doctores', 'visitadoras'],
-    'secretaria': ['sanatorio', 'inventario', 'visitadoras'],
-    'visitadora': ['visitadoras'],
-    'doctor':     ['doctores'],
+    'admin':      ['sanatorio', 'inventario', 'contabilidad', 'personal', 'doctores', 'visitadoras', 'documentos'],
+    'secretaria': ['sanatorio', 'inventario', 'visitadoras', 'documentos'],
+    'visitadora': ['visitadoras', 'documentos'],
+    'doctor':     ['doctores', 'documentos'],
   };
 
   const modulosPermitidos = permisosPorRol[rolUsuario] || permisosPorRol['secretaria'];
@@ -75,6 +92,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateToModule
       bg: 'linear-gradient(135deg,#be185d 0%,#ec4899 60%,#f9a8d4 100%)',
       accent: '#fce7f3', iconBg: 'rgba(255,255,255,0.18)',
     },
+    {
+      id: 'documentos', name: 'Repositorio de Documentos',
+      description: 'Archivos y documentos compartidos',
+      icon: Folder,
+      bg: 'linear-gradient(135deg,#1e1b4b 0%,#4f46e5 60%,#818cf8 100%)',
+      accent: '#c7d2fe', iconBg: 'rgba(255,255,255,0.18)',
+    },
   ];
 
   const modulosFiltrados = modules.filter(m => modulosPermitidos.includes(m.id));
@@ -99,9 +123,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateToModule
               <p className="text-sm font-bold text-gray-800">{nombreUsuario}</p>
               <p className="text-xs text-gray-400">{getRolLabel(rolUsuario)}</p>
             </div>
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-sm shadow-sm">
-              {nombreUsuario.charAt(0).toUpperCase()}
-            </div>
+            <button onClick={() => setShowPerfil(true)}
+              className="relative group flex items-center gap-2 hover:opacity-90 transition-opacity">
+              {fotoUrl ? (
+                <img src={fotoUrl} alt="avatar"
+                  className="w-9 h-9 rounded-xl object-cover border-2 border-indigo-200 shadow-sm group-hover:border-indigo-400 transition-colors" />
+              ) : (
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-sm shadow-sm group-hover:from-indigo-500 group-hover:to-violet-600 transition-all">
+                  {nombreUsuario.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white" />
+            </button>
             <button onClick={handleLogout}
               className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-bold shadow-sm shadow-red-200 transition-all">
               <LogOut size={15} /> Salir
@@ -177,6 +210,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigateToModule
             className="font-mono hover:text-gray-600 transition-colors">&lt;/&gt;</button>
         </div>
       </div>
+
+      {/* ── Modal Perfil ── */}
+      {showPerfil && <PerfilModal onClose={() => setShowPerfil(false)} />}
 
       {/* ── Modal dev ── */}
       <div id="dev-modal" className="fixed inset-0 bg-black/50 items-center justify-center z-50" style={{ display:'none' }}

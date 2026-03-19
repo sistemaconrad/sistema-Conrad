@@ -169,6 +169,7 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
           motivo: motivo,
           numero_paciente: numeroEliminado
         },
+        p_fecha: getFechaGuatemala(),
         p_requirio_autorizacion: true
       });
 
@@ -235,6 +236,7 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
           estudio: accionPendiente.datos.nombreEstudio,
           precio: precioEstudio
         },
+        p_fecha: getFechaGuatemala(),
         p_requirio_autorizacion: true
       });
 
@@ -336,6 +338,7 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
           justificacion: justificacionPrecio.trim(),
           usuario: usuarioActual
         },
+        p_fecha: getFechaGuatemala(),
         p_requirio_autorizacion: true
       });
 
@@ -443,10 +446,21 @@ export const PacientesPage: React.FC<PacientesPageProps> = ({ onBack }) => {
         p_tipo_registro: 'paciente',
         p_registro_id: pacienteEditando.id,
         p_detalles: {
-          nombre: pacienteData.nombre,
-          edad: pacienteData.edad,
-          medico: medicoNombre || 'Sin médico'
+          descripcion: `${pacienteData.nombre}`,
+          antes: {
+            nombre: pacienteEditando.nombre,
+            edad: pacienteEditando.edad,
+            telefono: pacienteEditando.telefono,
+            medico: consultaSeleccionada.medicos?.nombre || consultaSeleccionada.medico_recomendado || 'Sin médico'
+          },
+          despues: {
+            nombre: pacienteData.nombre,
+            edad: pacienteData.edad,
+            telefono: pacienteData.telefono,
+            medico: medicoNombre || 'Sin médico'
+          }
         },
+        p_fecha: getFechaGuatemala(),
         p_requirio_autorizacion: true
       });
 

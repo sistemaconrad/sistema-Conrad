@@ -206,170 +206,154 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <button onClick={onBack} className="text-white hover:text-green-100 mb-4 flex items-center gap-2 transition-colors">
-            <ArrowLeft size={20} />
-            Volver al Dashboard
+
+      {/* ── HEADER ── */}
+      <div className="bg-gradient-to-r from-[#0f172a] via-[#064e3b] to-[#065f46] text-white shadow-xl">
+        <div className="max-w-4xl mx-auto px-6 py-6">
+          <button onClick={onBack} className="flex items-center gap-2 text-emerald-200 hover:text-white mb-4 text-sm font-medium transition-colors group">
+            <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Volver
           </button>
-          <h1 className="text-3xl font-bold">Generar Reportes</h1>
-          <p className="text-green-100 mt-2">Exportación de datos a Excel</p>
+          <div className="flex items-center gap-4">
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3">
+              <FileSpreadsheet size={28} className="text-emerald-200" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black tracking-tight">Generar Reportes</h1>
+              <p className="text-emerald-300 text-sm mt-0.5">Exportación de datos a Excel</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-              <FileSpreadsheet className="text-green-600" size={32} />
+      <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
+
+        {/* ── FEATURES ── */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            { icon: <Calendar size={16} className="text-blue-500" />, bg: 'bg-blue-50', label: 'Flexible', desc: 'Un día o mes completo' },
+            { icon: <FileSpreadsheet size={16} className="text-violet-500" />, bg: 'bg-violet-50', label: 'Profesional', desc: 'Colores y totales' },
+            { icon: <Download size={16} className="text-emerald-500" />, bg: 'bg-emerald-50', label: 'Inmediato', desc: 'Descarga al instante' },
+            { icon: <Calendar size={16} className="text-amber-500" />, bg: 'bg-amber-50', label: 'Una hoja/día', desc: 'Pestaña por día' },
+          ].map((f, i) => (
+            <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-start gap-3">
+              <div className={`${f.bg} rounded-xl p-2 flex-shrink-0`}>{f.icon}</div>
+              <div>
+                <div className="text-xs font-black text-gray-800">{f.label}</div>
+                <div className="text-xs text-gray-400 mt-0.5">{f.desc}</div>
+              </div>
             </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              Reporte de Consultas en Excel
-            </h2>
-            <p className="text-gray-600">
-              Genera un archivo Excel profesional con formato CONRAD CENTRAL
-            </p>
+          ))}
+        </div>
+
+        {/* ── CARD PRINCIPAL ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+            <div className="bg-emerald-50 rounded-xl p-2"><FileSpreadsheet size={16} className="text-emerald-600" /></div>
+            <h2 className="text-base font-black text-gray-900">Configurar Reporte</h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-            <div className="bg-blue-50 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <Calendar className="text-blue-600 mt-1" size={20} />
-                <div>
-                  <h3 className="font-semibold text-gray-800 mb-1">Flexible</h3>
-                  <p className="text-sm text-gray-600">Un día, varios días, o mes completo</p>
-                </div>
+          <div className="px-6 py-6 space-y-6">
+
+            {/* Tipo de reporte */}
+            <div>
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Tipo de reporte</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setTipoReporte('dia')}
+                  className={`relative p-4 rounded-xl border-2 transition-all text-left ${
+                    tipoReporte === 'dia'
+                      ? 'border-emerald-500 bg-emerald-50 shadow-sm shadow-emerald-100'
+                      : 'border-gray-200 hover:border-gray-300 bg-white'
+                  }`}
+                >
+                  {tipoReporte === 'dia' && <div className="absolute top-3 right-3 w-2 h-2 rounded-full bg-emerald-500" />}
+                  <Calendar size={18} className={`mb-2 ${tipoReporte === 'dia' ? 'text-emerald-600' : 'text-gray-400'}`} />
+                  <div className={`text-sm font-black ${tipoReporte === 'dia' ? 'text-emerald-700' : 'text-gray-700'}`}>Un Día</div>
+                  <div className={`text-xs mt-0.5 ${tipoReporte === 'dia' ? 'text-emerald-400' : 'text-gray-400'}`}>Reporte de fecha específica</div>
+                </button>
+                <button
+                  onClick={() => setTipoReporte('mes')}
+                  className={`relative p-4 rounded-xl border-2 transition-all text-left ${
+                    tipoReporte === 'mes'
+                      ? 'border-emerald-500 bg-emerald-50 shadow-sm shadow-emerald-100'
+                      : 'border-gray-200 hover:border-gray-300 bg-white'
+                  }`}
+                >
+                  {tipoReporte === 'mes' && <div className="absolute top-3 right-3 w-2 h-2 rounded-full bg-emerald-500" />}
+                  <FileSpreadsheet size={18} className={`mb-2 ${tipoReporte === 'mes' ? 'text-emerald-600' : 'text-gray-400'}`} />
+                  <div className={`text-sm font-black ${tipoReporte === 'mes' ? 'text-emerald-700' : 'text-gray-700'}`}>Mes Completo</div>
+                  <div className={`text-xs mt-0.5 ${tipoReporte === 'mes' ? 'text-emerald-400' : 'text-gray-400'}`}>Unificado con pestañas</div>
+                </button>
               </div>
             </div>
 
-            <div className="bg-purple-50 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <FileSpreadsheet className="text-purple-600 mt-1" size={20} />
-                <div>
-                  <h3 className="font-semibold text-gray-800 mb-1">Profesional</h3>
-                  <p className="text-sm text-gray-600">Colores, bordes, totales automáticos</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-green-50 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <Download className="text-green-600 mt-1" size={20} />
-                <div>
-                  <h3 className="font-semibold text-gray-800 mb-1">Descarga inmediata</h3>
-                  <p className="text-sm text-gray-600">Se genera y descarga al instante</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-orange-50 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <Calendar className="text-orange-600 mt-1" size={20} />
-                <div>
-                  <h3 className="font-semibold text-gray-800 mb-1">Una hoja por día</h3>
-                  <p className="text-sm text-gray-600">Cada día tiene su propia pestaña</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t pt-6">
-            <h3 className="font-bold text-gray-800 mb-4">Selecciona el tipo de reporte</h3>
-
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <button
-                onClick={() => setTipoReporte('dia')}
-                className={`p-4 rounded-lg border-2 transition-all ${
-                  tipoReporte === 'dia'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 hover:border-blue-300'
-                }`}
-              >
-                <Calendar className="mx-auto mb-2" size={24} />
-                <p className="font-semibold text-sm">Un Día</p>
-              </button>
-
-              <button
-                onClick={() => setTipoReporte('mes')}
-                className={`p-4 rounded-lg border-2 transition-all ${
-                  tipoReporte === 'mes'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 hover:border-blue-300'
-                }`}
-              >
-                <Calendar className="mx-auto mb-2" size={24} />
-                <p className="font-semibold text-sm">Mes Completo Unificado</p>
-              </button>
-            </div>
-
-            {tipoReporte === 'dia' && (
-              <div className="mb-6">
-                <label className="label">Fecha</label>
+            {/* Fecha / Mes-Año */}
+            {tipoReporte === 'dia' ? (
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Fecha</label>
                 <input
                   type="date"
                   value={fechaUnica}
                   onChange={(e) => setFechaUnica(e.target.value)}
-                  className="input-field"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400"
                 />
               </div>
-            )}
-
-            {tipoReporte === 'mes' && (
-              <div className="grid grid-cols-2 gap-4 mb-6">
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="label">Mes</label>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Mes</label>
                   <select
                     value={mes}
                     onChange={(e) => setMes(parseInt(e.target.value))}
-                    className="input-field"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 bg-white"
                   >
-                    {meses.map(m => (
+                    {meses.map((m) => (
                       <option key={m.value} value={m.value}>{m.label}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="label">Año</label>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Año</label>
                   <select
                     value={anio}
                     onChange={(e) => setAnio(parseInt(e.target.value))}
-                    className="input-field"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 bg-white"
                   >
-                    {[2024, 2025, 2026, 2027].map(a => (
-                      <option key={a} value={a}>{a}</option>
-                    ))}
+                    {[2024, 2025, 2026, 2027].map(a => (<option key={a} value={a}>{a}</option>))}
                   </select>
                 </div>
               </div>
             )}
 
-            <div className="space-y-3">
+            {/* Botones */}
+            <div className="space-y-3 pt-1">
               <button
                 onClick={handleGenerarReporte}
                 disabled={generando}
-                className="w-full btn-primary flex items-center justify-center gap-2 py-3 text-lg"
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white py-3 rounded-xl font-bold text-sm shadow-sm shadow-emerald-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {generando ? (
                   <><LoadingSpinner />Generando reporte...</>
                 ) : (
-                  <><Download size={24} />📋 Generar Reporte Regular</>
+                  <><Download size={16} />Generar Reporte Regular</>
                 )}
               </button>
 
               <button
                 onClick={handleGenerarReporteMoviles}
                 disabled={generando}
-                className="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-lg flex items-center justify-center gap-2 py-3 text-lg transition-colors disabled:bg-gray-400"
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white py-3 rounded-xl font-bold text-sm shadow-sm shadow-orange-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {generando ? (
                   <><LoadingSpinner />Generando móviles...</>
                 ) : (
-                  <><Download size={24} />📱 Generar Reporte Servicios Móviles</>
+                  <><Download size={16} />Generar Reporte Servicios Móviles</>
                 )}
               </button>
             </div>
           </div>
         </div>
+
       </div>
 
       {toast && <Toast {...toast} onClose={hideToast} />}
