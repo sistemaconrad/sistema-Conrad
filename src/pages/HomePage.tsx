@@ -60,9 +60,21 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const [datosReciboTemp, setDatosReciboTemp] = useState<any>(null);
 
   const esHorarioNormal = () => {
-    const now = new Date();
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Guatemala' }));
     const dia = now.getDay();
     const hora = now.getHours();
+    const minuto = now.getMinutes();
+    const año = now.getFullYear();
+    const mes = now.getMonth();
+    const diaNum = now.getDate();
+
+    // SEMANA SANTA 2026: especial desde Mié 2 abril 12:00 hasta Lun 6 abril 7:00am
+    if (año === 2026 && mes === 3) {
+      if (diaNum === 2 && hora >= 12) return false;
+      if (diaNum >= 3 && diaNum <= 5) return false;
+      if (diaNum === 6 && hora < 7) return false;
+    }
+
     if (dia >= 1 && dia <= 5) return hora >= 7 && hora < 16;
     if (dia === 6) return hora >= 7 && hora < 11;
     return false;

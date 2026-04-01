@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft, FileText, Upload, Search, Filter, Calendar,
-  User, Stethoscope, CheckCircle, Edit, Clock, AlertCircle,
-  Activity, Users, ClipboardList, TrendingUp
+  User, Stethoscope, CheckCircle, Clock, AlertCircle,
+  Users, ClipboardList
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { InformeMedicoModal } from '../components/InformeMedicoModal';
 import { ArchivosModal } from '../components/ArchivosModal';
 
 interface DoctoresPageProps { onBack: () => void; }
@@ -38,7 +37,6 @@ export const DoctoresPage: React.FC<DoctoresPageProps> = ({ onBack }) => {
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstudio, setFiltroEstudio] = useState<FiltroEstudio>('TODOS');
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState<Paciente | null>(null);
-  const [mostrarModalInforme, setMostrarModalInforme] = useState(false);
   const [mostrarModalArchivos, setMostrarModalArchivos] = useState(false);
   const [fechaSeleccionada, setFechaSeleccionada] = useState(() => {
     const gt = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Guatemala' }));
@@ -278,23 +276,17 @@ export const DoctoresPage: React.FC<DoctoresPageProps> = ({ onBack }) => {
                       )}
                     </div>
 
-                    {/* Botones acción */}
+                    {/* Botón acción — solo subir PDF */}
                     <div className="flex items-center gap-2 shrink-0">
                       <button
-                        onClick={() => { setPacienteSeleccionado(p); setMostrarModalInforme(true); }}
-                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                          p.tiene_informe
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                            : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm'
-                        }`}>
-                        <Edit size={13} />
-                        {p.tiene_informe ? 'Editar' : 'Crear informe'}
-                      </button>
-                      <button
                         onClick={() => { setPacienteSeleccionado(p); setMostrarModalArchivos(true); }}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100 transition-all">
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm ${
+                          p.tiene_archivos
+                            ? 'bg-violet-100 text-violet-700 border border-violet-200 hover:bg-violet-200'
+                            : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                        }`}>
                         <Upload size={13} />
-                        {p.tiene_archivos ? 'Archivos' : 'Subir PDF'}
+                        {p.tiene_archivos ? 'Ver / Subir PDF' : 'Subir PDF'}
                       </button>
                     </div>
                   </div>
@@ -305,11 +297,6 @@ export const DoctoresPage: React.FC<DoctoresPageProps> = ({ onBack }) => {
         </div>
       </div>
 
-      {mostrarModalInforme && pacienteSeleccionado && (
-        <InformeMedicoModal paciente={pacienteSeleccionado}
-          onClose={() => { setMostrarModalInforme(false); setPacienteSeleccionado(null); }}
-          onSaved={() => { setMostrarModalInforme(false); setPacienteSeleccionado(null); cargarPacientes(); }} />
-      )}
       {mostrarModalArchivos && pacienteSeleccionado && (
         <ArchivosModal paciente={pacienteSeleccionado}
           onClose={() => { setMostrarModalArchivos(false); setPacienteSeleccionado(null); }}
