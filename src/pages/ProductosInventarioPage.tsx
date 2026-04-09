@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Search, AlertCircle, X, Save, Package } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { registrarLog } from '../utils/registrarLog';
 import { ProductoInventario, CategoriaInventario } from '../types';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Toast } from '../components/Toast';
@@ -89,10 +90,25 @@ export const ProductosInventarioPage: React.FC<ProductosInventarioPageProps> = (
       if (editando) {
         const { error } = await supabase.from('productos_inventario').update(datos).eq('id', editando);
         if (error) throw error;
+        await registrarLog({
+          modulo: 'inventario',
+          accion: 'editar',
+          tipo_registro: 'producto',
+          registro_id: editando,
+          descripcion: `Producto editado: ${form.nombre}`,
+          detalles: { nombre: form.nombre, stock_actual: datos.stock_actual, precio_venta: datos.precio_venta }
+        });
         showToast('Producto actualizado', 'success');
       } else {
         const { error } = await supabase.from('productos_inventario').insert(datos);
         if (error) throw error;
+        await registrarLog({
+          modulo: 'inventario',
+          accion: 'crear',
+          tipo_registro: 'producto',
+          descripcion: `Producto creado: ${form.nombre}`,
+          detalles: { nombre: form.nombre, stock_actual: datos.stock_actual, precio_venta: datos.precio_venta }
+        });
         showToast('Producto agregado', 'success');
       }
       setShowModal(false);

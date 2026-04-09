@@ -5,6 +5,7 @@ import {
   ChevronRight, Home, Eye, Shield, Clock
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { registrarLog } from '../utils/registrarLog';
 import { AutorizacionModal } from '../components/AutorizacionModal';
 
 interface DocumentosPageProps { onBack: () => void; }
@@ -132,12 +133,26 @@ export const DocumentosPage: React.FC<DocumentosPageProps> = ({ onBack }) => {
           await supabase.storage.from('documentos').remove(docs.map(d => d.storage_path));
         }
         await supabase.from('carpetas_documentos').delete().eq('id', pendingDelete.id);
+        await registrarLog({
+          modulo: 'documentos',
+          accion: 'eliminar',
+          tipo_registro: 'carpeta',
+          descripcion: `Carpeta eliminada: "${pendingDelete.nombre}"`,
+          detalles: { nombre: pendingDelete.nombre, tipo: 'carpeta' }
+        });
         setCarpetaActual(null);
         cargarCarpetas();
       } else {
         const { data: doc } = await supabase.from('documentos').select('storage_path').eq('id', pendingDelete.id).single();
         if (doc) await supabase.storage.from('documentos').remove([doc.storage_path]);
         await supabase.from('documentos').delete().eq('id', pendingDelete.id);
+        await registrarLog({
+          modulo: 'documentos',
+          accion: 'eliminar',
+          tipo_registro: 'documento',
+          descripcion: `Documento eliminado: "${pendingDelete.nombre}"`,
+          detalles: { nombre: pendingDelete.nombre, tipo: 'documento' }
+        });
         cargarDocumentos(carpetaActual.id);
       }
     } catch (e: any) { alert('Error al eliminar: ' + e.message); }

@@ -32,6 +32,12 @@ interface CuadreDatos {
     total: number;
     es_servicio_movil?: boolean;
   }>;
+  gastos?: Array<{
+    concepto: string;
+    monto: number;
+    categoria?: string;
+    created_at?: string;
+  }>;
 }
 
 // ✅ Helpers para sanitizar valores antes de escribir en ExcelJS
@@ -70,6 +76,8 @@ const fillPurple = { type: 'pattern' as const, pattern: 'solid' as const, fgColo
 const fillLightPurple = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFE1BEE7' } };
 const fillOKGreen = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFC6EFCE' } };
 const fillErrRed = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFFFC7CE' } };
+const fillOrange = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFE65100' } };
+const fillLightOrange = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFFFE0B2' } };
 
 export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
   const workbook = new ExcelJS.Workbook();
@@ -332,6 +340,75 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
     r++;
   }
 
+  // ===== GASTOS DEL DÍA =====
+  r += 2;
+
+  worksheet.mergeCells(`A${r}:F${r}`);
+  const cGastosH = worksheet.getCell(`A${r}`);
+  cGastosH.value = 'GASTOS DEL DIA';
+  cGastosH.font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+  cGastosH.fill = fillOrange;
+  cGastosH.alignment = { horizontal: 'center', vertical: 'middle' };
+  cGastosH.border = borderThin;
+  r++;
+
+  // Headers tabla gastos
+  ['Concepto', 'Categoria', 'Hora', 'Monto'].forEach((h, i) => {
+    const cell = worksheet.getCell(r, i + 2);
+    cell.value = h;
+    cell.font = { bold: true };
+    cell.fill = fillLightOrange;
+    cell.alignment = { horizontal: 'center' };
+    cell.border = borderThin;
+  });
+  r++;
+
+  const gastosLista = datos.gastos || [];
+  if (gastosLista.length > 0) {
+    gastosLista.forEach(g => {
+      let horaStr = '';
+      if (g.created_at) {
+        try {
+          const d = new Date(g.created_at);
+          horaStr = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        } catch { horaStr = ''; }
+      }
+
+      worksheet.getCell(r, 2).value = safeStr(g.concepto);
+      worksheet.getCell(r, 2).alignment = { horizontal: 'left' };
+
+      worksheet.getCell(r, 3).value = safeStr(g.categoria || '—');
+      worksheet.getCell(r, 3).alignment = { horizontal: 'center' };
+
+      worksheet.getCell(r, 4).value = safeStr(horaStr);
+      worksheet.getCell(r, 4).alignment = { horizontal: 'center' };
+
+      worksheet.getCell(r, 5).value = safeNum(g.monto);
+      worksheet.getCell(r, 5).numFmt = '#,##0.00';
+      worksheet.getCell(r, 5).alignment = { horizontal: 'right' };
+      worksheet.getCell(r, 5).font = { color: { argb: 'FFC62828' } };
+
+      for (let col = 2; col <= 5; col++) worksheet.getCell(r, col).border = borderThin;
+      r++;
+    });
+
+    // Fila total gastos
+    const totalGastos = gastosLista.reduce((s, g) => s + safeNum(g.monto), 0);
+    worksheet.getCell(r, 2).value = 'TOTAL GASTOS:';
+    worksheet.getCell(r, 2).font = { bold: true };
+    worksheet.getCell(r, 5).value = totalGastos;
+    worksheet.getCell(r, 5).numFmt = '#,##0.00';
+    worksheet.getCell(r, 5).alignment = { horizontal: 'right' };
+    worksheet.getCell(r, 5).font = { bold: true, color: { argb: 'FFC62828' } };
+    worksheet.getCell(r, 5).fill = fillLightOrange;
+    for (let col = 2; col <= 5; col++) worksheet.getCell(r, col).border = borderThin;
+    r++;
+  } else {
+    worksheet.getCell(r, 2).value = 'No hay gastos registrados para este dia';
+    worksheet.getCell(r, 2).font = { italic: true, color: { argb: 'FF9E9E9E' } };
+    r++;
+  }
+
   // ===== FIRMA DIGITAL =====
   if (datos.cajero) {
     r += 2;
@@ -361,6 +438,32 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
     worksheet.getCell(`C${r}`).value = 'CAJA CERRADA Y CONFIRMADA';
     worksheet.getCell(`C${r}`).font = { bold: true, color: { argb: 'FF70AD47' } };
   }
+
+  // ===== MARCA DE AGUA =====
+  r += 2;
+  worksheet.mergeCells(`A${r}:F${r}`);
+  const cWater = worksheet.getCell(`A${r}`);
+  cWater.value = 'DOCUMENTO OFICIAL - SOLO LECTURA - CONRAD CENTRAL - PROHIBIDA SU MODIFICACION';
+  cWater.font = { name: 'Calibri', size: 9, bold: true, italic: true, color: { argb: 'FFBDBDBD' } };
+  cWater.alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(r).height = 18;
+
+  // ===== PROTECCIÓN DE HOJA (solo lectura con contraseña) =====
+  await worksheet.protect('Conrad2024!', {
+    selectLockedCells: true,
+    selectUnlockedCells: false,
+    formatCells: false,
+    formatColumns: false,
+    formatRows: false,
+    insertColumns: false,
+    insertRows: false,
+    insertHyperlinks: false,
+    deleteColumns: false,
+    deleteRows: false,
+    sort: false,
+    autoFilter: false,
+    pivotTables: false
+  });
 
   // ===== DESCARGAR =====
   const buffer = await workbook.xlsx.writeBuffer();

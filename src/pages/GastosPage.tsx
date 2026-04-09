@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Trash2, Edit2, Search, Calendar, ChevronDown, ChevronUp, TrendingDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { registrarLog } from '../utils/registrarLog';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -111,6 +112,14 @@ export const GastosPage: React.FC<GastosPageProps> = ({ onBack }) => {
 
       if (error) throw error;
 
+      await registrarLog({
+        modulo: 'gastos',
+        accion: 'crear',
+        tipo_registro: 'gasto',
+        descripcion: `Gasto registrado: ${formData.concepto} - Q${parseFloat(formData.monto).toFixed(2)}`,
+        detalles: { concepto: formData.concepto, monto: parseFloat(formData.monto), fecha: formData.fecha }
+      });
+
       alert('Gasto registrado exitosamente');
       setShowModal(false);
       resetForm();
@@ -125,12 +134,26 @@ export const GastosPage: React.FC<GastosPageProps> = ({ onBack }) => {
     if (!confirm('¿Eliminar este gasto?')) return;
 
     try {
+      const gastoAEliminar = gastos.find((g: any) => g.id === id);
+
       const { error } = await supabase
         .from('gastos')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
+
+      await registrarLog({
+        modulo: 'gastos',
+        accion: 'eliminar',
+        tipo_registro: 'gasto',
+        registro_id: id,
+        descripcion: gastoAEliminar
+          ? `Gasto eliminado: ${gastoAEliminar.concepto} - Q${Number(gastoAEliminar.monto).toFixed(2)}`
+          : `Gasto eliminado (id: ${id})`,
+        detalles: gastoAEliminar ? { concepto: gastoAEliminar.concepto, monto: gastoAEliminar.monto, fecha: gastoAEliminar.fecha } : {}
+      });
+
       cargarGastos();
     } catch (error) {
       console.error('Error:', error);

@@ -203,8 +203,18 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
       });
 
       // Gastos del día
-      const { data: gastosDia } = await supabase.from('gastos').select('monto').eq('fecha', fecha);
+      const { data: gastosDia } = await supabase
+        .from('gastos')
+        .select('*, categorias_gastos(nombre)')
+        .eq('fecha', fecha)
+        .order('created_at', { ascending: true });
       const totalGastos = gastosDia?.reduce((s: number, g: any) => s + parseFloat(g.monto || 0), 0) || 0;
+      const gastosParaExcel = (gastosDia || []).map((g: any) => ({
+        concepto: g.concepto || '',
+        monto: parseFloat(g.monto || 0),
+        categoria: g.categorias_gastos?.nombre || g.categoria || '',
+        created_at: g.created_at || ''
+      }));
 
       // Calcular esperados igual que CuadreDiarioPage
       const efectivoEsperado =
@@ -267,7 +277,8 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
           cantidad: c.cantidad,
           total: c.total,
           es_servicio_movil: c.es_servicio_movil
-        }))
+        })),
+        gastos: gastosParaExcel
       });
     } catch (error) {
       console.error('Error al descargar Excel:', error);
@@ -350,6 +361,13 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                 className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-emerald-900/30">
                 <FileText size={14} /> Descargar Excel
               </button>
+              {localStorage.getItem('rolUsuarioConrad') === 'admin' && (
+                <div className="flex items-center gap-1.5 bg-white/10 border border-white/15 rounded-xl px-3 py-2" title="Contraseña para desproteger el Excel">
+                  <Shield size={12} className="text-yellow-300 shrink-0" />
+                  <span className="text-xs text-white/60 font-medium">Excel:</span>
+                  <span className="text-xs text-yellow-300 font-bold tracking-wide">Conrad2024!</span>
+                </div>
+              )}
               {localStorage.getItem('rolUsuarioConrad') === 'admin' && onNavigate && (
                 <button onClick={() => onNavigate('usuarios')}
                   className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all">
@@ -572,21 +590,19 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
               <div className="flex items-center gap-2 mb-4">
                 <div className="bg-indigo-50 rounded-lg p-1.5"><Shield size={14} className="text-indigo-600" /></div>
                 <span className="text-sm font-black text-slate-800">Filtrar registros</span>
-                {(filtroUsuario || filtroModulo || filtroAccion) && (
-                  <div className="ml-auto flex items-center gap-3">
-                    <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer select-none">
-                      <input type="checkbox" checked={mostrarTokens} onChange={e => setMostrarTokens(e.target.checked)}
-                        className="rounded" />
-                      Mostrar tokens de autorización
-                    </label>
-                    {(filtroUsuario || filtroModulo || filtroAccion) && (
-                      <button onClick={() => { setFiltroUsuario(''); setFiltroModulo(''); setFiltroAccion(''); }}
-                        className="text-xs text-red-500 hover:text-red-700 font-bold flex items-center gap-1">
-                        <AlertCircle size={12} /> Limpiar filtros
-                      </button>
-                    )}
-                  </div>
-                )}
+                <div className="ml-auto flex items-center gap-3">
+                  <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer select-none">
+                    <input type="checkbox" checked={mostrarTokens} onChange={e => setMostrarTokens(e.target.checked)}
+                      className="rounded" />
+                    Mostrar autorizaciones con token
+                  </label>
+                  {(filtroUsuario || filtroModulo || filtroAccion) && (
+                    <button onClick={() => { setFiltroUsuario(''); setFiltroModulo(''); setFiltroAccion(''); }}
+                      className="text-xs text-red-500 hover:text-red-700 font-bold flex items-center gap-1">
+                      <AlertCircle size={12} /> Limpiar filtros
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>

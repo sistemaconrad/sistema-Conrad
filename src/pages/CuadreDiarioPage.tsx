@@ -3,6 +3,7 @@ import { ArrowLeft, Calendar, DollarSign, CheckCircle2, Plus, Trash2, X, Chevron
 import { supabase } from '../lib/supabase';
 import { format, subDays } from 'date-fns';
 import { generarCuadreExcel } from '../utils/cuadre-excel-generator';
+import { registrarLog } from '../utils/registrarLog';
 import { AutorizacionModal } from '../components/AutorizacionModal';
 
 interface CuadrePorFormaPago {
@@ -118,8 +119,6 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
   const [mostrarGastos, setMostrarGastos] = useState(true);
   const [mostrarAnuladas, setMostrarAnuladas] = useState(false);
   const [consultasAnuladas, setConsultasAnuladas] = useState<any[]>([]);
-  const [listaConsultas, setListaConsultas] = useState<any[]>([]);
-  const [mostrarListaPacientes, setMostrarListaPacientes] = useState(false);
 
   const cajaBloqueada = debeEstarCerrada() && !modoEdicion;
 
@@ -176,7 +175,7 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
         .select(`
           *,
           pacientes(nombre),
-          medicos(nombre, es_referente)
+          medicos(nombre)
         `)
         .eq('fecha', fecha);
 
@@ -244,7 +243,6 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
         cuadres_forma_pago: Object.values(cuadrePorForma)
       });
 
-      setListaConsultas(consultasRegulares);
       setConsultasAnuladas(consultasAnuladasData.map(c => ({
         nombre: c.pacientes?.nombre,
         usuario_anulo: c.usuario_anulo,
@@ -316,6 +314,15 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
         .upsert(cuadreData, { onConflict: 'fecha' });
 
       if (error) throw error;
+
+      await registrarLog({
+        modulo: 'cuadre',
+        accion: 'guardar',
+        tipo_registro: 'cuadre_diario',
+        descripcion: `Cuadre del día ${fecha} guardado`,
+        detalles: { fecha, cajero: nombreCajero, efectivo_contado: efectivoContadoNum }
+      });
+
       alert('✅ Cuadre guardado correctamente');
     } catch (error) {
       console.error('Error al guardar cuadre:', error);
@@ -415,8 +422,21 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
   const eliminarGasto = async (id: string) => {
     if (!confirm('¿Eliminar este gasto?')) return;
     try {
+      const gastoAEliminar = gastos.find((g: any) => g.id === id);
       const { error } = await supabase.from('gastos').delete().eq('id', id);
       if (error) throw error;
+
+      await registrarLog({
+        modulo: 'gastos',
+        accion: 'eliminar',
+        tipo_registro: 'gasto',
+        registro_id: id,
+        descripcion: gastoAEliminar
+          ? `Gasto eliminado desde cuadre: ${gastoAEliminar.concepto} - Q${Number(gastoAEliminar.monto).toFixed(2)}`
+          : `Gasto eliminado desde cuadre (id: ${id})`,
+        detalles: gastoAEliminar ? { concepto: gastoAEliminar.concepto, monto: gastoAEliminar.monto } : {}
+      });
+
       cargarGastos();
       alert('Gasto eliminado');
     } catch (error) {
@@ -551,6 +571,14 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
     const horaActual = format(new Date(), 'HH:mm');
 
     if (formato === 'csv') {
+      // Usar los gastos ya cargados en el estado de la página
+      const gastosParaExcel = gastos.map((g: any) => ({
+        concepto: g.concepto || '',
+        monto: parseFloat(g.monto || 0),
+        categoria: g.categorias_gastos?.nombre || g.categoria || '',
+        created_at: g.created_at || ''
+      }));
+
       await generarCuadreExcel({
         fecha: fechaFormateada,
         horaActual,
@@ -571,7 +599,8 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
           cantidad: c.cantidad,
           total: c.total,
           es_servicio_movil: c.es_servicio_movil || false
-        })) || []
+        })) || [],
+        gastos: gastosParaExcel
       });
     }
   };
@@ -626,99 +655,133 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
     Math.abs(diferenciaTarjeta) < 0.01 &&
     (estadoCuentaEsperada < 0.01 || Math.abs(diferenciaEstadoCuenta) < 0.01);
 
-  const inputBase = `w-full px-3 py-2 border border-gray-200 rounded-xl text-center font-bold text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`;
-  const inputDisabled = `bg-gray-50 cursor-not-allowed text-gray-400`;
-  const btnPrimary = `w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm transition-all shadow-sm`;
-
   return (
-    <div className="min-h-screen" style={{ background: '#f0f4f8' }}>
-
-      {/* ─── HEADER ─────────────────────────────────────── */}
-      <header className="text-white shadow-xl" style={{ background: 'linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#1d4ed8 100%)' }}>
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button onClick={onBack} className="bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl p-2 transition-colors">
-              <ArrowLeft size={18} />
-            </button>
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-white shadow-sm border-b">
+        <div className="container mx-auto px-4 py-4">
+          <button onClick={onBack} className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-3 transition-colors">
+            <ArrowLeft size={20} />
+            <span className="font-medium">Volver</span>
+          </button>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Cierre de Caja</h1>
+              <p className="text-gray-500 text-sm mt-1">Control y cuadre diario de operaciones</p>
+            </div>
             <div className="flex items-center gap-3">
-              <div className="bg-white/10 rounded-xl p-2 border border-white/20">
-                <DollarSign size={20} />
+              <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
+                <div className="flex items-center gap-2">
+                  <Calendar size={16} className="text-blue-600" />
+                  <span className="text-sm font-medium text-gray-700">
+                    {format(new Date(fecha + 'T12:00:00'), 'dd/MM/yyyy')}
+                  </span>
+                </div>
               </div>
-              <div>
-                <h1 className="text-xl font-black tracking-tight">Cierre de Caja</h1>
-                <p className="text-blue-200 text-xs">Control y cuadre diario · Incluye servicios móviles</p>
+              <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-2">
+                <p className="text-xs text-purple-800 flex items-center gap-2">
+                  📱 <strong>Incluye servicios móviles</strong>
+                </p>
               </div>
             </div>
           </div>
-          <div className="bg-white/10 border border-white/20 rounded-xl px-4 py-2 flex items-center gap-2">
-            <Calendar size={14} className="text-blue-200" />
-            <span className="text-sm font-bold">{format(new Date(fecha + 'T12:00:00'), 'dd/MM/yyyy')}</span>
-          </div>
         </div>
-      </header>
+      </div>
 
-      <div className="container mx-auto px-4 py-5 max-w-5xl">
-
-        {/* ─── BARRA FECHA ─────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-5 py-3.5 mb-5 flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-2">
-            <button onClick={() => { const d = new Date(fecha + 'T12:00:00'); d.setDate(d.getDate() - 1); setFecha(d.toISOString().split('T')[0]); }}
-              className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"><ChevronLeft size={16} /></button>
-            <input type="date"
-              className="px-3 py-2 border border-gray-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
-              value={fecha} onChange={(e) => setFecha(e.target.value)} />
-            <button onClick={() => { const d = new Date(fecha + 'T12:00:00'); d.setDate(d.getDate() + 1); setFecha(d.toISOString().split('T')[0]); }}
-              className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"><ChevronRight size={16} /></button>
-          </div>
-          <div className="flex items-center gap-2">
-            {cuadreCerrado && (
-              <span className="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5">
-                <CheckCircle2 size={14} /> Caja Cerrada
-              </span>
-            )}
-            <button onClick={() => setMostrarCuadre(!mostrarCuadre)}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm shadow-blue-200 transition-all">
-              <DollarSign size={15} />
+      <div className="container mx-auto p-4 max-w-7xl">
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-6 border border-gray-200">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium text-gray-700">Fecha:</label>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    const d = new Date(fecha + 'T12:00:00');
+                    d.setDate(d.getDate() - 1);
+                    setFecha(d.toISOString().split('T')[0]);
+                  }}
+                  className="p-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+                  title="Día anterior"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <input
+                  type="date"
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={fecha}
+                  onChange={(e) => setFecha(e.target.value)}
+                />
+                <button
+                  onClick={() => {
+                    const d = new Date(fecha + 'T12:00:00');
+                    d.setDate(d.getDate() + 1);
+                    setFecha(d.toISOString().split('T')[0]);
+                  }}
+                  className="p-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+                  title="Día siguiente"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+            <button
+              onClick={() => setMostrarCuadre(!mostrarCuadre)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-colors"
+            >
+              <DollarSign size={18} />
               {mostrarCuadre ? 'Ocultar Cuadre' : 'Ver Cuadre del Día'}
             </button>
+            {cuadreCerrado && (
+              <div className="bg-green-100 text-green-700 px-4 py-2 rounded-lg font-medium flex items-center gap-2">
+                <CheckCircle2 size={18} />
+                Caja Cerrada
+              </div>
+            )}
           </div>
         </div>
 
         {loading ? (
-          <div className="text-center py-20">
-            <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-blue-600 mb-4" />
-            <p className="text-gray-400 text-sm">Cargando información...</p>
+          <div className="text-center py-16">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-blue-600"></div>
+            <p className="text-gray-600 mt-4">Cargando información...</p>
           </div>
         ) : (
           <>
-            {/* ─── PANEL CIERRE ─────────────────────────── */}
             {mostrarCuadre && cuadre && cuadre.total_consultas > 0 && (
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-5 overflow-hidden">
-
-                {/* Sub-header del panel */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100"
-                  style={{ background: cajaBloqueada && !modoEdicion ? 'linear-gradient(90deg,#fff1f2,#ffe4e6)' : modoEdicion ? 'linear-gradient(90deg,#fffbeb,#fef3c7)' : 'linear-gradient(90deg,#f0f9ff,#e0f2fe)' }}>
-                  <div className="flex items-center gap-3">
-                    <div className={`rounded-xl p-2.5 ${cajaBloqueada && !modoEdicion ? 'bg-red-100' : modoEdicion ? 'bg-amber-100' : 'bg-blue-100'}`}>
-                      <DollarSign size={18} className={cajaBloqueada && !modoEdicion ? 'text-red-600' : modoEdicion ? 'text-amber-600' : 'text-blue-600'} />
-                    </div>
-                    <div>
-                      <p className="font-black text-gray-900 text-sm">Formulario de Cierre</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {cajaBloqueada && !modoEdicion ? 'Solo lectura — caja cerrada' : modoEdicion ? 'Modo edición activo' : 'Cuenta el dinero físicamente e ingresa las cantidades'}
-                      </p>
-                    </div>
+              <div className="bg-white rounded-lg shadow-lg p-6 mb-6 border-2 border-blue-500">
+                <div className="flex items-center gap-3 mb-6 pb-4 border-b">
+                  <div className="bg-blue-100 p-3 rounded-lg">
+                    <DollarSign size={28} className="text-blue-700" />
                   </div>
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-bold text-gray-900">Cierre de Caja</h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {cajaBloqueada ? 'Cuadre bloqueado - Solo lectura' : 'Cuenta el dinero físicamente e ingresa las cantidades'}
+                    </p>
+                  </div>
+
                   {cajaBloqueada && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       {modoEdicion ? (
-                        <span className="bg-amber-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5"><Edit size={12}/> Modo Edición</span>
+                        <div className="bg-yellow-100 border-2 border-yellow-500 px-4 py-2 rounded-lg">
+                          <p className="text-yellow-800 font-bold flex items-center gap-2">
+                            <Edit size={18} />
+                            Modo Edición Activo
+                          </p>
+                        </div>
                       ) : (
                         <>
-                          <span className="bg-red-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5"><Lock size={12}/> Cerrada</span>
-                          <button onClick={solicitarEdicion}
-                            className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-1.5 transition-all shadow-sm">
-                            <Edit size={14}/> Editar Cuadre
+                          <div className="bg-red-100 border-2 border-red-500 px-4 py-2 rounded-lg">
+                            <p className="text-red-800 font-bold flex items-center gap-2">
+                              <Lock size={18} />
+                              Caja Cerrada
+                            </p>
+                          </div>
+                          <button
+                            onClick={solicitarEdicion}
+                            className="bg-orange-600 hover:bg-orange-700 text-white px-5 py-2.5 rounded-lg font-semibold flex items-center gap-2 transition-colors shadow-md hover:shadow-lg"
+                          >
+                            <Edit size={18} />
+                            Editar Cuadre
                           </button>
                         </>
                       )}
@@ -726,373 +789,343 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
                   )}
                 </div>
 
-                <div className="p-6 space-y-6">
+                {/* Conteo de Efectivo */}
+                <div className="mb-8">
+                  <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">💵 Conteo de Efectivo</h4>
 
-                  {/* ── BILLETES ── */}
-                  <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">💵 Billetes</p>
-                    <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                  <div className="bg-green-50 rounded-lg p-5 mb-4 border border-green-200">
+                    <h5 className="font-medium text-gray-700 mb-3">BILLETES:</h5>
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
                       {[
-                        { key: 'b200', label: 'Q200', value: 200 },
-                        { key: 'b100', label: 'Q100', value: 100 },
-                        { key: 'b50',  label: 'Q50',  value: 50  },
-                        { key: 'b20',  label: 'Q20',  value: 20  },
-                        { key: 'b10',  label: 'Q10',  value: 10  },
-                        { key: 'b5',   label: 'Q5',   value: 5   },
-                        { key: 'b1',   label: 'Q1',   value: 1   },
-                      ].map(b => (
-                        <div key={b.key} className="bg-emerald-50 border border-emerald-100 rounded-xl p-2 text-center">
-                          <p className="text-xs font-bold text-emerald-700 mb-1">{b.label}</p>
-                          <input type="number" min="0" placeholder="0"
-                            className={`${inputBase} bg-white border-emerald-200 focus:ring-emerald-400 ${cajaBloqueada ? inputDisabled : ''}`}
-                            value={billetes[b.key as keyof typeof billetes]}
-                            onChange={(e) => setBilletes({ ...billetes, [b.key]: e.target.value })}
-                            disabled={cajaBloqueada} onWheel={(e) => e.currentTarget.blur()} />
-                          {billetes[b.key as keyof typeof billetes] && (
-                            <p className="text-xs text-emerald-600 mt-1 font-semibold">
-                              Q{((parseFloat(billetes[b.key as keyof typeof billetes]) || 0) * b.value).toFixed(0)}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* ── MONEDAS ── */}
-                  <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">🪙 Monedas</p>
-                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                      {[
-                        { key: 'm1',   label: 'Q1',    value: 1    },
-                        { key: 'm050', label: 'Q0.50', value: 0.50 },
-                        { key: 'm025', label: 'Q0.25', value: 0.25 },
-                        { key: 'm010', label: 'Q0.10', value: 0.10 },
-                        { key: 'm005', label: 'Q0.05', value: 0.05 },
-                        { key: 'm001', label: 'Q0.01', value: 0.01 },
-                      ].map(m => (
-                        <div key={m.key} className="bg-amber-50 border border-amber-100 rounded-xl p-2 text-center">
-                          <p className="text-xs font-bold text-amber-700 mb-1">{m.label}</p>
-                          <input type="number" min="0" placeholder="0"
-                            className={`${inputBase} bg-white border-amber-200 focus:ring-amber-400 ${cajaBloqueada ? inputDisabled : ''}`}
-                            value={monedas[m.key as keyof typeof monedas]}
-                            onChange={(e) => setMonedas({ ...monedas, [m.key]: e.target.value })}
-                            disabled={cajaBloqueada} onWheel={(e) => e.currentTarget.blur()} />
-                          {monedas[m.key as keyof typeof monedas] && (
-                            <p className="text-xs text-amber-600 mt-1 font-semibold">
-                              Q{((parseFloat(monedas[m.key as keyof typeof monedas]) || 0) * m.value).toFixed(2)}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* ── TOTAL EFECTIVO ── */}
-                  <div className="rounded-2xl p-4 flex items-center justify-between" style={{ background: 'linear-gradient(90deg,#052e16,#14532d)' }}>
-                    <span className="text-emerald-300 text-sm font-bold uppercase tracking-wide">Total Efectivo en Caja</span>
-                    <span className="text-3xl font-black text-white">Q {calcularTotalEfectivoContado().toFixed(2)}</span>
-                  </div>
-
-                  {/* ── TARJETA / TRANSFERENCIA / ESTADO CUENTA ── */}
-                  <div className="grid sm:grid-cols-3 gap-4">
-                    {[
-                      { label: '💳 Tarjeta', sub: 'Suma total de vouchers', color: 'purple', val: tarjetaContado, set: setTarjetaContado },
-                      { label: '🏦 Transferencias', sub: 'Suma de comprobantes', color: 'blue', val: transferenciaContado, set: setTransferenciaContado },
-                      { label: '📋 Estado de Cuenta', sub: 'Pagos a cuenta o crédito', color: 'amber', val: estadoCuentaContado, set: setEstadoCuentaContado },
-                    ].map(item => (
-                      <div key={item.label} className={`bg-${item.color}-50 border border-${item.color}-100 rounded-2xl p-4`}>
-                        <p className="text-sm font-bold text-gray-700 mb-2">{item.label}</p>
-                        <input type="number" step="0.01" placeholder="0.00"
-                          className={`${inputBase} bg-white text-lg border-${item.color}-200 focus:ring-${item.color}-400 ${cajaBloqueada ? inputDisabled : ''}`}
-                          value={item.val} onChange={(e) => item.set(e.target.value)}
-                          disabled={cajaBloqueada} onWheel={(e) => e.currentTarget.blur()} />
-                        <p className="text-xs text-gray-400 text-center mt-1.5">{item.sub}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* ── OBSERVACIONES ── */}
-                  <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Observaciones del Cierre</label>
-                    <textarea
-                      className={`w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 resize-none ${cajaBloqueada ? 'bg-gray-50 cursor-not-allowed' : ''}`}
-                      value={observaciones} onChange={(e) => setObservaciones(e.target.value)}
-                      disabled={cajaBloqueada} placeholder="Notas, incidencias o comentarios..." rows={3} />
-                  </div>
-
-                  {/* ── BOTONES ACCIÓN ── */}
-                  {!cajaBloqueada && (
-                    <div className="space-y-3">
-                      <button onClick={guardarCuadre} className={`${btnPrimary} bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200`}>
-                        💾 Guardar Cuadre
-                      </button>
-                      <button onClick={validarCuadre} disabled={cuadreValidado}
-                        className={`${btnPrimary} ${cuadreValidado ? 'bg-gray-300 cursor-not-allowed text-gray-500' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200'}`}>
-                        <CheckCircle2 size={18} />
-                        {cuadreValidado ? '✓ Cuadre Validado' : 'Validar Cuadre'}
-                      </button>
-                      {cuadreValidado && !cuadreCerrado && (
-                        <button onClick={solicitarDescargaExcel} className={`${btnPrimary} bg-teal-600 hover:bg-teal-700 text-white shadow-teal-200`}>
-                          <FileText size={18} /> Descargar Excel del Cuadre
-                          {necesitaAutorizacionParaExcel() && <span className="ml-2 text-xs bg-orange-500 px-2 py-0.5 rounded-lg">Requiere autorización</span>}
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {cajaBloqueada && modoEdicion && (
-                    <div className="space-y-3">
-                      <button onClick={guardarCuadre} className={`${btnPrimary} bg-emerald-600 hover:bg-emerald-700 text-white`}>
-                        💾 Guardar Cambios
-                      </button>
-                      <button onClick={validarCuadre} className={`${btnPrimary} bg-blue-600 hover:bg-blue-700 text-white`}>
-                        <CheckCircle2 size={18} /> Re-Validar Cuadre
-                      </button>
-                      {cuadreValidado && (
-                        <button onClick={solicitarDescargaExcel} className={`${btnPrimary} bg-teal-600 hover:bg-teal-700 text-white`}>
-                          <FileText size={18} /> Descargar Excel del Cuadre
-                          {necesitaAutorizacionParaExcel() && <span className="ml-2 text-xs bg-orange-500 px-2 py-0.5 rounded-lg">Requiere autorización</span>}
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {cajaBloqueada && !modoEdicion && (
-                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-center">
-                      <Lock size={28} className="text-slate-400 mx-auto mb-2" />
-                      <p className="font-bold text-slate-700">Cuadre Bloqueado</p>
-                      <p className="text-xs text-slate-400 mt-1">Día pasado en modo solo lectura. Usa "Editar Cuadre" para modificar.</p>
-                    </div>
-                  )}
-
-                  {/* ── COMPARACIÓN SISTEMA vs CONTADO ── */}
-                  {cuadreValidado && mostrarEsperados && (
-                    <div className="space-y-4 pt-2">
-                      {cuadreCorrecto ? (
-                        <>
-                          <div className="rounded-2xl border border-gray-100 overflow-hidden">
-                            <div className="bg-gray-50 px-5 py-3 border-b border-gray-100">
-                              <p className="font-bold text-gray-700 text-sm">📊 Comparación Sistema vs Contado</p>
+                        { key: 'b200', label: 'Q 200', value: 200 },
+                        { key: 'b100', label: 'Q 100', value: 100 },
+                        { key: 'b50', label: 'Q 50', value: 50 },
+                        { key: 'b20', label: 'Q 20', value: 20 },
+                        { key: 'b10', label: 'Q 10', value: 10 },
+                        { key: 'b5', label: 'Q 5', value: 5 },
+                        { key: 'b1', label: 'Q 1', value: 1 }
+                      ].map(billete => (
+                        <div key={billete.key}>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">{billete.label}</label>
+                          <input
+                            type="number" min="0"
+                            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${cajaBloqueada ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                            value={billetes[billete.key as keyof typeof billetes]}
+                            onChange={(e) => setBilletes({ ...billetes, [billete.key]: e.target.value })}
+                            disabled={cajaBloqueada}
+                            onWheel={(e) => e.currentTarget.blur()}
+                            placeholder="0"
+                          />
+                          {billetes[billete.key as keyof typeof billetes] && (
+                            <div className="text-xs text-green-700 mt-1 text-center font-semibold">
+                              = Q {((parseFloat(billetes[billete.key as keyof typeof billetes]) || 0) * billete.value).toFixed(2)}
                             </div>
-                            <div className="divide-y divide-gray-50">
-                              {[
-                                { label: '💵 Efectivo', esperado: efectivoEsperado, contado: efectivoContadoNum, diferencia: diferenciaEfectivo },
-                                { label: '💳 Tarjeta', esperado: tarjetaEsperada, contado: tarjetaContadoNum, diferencia: diferenciaTarjeta },
-                                { label: '🏦 Transferencias', esperado: depositadoEsperado, contado: depositadoContadoNum, diferencia: diferenciaDepositado },
-                                ...(estadoCuentaEsperada > 0 ? [{ label: '📋 Estado de Cuenta', esperado: estadoCuentaEsperada, contado: estadoCuentaContadoNum, diferencia: diferenciaEstadoCuenta }] : [])
-                              ].map((row, i) => (
-                                <div key={i} className="px-5 py-3 grid grid-cols-4 gap-3 items-center">
-                                  <span className="text-sm font-semibold text-gray-700">{row.label}</span>
-                                  <div className="text-center">
-                                    <p className="text-xs text-gray-400">Sistema</p>
-                                    <p className="font-bold text-gray-800 text-sm">Q {row.esperado.toFixed(2)}</p>
-                                  </div>
-                                  <div className="text-center">
-                                    <p className="text-xs text-gray-400">Contado</p>
-                                    <p className="font-bold text-gray-800 text-sm">Q {row.contado.toFixed(2)}</p>
-                                  </div>
-                                  <div className="text-center">
-                                    <p className="text-xs text-gray-400">Diferencia</p>
-                                    <p className="font-bold text-emerald-600 text-sm">{row.diferencia > 0 ? '+' : ''}{row.diferencia.toFixed(2)}</p>
-                                  </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-yellow-50 rounded-lg p-5 border border-yellow-200">
+                    <h5 className="font-medium text-gray-700 mb-3">MONEDAS:</h5>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                      {[
+                        { key: 'm1', label: 'Q 1', value: 1 },
+                        { key: 'm050', label: 'Q 0.50', value: 0.50 },
+                        { key: 'm025', label: 'Q 0.25', value: 0.25 },
+                        { key: 'm010', label: 'Q 0.10', value: 0.10 },
+                        { key: 'm005', label: 'Q 0.05', value: 0.05 },
+                        { key: 'm001', label: 'Q 0.01', value: 0.01 }
+                      ].map(moneda => (
+                        <div key={moneda.key}>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">{moneda.label}</label>
+                          <input
+                            type="number" min="0"
+                            className={`w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${cajaBloqueada ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                            value={monedas[moneda.key as keyof typeof monedas]}
+                            onChange={(e) => setMonedas({ ...monedas, [moneda.key]: e.target.value })}
+                            disabled={cajaBloqueada}
+                            onWheel={(e) => e.currentTarget.blur()}
+                            placeholder="0"
+                          />
+                          {monedas[moneda.key as keyof typeof monedas] && (
+                            <div className="text-xs text-yellow-700 mt-1 text-center font-semibold">
+                              = Q {((parseFloat(monedas[moneda.key as keyof typeof monedas]) || 0) * moneda.value).toFixed(2)}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-green-100 border-2 border-green-500 rounded-lg p-4 mt-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-lg font-bold text-gray-900">TOTAL EFECTIVO EN CAJA:</span>
+                      <span className="text-3xl font-bold text-green-700">Q {calcularTotalEfectivoContado().toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6 mb-6">
+                  <div className="bg-purple-50 rounded-lg p-5 border border-purple-200">
+                    <label className="block text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">💳 Tarjeta (Vouchers)</label>
+                    <input
+                      type="number" step="0.01"
+                      className={`w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xl font-bold text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${cajaBloqueada ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      value={tarjetaContado}
+                      onChange={(e) => setTarjetaContado(e.target.value)}
+                      disabled={cajaBloqueada}
+                      onWheel={(e) => e.currentTarget.blur()}
+                      placeholder="0.00"
+                    />
+                    <p className="text-xs text-gray-600 mt-2 text-center">Suma total de vouchers</p>
+                  </div>
+
+                  <div className="bg-blue-50 rounded-lg p-5 border border-blue-200">
+                    <label className="block text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">🏦 Transferencias/Depósitos</label>
+                    <input
+                      type="number" step="0.01"
+                      className={`w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xl font-bold text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${cajaBloqueada ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      value={transferenciaContado}
+                      onChange={(e) => setTransferenciaContado(e.target.value)}
+                      disabled={cajaBloqueada}
+                      onWheel={(e) => e.currentTarget.blur()}
+                      placeholder="0.00"
+                    />
+                    <p className="text-xs text-gray-600 mt-2 text-center">Suma de comprobantes</p>
+                  </div>
+
+                  <div className="bg-amber-50 rounded-lg p-5 border border-amber-200 md:col-span-2">
+                    <label className="block text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">📋 Estado de Cuenta</label>
+                    <input
+                      type="number" step="0.01"
+                      className={`w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xl font-bold text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${cajaBloqueada ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      value={estadoCuentaContado}
+                      onChange={(e) => setEstadoCuentaContado(e.target.value)}
+                      disabled={cajaBloqueada}
+                      onWheel={(e) => e.currentTarget.blur()}
+                      placeholder="0.00"
+                    />
+                    <p className="text-xs text-gray-600 mt-2 text-center">Pagos a cuenta o crédito</p>
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Observaciones del Cierre</label>
+                  <textarea
+                    className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${cajaBloqueada ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                    value={observaciones}
+                    onChange={(e) => setObservaciones(e.target.value)}
+                    disabled={cajaBloqueada}
+                    placeholder="Notas, incidencias o comentarios sobre el cierre..."
+                    rows={3}
+                  />
+                </div>
+
+                {!cajaBloqueada && (
+                  <>
+                    <button onClick={guardarCuadre} className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 transition-colors mb-4">
+                      💾 Guardar Cuadre
+                    </button>
+                    <button
+                      onClick={validarCuadre}
+                      disabled={cuadreValidado}
+                      className={`w-full px-6 py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 transition-colors mb-6 ${cuadreValidado ? 'bg-gray-400 cursor-not-allowed text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+                    >
+                      <CheckCircle2 size={24} />
+                      {cuadreValidado ? '✓ Cuadre Validado' : 'Validar Cuadre'}
+                    </button>
+                    {cuadreValidado && !cuadreCerrado && (
+                      <button onClick={solicitarDescargaExcel} className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 transition-colors mb-6">
+                        <FileText size={24} />
+                        📥 Descargar Excel del Cuadre
+                        {necesitaAutorizacionParaExcel() && <span className="ml-2 text-xs bg-orange-500 px-2 py-1 rounded">Requiere autorización</span>}
+                      </button>
+                    )}
+                  </>
+                )}
+
+                {cajaBloqueada && modoEdicion && (
+                  <>
+                    <button onClick={guardarCuadre} className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 transition-colors mb-4">
+                      💾 Guardar Cambios
+                    </button>
+                    <button onClick={validarCuadre} className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 transition-colors mb-6">
+                      <CheckCircle2 size={24} />
+                      Re-Validar Cuadre
+                    </button>
+                    {cuadreValidado && (
+                      <button onClick={solicitarDescargaExcel} className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 transition-colors mb-6">
+                        <FileText size={24} />
+                        📥 Descargar Excel del Cuadre
+                        {necesitaAutorizacionParaExcel() && <span className="ml-2 text-xs bg-orange-500 px-2 py-1 rounded">Requiere autorización</span>}
+                      </button>
+                    )}
+                  </>
+                )}
+
+                {cajaBloqueada && !modoEdicion && (
+                  <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-5 text-center">
+                    <div className="flex items-center justify-center gap-2 mb-3">
+                      <Lock className="text-blue-600" size={28} />
+                      <p className="text-blue-800 font-bold text-lg">Cuadre Bloqueado</p>
+                    </div>
+                    <p className="text-sm text-blue-700 mb-2">Este cuadre corresponde a un día pasado y está en modo solo lectura</p>
+                    <p className="text-xs text-blue-600">Haga clic en el botón "Editar Cuadre" arriba para modificarlo (requiere autorización)</p>
+                  </div>
+                )}
+
+                {cuadreValidado && mostrarEsperados && (
+                  <div className="space-y-4">
+                    {cuadreCorrecto ? (
+                      <>
+                        <div className="bg-gray-50 rounded-lg p-6 border-2 border-gray-300">
+                          <h4 className="text-lg font-bold text-gray-900 mb-4">📊 Comparación Sistema vs Contado</h4>
+                          <div className="space-y-3">
+                            {[
+                              { label: '💵 Efectivo (Incluye móviles)', esperado: efectivoEsperado, contado: efectivoContadoNum, diferencia: diferenciaEfectivo },
+                              { label: '💳 Tarjeta (Incluye móviles)', esperado: tarjetaEsperada, contado: tarjetaContadoNum, diferencia: diferenciaTarjeta },
+                              { label: '🏦 Transferencias (Incluye móviles)', esperado: depositadoEsperado, contado: depositadoContadoNum, diferencia: diferenciaDepositado },
+                              ...(estadoCuentaEsperada > 0 ? [{ label: '📋 Estado de Cuenta (Incluye móviles)', esperado: estadoCuentaEsperada, contado: estadoCuentaContadoNum, diferencia: diferenciaEstadoCuenta }] : [])
+                            ].map((row, i) => (
+                              <div key={i} className="p-4 rounded-lg border-2 bg-green-50 border-green-500">
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="font-semibold text-gray-900">{row.label}</span>
+                                  <span className="text-green-700 font-bold">✓ Correcto</span>
                                 </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5">
-                            <div className="flex items-center gap-3 mb-5">
-                              <div className="bg-emerald-500 rounded-xl p-2"><CheckCircle2 size={20} className="text-white" /></div>
-                              <div>
-                                <p className="font-black text-emerald-800">¡Cuadre Correcto!</p>
-                                <p className="text-xs text-emerald-600">Confirme el cierre de caja para bloquearlo</p>
+                                <div className="grid grid-cols-3 gap-2 text-sm">
+                                  <div><div className="text-gray-600">Sistema:</div><div className="font-bold">Q {row.esperado.toFixed(2)}</div></div>
+                                  <div><div className="text-gray-600">Contado:</div><div className="font-bold">Q {row.contado.toFixed(2)}</div></div>
+                                  <div><div className="text-gray-600">Diferencia:</div><div className="font-bold text-green-700">{row.diferencia > 0 ? '+' : ''}{row.diferencia.toFixed(2)}</div></div>
+                                </div>
                               </div>
-                            </div>
-                            <div className="space-y-3">
-                              <div>
-                                <label className="block text-xs font-bold text-gray-500 mb-1.5">Nombre de quien cuadró *</label>
-                                <input type="text"
-                                  className="w-full px-4 py-2.5 border border-emerald-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400"
-                                  value={nombreCajero} onChange={(e) => setNombreCajero(e.target.value)} placeholder="Ingrese su nombre completo" />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-bold text-gray-500 mb-1.5">PIN de Autorización *</label>
-                                <input type="password"
-                                  className="w-full px-4 py-2.5 border border-emerald-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400"
-                                  value={pinCierre} onChange={(e) => setPinCierre(e.target.value)} placeholder="••••" maxLength={4} />
-                              </div>
-                              <button onClick={confirmarCierre} className={`${btnPrimary} bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200`}>
-                                <Lock size={16} /> Confirmar y Cerrar Caja
-                              </button>
-                              <button onClick={solicitarDescargaExcel} className={`${btnPrimary} bg-blue-600 hover:bg-blue-700 text-white`}>
-                                <FileText size={16} /> Descargar Excel del Cuadre
-                              </button>
-                            </div>
+                            ))}
                           </div>
-                        </>
-                      ) : (
-                        <div className="bg-red-50 border border-red-200 rounded-2xl p-5">
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="bg-red-500 rounded-xl p-2"><X size={18} className="text-white" /></div>
-                            <div>
-                              <p className="font-black text-red-800">Cuadre Incorrecto</p>
-                              <p className="text-xs text-red-500">Las siguientes formas de pago no cuadran:</p>
-                            </div>
-                          </div>
-                          <div className="space-y-2 mb-4">
-                            {diferenciaEfectivo !== 0     && <div className="bg-white border border-red-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-red-700 flex items-center gap-2">✗ 💵 Efectivo</div>}
-                            {diferenciaTarjeta !== 0      && <div className="bg-white border border-red-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-red-700 flex items-center gap-2">✗ 💳 Tarjeta</div>}
-                            {diferenciaDepositado !== 0   && <div className="bg-white border border-red-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-red-700 flex items-center gap-2">✗ 🏦 Transferencias</div>}
-                            {diferenciaEstadoCuenta !== 0 && <div className="bg-white border border-red-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-red-700 flex items-center gap-2">✗ 📋 Estado de Cuenta</div>}
-                          </div>
-                          <button onClick={() => { setCuadreValidado(false); setMostrarEsperados(false); }}
-                            className={`${btnPrimary} bg-red-600 hover:bg-red-700 text-white`}>
-                            Volver a Contar
-                          </button>
                         </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
 
-            {/* ─── GASTOS ───────────────────────────────── */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-5 overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-4">
-                <button onClick={() => setMostrarGastos(!mostrarGastos)} className="flex items-center gap-2.5">
-                  <div className="bg-red-100 rounded-xl p-2"><span className="text-base">📉</span></div>
-                  <span className="font-bold text-gray-800 text-sm">Gastos del Día</span>
-                  {gastos.length > 0 && (
-                    <span className="bg-red-100 text-red-600 text-xs font-bold px-2 py-0.5 rounded-full">{gastos.length}</span>
-                  )}
-                  {mostrarGastos ? <ChevronUp size={15} className="text-gray-300 ml-1" /> : <ChevronDown size={15} className="text-gray-300 ml-1" />}
-                </button>
-                <button onClick={() => setShowModalGasto(true)}
-                  className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm shadow-red-200">
-                  <Plus size={14} /> Agregar
-                </button>
-              </div>
-              {mostrarGastos && (
-                <div className="border-t border-gray-100 px-5 pb-5 pt-4">
-                  {gastos.length === 0 ? (
-                    <p className="text-center text-gray-400 text-sm py-6">No hay gastos registrados hoy</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {gastos.map(gasto => (
-                        <div key={gasto.id} className="flex items-center justify-between bg-red-50 border border-red-100 rounded-xl px-4 py-3">
-                          <div>
-                            <p className="font-semibold text-gray-900 text-sm">{gasto.concepto}</p>
-                            <p className="text-xs text-gray-400 mt-0.5">
-                              {(() => {
-                                const f = new Date(gasto.created_at);
-                                const horaGT = new Date(f.getTime() - (6 * 60 * 60 * 1000));
-                                return horaGT.toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', hour12: true });
-                              })()}
-                            </p>
+                        <div className="bg-green-50 border-2 border-green-500 rounded-lg p-6">
+                          <div className="flex items-center gap-3 mb-4">
+                            <CheckCircle2 size={32} className="text-green-600" />
+                            <div>
+                              <h4 className="text-xl font-bold text-green-700">¡Cuadre Correcto!</h4>
+                              <p className="text-sm text-green-600">Confirme el cierre de caja</p>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <span className="font-black text-red-600">- Q {gasto.monto.toFixed(2)}</span>
-                            <button onClick={() => eliminarGasto(gasto.id)}
-                              className="text-red-400 hover:text-red-600 hover:bg-red-100 p-1.5 rounded-lg transition-colors">
-                              <Trash2 size={14} />
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Nombre de quien cuadro *</label>
+                              <input type="text" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500" value={nombreCajero} onChange={(e) => setNombreCajero(e.target.value)} placeholder="Ingrese su nombre completo" />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">PIN de Autorización *</label>
+                              <input type="password" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500" value={pinCierre} onChange={(e) => setPinCierre(e.target.value)} placeholder="••••" maxLength={4} />
+                            </div>
+                            <button onClick={confirmarCierre} className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 transition-colors">
+                              <Lock size={24} />
+                              Confirmar y Cerrar Caja
+                            </button>
+                            <button onClick={solicitarDescargaExcel} className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors">
+                              <FileText size={20} />
+                              Descargar Excel del Cuadre
                             </button>
                           </div>
                         </div>
-                      ))}
-                      <div className="flex justify-between items-center px-4 py-3 bg-red-100 border border-red-200 rounded-xl font-black mt-1">
-                        <span className="text-gray-700 text-sm">Total Gastos</span>
-                        <span className="text-red-700 text-lg">- Q {totalGastos.toFixed(2)}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* ─── PACIENTES DEL DÍA ───────────────────── */}
-            {listaConsultas.length > 0 && (
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-5 overflow-hidden">
-                <button onClick={() => setMostrarListaPacientes(!mostrarListaPacientes)}
-                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center gap-2.5">
-                    <div className="bg-blue-100 rounded-xl p-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                    </div>
-                    <span className="font-bold text-gray-800 text-sm">Pacientes del día</span>
-                    <span className="bg-blue-100 text-blue-600 text-xs font-bold px-2 py-0.5 rounded-full">{listaConsultas.length}</span>
-                  </div>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-gray-300 transition-transform ${mostrarListaPacientes ? 'rotate-180' : ''}`}><polyline points="6 9 12 15 18 9"/></svg>
-                </button>
-                {mostrarListaPacientes && (
-                  <div className="border-t border-gray-100 divide-y divide-gray-50">
-                    {listaConsultas.map((c, idx) => {
-                      const esSinOrden = c.sin_orden_medica === true;
-                      const tieneReferente = c.medicos?.es_referente === true;
-                      const tieneNoReferente = c.medico_id && !tieneReferente && !c.sin_informacion_medico && !c.es_servicio_movil;
-                      const medicoNombre = c.medicos?.nombre || c.medico_recomendado;
-                      return (
-                        <div key={c.id} className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors">
-                          <div className="flex items-center gap-3">
-                            <span className="text-xs text-gray-300 w-5 text-right font-mono">{idx + 1}</span>
-                            <div>
-                              <p className="text-sm font-semibold text-gray-900">{c.pacientes?.nombre || '—'}</p>
-                              {medicoNombre && (
-                                <p className={`text-xs mt-0.5 font-medium ${
-                                  esSinOrden && tieneReferente   ? 'text-amber-600' :
-                                  esSinOrden && tieneNoReferente ? 'text-orange-600' :
-                                  tieneReferente                 ? 'text-emerald-600' :
-                                  tieneNoReferente               ? 'text-blue-500' : 'text-gray-400'
-                                }`}>
-                                  {medicoNombre}
-                                  {esSinOrden ? <span className="ml-1 font-normal">(sin orden)</span> : tieneNoReferente ? <span className="ml-1 font-normal">(referente)</span> : null}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5 text-xs">
-                            {esSinOrden && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold">Sin orden</span>}
-                            {!esSinOrden && tieneReferente && <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">Referente</span>}
-                            {!esSinOrden && tieneNoReferente && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">No Ref.</span>}
-                            <span className={`px-2 py-0.5 rounded-full font-semibold ${
-                              c.tipo_cobro === 'normal'        ? 'bg-gray-100 text-gray-500' :
-                              c.tipo_cobro === 'especial'      ? 'bg-purple-100 text-purple-700' :
-                              c.forma_pago === 'estado_cuenta' ? 'bg-amber-100 text-amber-700' :
-                              'bg-gray-100 text-gray-500'
-                            }`}>
-                              {c.forma_pago === 'estado_cuenta' ? 'Est.Cta' : c.tipo_cobro}
-                            </span>
+                      </>
+                    ) : (
+                      <div className="bg-red-50 border-2 border-red-500 rounded-lg p-6">
+                        <div className="flex items-center gap-3 mb-4">
+                          <X size={32} className="text-red-600" />
+                          <div>
+                            <h4 className="text-xl font-bold text-red-700">Cuadre Incorrecto</h4>
+                            <p className="text-sm text-red-600">Las siguientes formas de pago NO cuadran:</p>
                           </div>
                         </div>
-                      );
-                    })}
+                        <div className="space-y-2 mb-4">
+                          {diferenciaEfectivo !== 0 && <div className="bg-white border border-red-300 rounded p-3 flex items-center gap-2"><span className="text-red-600 font-bold">✗</span><span className="font-medium text-gray-900">💵 Efectivo</span></div>}
+                          {diferenciaTarjeta !== 0 && <div className="bg-white border border-red-300 rounded p-3 flex items-center gap-2"><span className="text-red-600 font-bold">✗</span><span className="font-medium text-gray-900">💳 Tarjeta</span></div>}
+                          {diferenciaDepositado !== 0 && <div className="bg-white border border-red-300 rounded p-3 flex items-center gap-2"><span className="text-red-600 font-bold">✗</span><span className="font-medium text-gray-900">🏦 Transferencias</span></div>}
+                          {diferenciaEstadoCuenta !== 0 && <div className="bg-white border border-red-300 rounded p-3 flex items-center gap-2"><span className="text-red-600 font-bold">✗</span><span className="font-medium text-gray-900">📋 Estado de Cuenta</span></div>}
+                        </div>
+                        <button onClick={() => { setCuadreValidado(false); setMostrarEsperados(false); }} className="w-full bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                          Volver a Contar
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             )}
 
-            {/* ─── ANULADAS ─────────────────────────────── */}
-            {consultasAnuladas.length > 0 && (
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-5 overflow-hidden">
-                <button onClick={() => setMostrarAnuladas(!mostrarAnuladas)}
-                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center gap-2.5">
-                    <div className="bg-red-100 rounded-xl p-2"><X size={16} className="text-red-500" /></div>
-                    <span className="font-bold text-gray-800 text-sm">Consultas Anuladas</span>
-                    <span className="bg-red-100 text-red-600 text-xs font-bold px-2 py-0.5 rounded-full">{consultasAnuladas.length}</span>
+            {/* Gastos */}
+            <div className="bg-white rounded-lg shadow-sm p-6 mb-6 border border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <button onClick={() => setMostrarGastos(!mostrarGastos)} className="flex items-center gap-2">
+                  <span className="text-red-600 text-2xl">📉</span>
+                  <h3 className="text-lg font-semibold text-gray-900">Gastos del Día</h3>
+                  {gastos.length > 0 && <span className="bg-red-100 text-red-700 text-xs font-medium px-2 py-1 rounded-full">{gastos.length}</span>}
+                  {mostrarGastos ? <ChevronUp size={16} className="text-gray-400 ml-1" /> : <ChevronDown size={16} className="text-gray-400 ml-1" />}
+                </button>
+                <button onClick={() => setShowModalGasto(true)} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
+                  <Plus size={16} /> Agregar
+                </button>
+              </div>
+
+              {mostrarGastos && (
+                gastos.length === 0 ? (
+                  <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-gray-500">No hay gastos registrados hoy</p>
                   </div>
-                  {mostrarAnuladas ? <ChevronUp size={15} className="text-gray-300" /> : <ChevronDown size={15} className="text-gray-300" />}
+                ) : (
+                  <div className="space-y-2">
+                    {gastos.map(gasto => (
+                      <div key={gasto.id} className="flex justify-between items-center p-3 bg-red-50 border border-red-100 rounded-lg">
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900">{gasto.concepto}</div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {(() => {
+                              const f = new Date(gasto.created_at);
+                              const horaGT = new Date(f.getTime() - (6 * 60 * 60 * 1000));
+                              return horaGT.toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', hour12: true });
+                            })()}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-lg font-bold text-red-600">- Q {gasto.monto.toFixed(2)}</div>
+                          <button onClick={() => eliminarGasto(gasto.id)} className="text-red-600 hover:bg-red-100 p-2 rounded transition-colors"><Trash2 size={16} /></button>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex justify-between items-center p-4 bg-red-100 border border-red-300 rounded-lg font-bold mt-3">
+                      <span className="text-gray-900">Total Gastos:</span>
+                      <span className="text-red-700 text-xl">- Q {totalGastos.toFixed(2)}</span>
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
+
+            {/* Anuladas */}
+            {consultasAnuladas.length > 0 && (
+              <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <button onClick={() => setMostrarAnuladas(!mostrarAnuladas)} className="w-full flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-red-100 p-2 rounded-lg"><X size={20} className="text-red-600" /></div>
+                    <h3 className="text-lg font-semibold text-gray-900">Consultas Anuladas ({consultasAnuladas.length})</h3>
+                  </div>
+                  {mostrarAnuladas ? <ChevronUp size={20} className="text-gray-400" /> : <ChevronDown size={20} className="text-gray-400" />}
                 </button>
                 {mostrarAnuladas && (
-                  <div className="border-t border-gray-100 px-5 pb-5 pt-4 space-y-2">
+                  <div className="mt-4 pt-4 border-t border-gray-200 space-y-2">
                     {consultasAnuladas.map((anulada, index) => (
-                      <div key={index} className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 flex justify-between items-start">
-                        <div>
-                          <p className="font-semibold text-gray-900 text-sm">{anulada.nombre}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">{anulada.motivo_anulacion}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">Anulado por: {anulada.usuario_anulo}</p>
+                      <div key={index} className="bg-red-50 p-4 rounded-lg border border-red-200">
+                        <div className="flex justify-between">
+                          <div>
+                            <div className="font-semibold text-gray-900">{anulada.nombre}</div>
+                            <div className="text-sm text-gray-600 mt-1">{anulada.motivo_anulacion}</div>
+                            <div className="text-xs text-gray-500 mt-1">Anulado por: {anulada.usuario_anulo}</div>
+                          </div>
+                          <div className="text-lg font-bold text-red-600">Q {anulada.total.toFixed(2)}</div>
                         </div>
-                        <span className="font-black text-red-600 text-sm">Q {anulada.total.toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
@@ -1103,42 +1136,27 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
         )}
       </div>
 
-      {/* ─── MODAL GASTO ─────────────────────────────── */}
+      {/* Modal Gasto */}
       {showModalGasto && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
             <div className="flex justify-between items-center mb-5">
-              <div className="flex items-center gap-3">
-                <div className="bg-red-100 rounded-xl p-2"><Plus size={16} className="text-red-600" /></div>
-                <h2 className="text-base font-black text-gray-900">Agregar Gasto</h2>
-              </div>
-              <button onClick={() => { setShowModalGasto(false); setConceptoGasto(''); setMontoGasto(''); }}
-                className="text-gray-300 hover:text-gray-500 p-1 rounded-lg hover:bg-gray-100 transition-colors"><X size={18} /></button>
+              <h2 className="text-xl font-bold text-gray-900">Agregar Gasto</h2>
+              <button onClick={() => { setShowModalGasto(false); setConceptoGasto(''); setMontoGasto(''); }} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Concepto *</label>
-                <input type="text"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-400 focus:border-red-400"
-                  placeholder="Ej: Diesel, Papelería, Mantenimiento"
-                  value={conceptoGasto} onChange={(e) => setConceptoGasto(e.target.value)} />
+                <label className="block text-sm font-medium text-gray-700 mb-2">Concepto *</label>
+                <input type="text" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: Diesel, Papelería, Mantenimiento" value={conceptoGasto} onChange={(e) => setConceptoGasto(e.target.value)} />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Monto (Q) *</label>
-                <input type="number" step="0.01" placeholder="0.00"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-400 focus:border-red-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  value={montoGasto} onChange={(e) => setMontoGasto(e.target.value)} onWheel={(e) => e.currentTarget.blur()} />
+                <label className="block text-sm font-medium text-gray-700 mb-2">Monto (Q) *</label>
+                <input type="number" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="0.00" step="0.01" value={montoGasto} onChange={(e) => setMontoGasto(e.target.value)} onWheel={(e) => e.currentTarget.blur()} />
               </div>
             </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => { setShowModalGasto(false); setConceptoGasto(''); setMontoGasto(''); }}
-                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 font-semibold transition-colors">
-                Cancelar
-              </button>
-              <button onClick={agregarGasto}
-                className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-all shadow-sm shadow-red-200">
-                Guardar Gasto
-              </button>
+            <div className="flex gap-3 justify-end mt-6">
+              <button onClick={() => { setShowModalGasto(false); setConceptoGasto(''); setMontoGasto(''); }} className="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors">Cancelar</button>
+              <button onClick={agregarGasto} className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors">Guardar Gasto</button>
             </div>
           </div>
         </div>
@@ -1152,6 +1170,7 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
           onCancelar={() => setMostrarModalToken(false)}
         />
       )}
+
       {mostrarModalTokenExcel && (
         <AutorizacionModal
           accion="Descargar Excel de Cuadre"
