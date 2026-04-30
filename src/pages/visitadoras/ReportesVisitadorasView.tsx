@@ -138,6 +138,30 @@ export const ReportesVisitadorasView: React.FC = () => {
         titulo(ws, `SIN VISITAS REGISTRADAS — ${tipo === 'mensual' ? periodoLabel().toUpperCase() : fecha}`, cols);
       }
 
+      // Hoja resumen PRIMERO (solo mensual) para que aparezca como primera pestaña
+      if (tipo === 'mensual' && Object.keys(porVisitadora).length > 0) {
+        const wsRes = wb.addWorksheet('RESUMEN');
+        titulo(wsRes, `RESUMEN GENERAL — ${periodoLabel().toUpperCase()}`, 3);
+        subtitulo(wsRes, `${visitas.length} visitas totales`, 3);
+        wsRes.addRow(['VISITADORA', 'VISITAS', '% DEL TOTAL']);
+        hdr(wsRes, 4, 3, 'FF0D9488');
+        const total = visitas.length;
+        Object.entries(porVisitadora)
+          .sort((a, b) => b[1].length - a[1].length)
+          .forEach(([vis, items], i) => {
+            const r = wsRes.addRow([vis, items.length, `${Math.round((items.length / total) * 100)}%`]);
+            zebra(r, i, 'FFCCFBEF');
+            r.getCell(2).font = { bold: true };
+          });
+        wsRes.addRow([]);
+        const tr = wsRes.addRow(['TOTAL', total, '100%']);
+        tr.eachCell(c => {
+          c.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+          c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F766E' } };
+        });
+        [35, 12, 12].forEach((w, i) => wsRes.getColumn(i + 1).width = w);
+      }
+
       // Hoja por visitadora
       Object.entries(porVisitadora).forEach(([visitadora, items]) => {
         // Nombre hoja máximo 31 chars (límite Excel)
@@ -179,32 +203,6 @@ export const ReportesVisitadorasView: React.FC = () => {
         });
       });
 
-      // Hoja resumen (solo mensual)
-      if (tipo === 'mensual' && Object.keys(porVisitadora).length > 0) {
-        const wsRes = wb.addWorksheet('RESUMEN');
-        titulo(wsRes, `RESUMEN GENERAL — ${periodoLabel().toUpperCase()}`, 3);
-        subtitulo(wsRes, `${visitas.length} visitas totales`, 3);
-        wsRes.addRow(['VISITADORA', 'VISITAS', '% DEL TOTAL']);
-        hdr(wsRes, 4, 3, 'FF880E4F');
-        const total = visitas.length;
-        Object.entries(porVisitadora)
-          .sort((a, b) => b[1].length - a[1].length)
-          .forEach(([vis, items], i) => {
-            const r = wsRes.addRow([vis, items.length, `${Math.round((items.length / total) * 100)}%`]);
-            zebra(r, i, 'FFFCE4EC');
-            r.getCell(2).font = { bold: true };
-          });
-        wsRes.addRow([]);
-        const tr = wsRes.addRow(['TOTAL', total, '100%']);
-        tr.eachCell(c => {
-          c.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-          c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF880E4F' } };
-        });
-        [35, 12, 12].forEach((w, i) => wsRes.getColumn(i + 1).width = w);
-        // Mover resumen al inicio
-        wb.moveSheet('RESUMEN', 0);
-      }
-
       const nombre = tipo === 'mensual'
         ? `Visitas_${meses[mes - 1]}_${anio}.xlsx`
         : `Visitas_${fecha}.xlsx`;
@@ -216,67 +214,184 @@ export const ReportesVisitadorasView: React.FC = () => {
     setGenerando(null);
   };
 
-  // ── 2. DIRECTORIO (Base de datos estilo Excel entregado) ───────
+  // ── 2. DIRECTORIO — formato idéntico al Excel original ────────
   const reporteDirectorio = async () => {
     setGenerando('directorio');
     try {
-      const { data, error } = await supabase.from('medicos').select('*').eq('activo', true).order('nombre');
+      const { data, error } = await supabase
+        .from('medicos').select('*').eq('activo', true).order('nombre');
       if (error) throw error;
 
+      // ── Definición de columnas: [label, width] ────────────────
+      const COLS_DEF: [string, number][] = [
+        ['NOMBRE DEL MÉDICO\n/ ENCARGADO',   32],
+        ['CLÍNICA / FARMACIA\n/ C.S.',        22],
+        ['ESPECIALIDAD',                       18],
+        ['NO. DE\nTELÉFONO',                  14],
+        ['MUNICIPIO',                          18],
+        ['DIRECCIÓN EXACTA',                   32],
+        ['REFERENCIA',                         28],
+        ['HORARIO',                            14],
+        ['ESPECIAL',                           22],
+        ['GPS\nESTABLECIMIENTO',              22],
+      ];
+      const NUM_COLS = COLS_DEF.length;
+
+      // ── Colores ───────────────────────────────────────────────
+      const C = {
+        headerBg:     'FF0F766E',  // teal oscuro
+        headerMid:    'FF0D9488',  // teal medio (fila de columnas)
+        headerAccent: 'FF2DD4BF',  // teal claro (borde inferior headers)
+        titleFg:      'FFFFFFFF',
+        subtitleFg:   'FF94A3B8',
+        subtitleBg:   'FFF1F5F9',
+        zebraEven:    'FFCCFBEF',  // teal zebra
+        zebraOdd:     'FFFFFFFF',
+        cellFg:       'FF0F172A',
+        borderHair:   'FFE2E8F0',
+        borderMedium: 'FF2DD4BF',
+        // prospectos
+        prospHeaderBg: 'FF0369A1',  // azul
+        prospZebra:    'FFE0F2FE',
+      };
+
+      // ── Helper: construir una hoja con el formato base ─────────
+      const buildSheet = (
+        ws: ExcelJS.Worksheet,
+        sheetTitle: string,
+        subtitle: string,
+        rows: any[],
+        headerColor: string,
+        zebraColor: string,
+        tabColor: string,
+      ) => {
+        ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 3 }];
+
+        // Fila 1 — Título principal
+        ws.mergeCells(1, 1, 1, NUM_COLS);
+        const t = ws.getCell('A1');
+        t.value = sheetTitle;
+        t.font      = { name: 'Arial', bold: true, size: 13, color: { argb: C.titleFg } };
+        t.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.headerBg } };
+        t.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        ws.getRow(1).height = 42;
+
+        // Fila 2 — Subtítulo
+        ws.mergeCells(2, 1, 2, NUM_COLS);
+        const s = ws.getCell('A2');
+        s.value = subtitle;
+        s.font      = { name: 'Arial', italic: true, size: 9, color: { argb: C.subtitleFg } };
+        s.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.subtitleBg } };
+        s.alignment = { horizontal: 'center', vertical: 'middle' };
+        ws.getRow(2).height = 18;
+
+        // Fila 3 — Headers de columnas
+        COLS_DEF.forEach(([label, width], idx) => {
+          const cell = ws.getCell(3, idx + 1);
+          cell.value     = label;
+          cell.font      = { name: 'Arial', bold: true, size: 10, color: { argb: C.titleFg } };
+          cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerColor } };
+          cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+          cell.border    = {
+            bottom: { style: 'medium', color: { argb: C.borderMedium } },
+            right:  { style: 'thin',   color: { argb: 'FFFFFFFF' } },
+          };
+          ws.getColumn(idx + 1).width = width;
+        });
+        ws.getRow(3).height = 38;
+
+        // Filas de datos
+        rows.forEach((m, i) => {
+          const gps = m.lat_establecimiento
+            ? `${Number(m.lat_establecimiento).toFixed(6)}, ${Number(m.lng_establecimiento).toFixed(6)}`
+            : '';
+          const rowData = [
+            m.nombre        || '',
+            m.clinica       || '',
+            m.especialidad  || '',
+            m.telefono      || '',
+            getNombreMun(m.municipio),
+            m.direccion     || '',
+            m.referencia    || '',
+            m.horario       || '',
+            m.especial      || '',
+            gps,
+          ];
+          const r = ws.addRow(rowData);
+          const bg = i % 2 === 0 ? zebraColor : C.zebraOdd;
+          r.eachCell({ includeEmpty: true }, (cell, colNum) => {
+            if (colNum > NUM_COLS) return;
+            cell.font      = { name: 'Arial', size: 9.5, color: { argb: C.cellFg } };
+            cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+            cell.alignment = { vertical: 'middle', wrapText: true, horizontal: 'left' };
+            cell.border    = {
+              bottom: { style: 'hair',  color: { argb: C.borderHair } },
+              right:  { style: 'hair',  color: { argb: C.borderHair } },
+            };
+            // GPS en teal si tiene valor
+            if (colNum === NUM_COLS && gps) {
+              cell.font = { name: 'Arial', size: 9, color: { argb: 'FF0F766E' }, bold: true };
+            }
+          });
+          r.height = 22;
+        });
+
+        // Auto-filter en fila 3
+        ws.autoFilter = {
+          from: { row: 3, column: 1 },
+          to:   { row: 3, column: NUM_COLS },
+        };
+
+        // Tab color
+        ws.properties.tabColor = { argb: tabColor };
+
+        // Orientación horizontal al imprimir
+        ws.pageSetup = {
+          orientation: 'landscape',
+          fitToPage: true,
+          fitToWidth: 1,
+          fitToHeight: 0,
+        };
+      };
+
       const wb = new ExcelJS.Workbook();
-      const cols = COLS_BD.length;
+      wb.creator  = 'Conrad Central';
+      wb.lastModifiedBy = 'Conrad Central';
 
-      // Hoja referentes
+      const today = new Date().toLocaleDateString('es-GT', {
+        timeZone: 'America/Guatemala',
+        day: '2-digit', month: 'long', year: 'numeric',
+      });
+
+      const referentes = (data || []).filter(m => m.es_referente);
+      const prospectos = (data || []).filter(m => !m.es_referente);
+
+      // ── Hoja 1: Médicos Referentes ──────────────────────────────
       const wsRef = wb.addWorksheet('MÉDICOS REFERENTES');
-      titulo(wsRef, 'DIRECTORIO MÉDICOS REFERENTES — HOSPITAL SAN ÁNGEL / CONRAD', cols);
-      subtitulo(wsRef, `${(data || []).filter(m => m.es_referente).length} médicos referentes activos`, cols);
-      wsRef.addRow(COLS_BD);
-      hdr(wsRef, 4, cols, 'FF880E4F');
-      (data || []).filter(m => m.es_referente).forEach((m, i) => {
-        const gps = m.lat_establecimiento ? `${m.lat_establecimiento.toFixed(6)}, ${m.lng_establecimiento?.toFixed(6)}` : '';
-        const r = wsRef.addRow([
-          m.nombre || '',
-          m.clinica || '',
-          m.especialidad || '',
-          m.telefono || '',
-          getNombreMun(m.municipio),
-          m.direccion || '',
-          m.referencia || '',
-          m.horario || '',
-          m.especial || '',
-          gps,
-        ]);
-        zebra(r, i, 'FFFCE4EC');
-        r.height = 24;
-      });
-      [30, 25, 20, 16, 18, 35, 35, 18, 25, 28].forEach((w, idx) => wsRef.getColumn(idx + 1).width = w);
+      buildSheet(
+        wsRef,
+        'BASE DE DATOS — MÉDICOS REFERENTES\nHOSPITAL SAN ÁNGEL / CONRAD',
+        `${referentes.length} médicos referentes activos · Actualizado: ${today}`,
+        referentes,
+        C.headerMid,
+        C.zebraEven,
+        '0D9488',
+      );
 
-      // Hoja prospectos
+      // ── Hoja 2: Prospectos ──────────────────────────────────────
       const wsProsp = wb.addWorksheet('PROSPECTOS');
-      titulo(wsProsp, 'DIRECTORIO DE PROSPECTOS — HOSPITAL SAN ÁNGEL / CONRAD', cols);
-      subtitulo(wsProsp, `${(data || []).filter(m => !m.es_referente).length} prospectos activos`, cols);
-      wsProsp.addRow(COLS_BD);
-      hdr(wsProsp, 4, cols, 'FFEF6C00');
-      (data || []).filter(m => !m.es_referente).forEach((m, i) => {
-        const gps = m.lat_establecimiento ? `${m.lat_establecimiento.toFixed(6)}, ${m.lng_establecimiento?.toFixed(6)}` : '';
-        const r = wsProsp.addRow([
-          m.nombre || '',
-          m.clinica || '',
-          m.especialidad || '',
-          m.telefono || '',
-          getNombreMun(m.municipio),
-          m.direccion || '',
-          m.referencia || '',
-          m.horario || '',
-          m.especial || '',
-          gps,
-        ]);
-        zebra(r, i, 'FFFFF3E0');
-        r.height = 24;
-      });
-      [30, 25, 20, 16, 18, 35, 35, 18, 25, 28].forEach((w, idx) => wsProsp.getColumn(idx + 1).width = w);
+      buildSheet(
+        wsProsp,
+        'BASE DE DATOS — PROSPECTOS\nHOSPITAL SAN ÁNGEL / CONRAD',
+        `${prospectos.length} prospectos activos · Actualizado: ${today}`,
+        prospectos,
+        C.prospHeaderBg,
+        C.prospZebra,
+        '0369A1',
+      );
 
-      await descargar(wb, `Directorio_Medicos_${new Date().toLocaleDateString('en-CA')}.xlsx`);
+      const nombreArchivo = `Base_Datos_Medicos_${new Date().toLocaleDateString('en-CA')}.xlsx`;
+      await descargar(wb, nombreArchivo);
     } catch (e) {
       console.error(e);
       alert('Error al generar el directorio.');
