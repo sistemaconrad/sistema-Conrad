@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  UserPlus, Stethoscope, MapPin, Phone, Star, Clock, Search, X,
-  ChevronRight, AlertCircle, CheckCircle, Trash2, Navigation,
-  PenTool, MapPinIcon, MessageSquare, Plus, Edit2, Save
+  UserPlus, Stethoscope, MapPin, Phone, Clock, Search, X,
+  AlertCircle, CheckCircle, Trash2, Navigation,
+  PenTool, MessageSquare, Plus, Edit2, Save, AlertTriangle
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { departamentosGuatemala, municipiosGuatemala } from '../../data/guatemala';
@@ -18,9 +18,32 @@ interface VisitaProspecto {
   visitadora_nombre: string; comentario?: string;
 }
 
-// Canvas toma el tamaño real del contenedor (dinámico)
 const getNombreDepto = (id: string) => departamentosGuatemala.find(d => d.id === id)?.nombre || id;
 const getNombreMun   = (id: string) => municipiosGuatemala.find(m => m.id === id)?.nombre || id;
+
+// Devuelve días desde la última visita (o desde creación si nunca visitado)
+const diasSinVisita = (medico: Medico, visitas: VisitaProspecto[]): number => {
+  const vis = visitas.filter(v => v.medico_id === medico.id);
+  const ultima = vis.length > 0
+    ? new Date(Math.max(...vis.map(v => new Date(v.created_at).getTime())))
+    : new Date(medico.created_at);
+  const hoy = new Date();
+  return Math.floor((hoy.getTime() - ultima.getTime()) / (1000 * 60 * 60 * 24));
+};
+
+const BadgeDias = ({ dias }: { dias: number }) => {
+  if (dias < 7) return null;
+  if (dias >= 15) return (
+    <span className="flex items-center gap-1 bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-full">
+      <AlertCircle size={11} /> {dias}d sin visita
+    </span>
+  );
+  return (
+    <span className="flex items-center gap-1 bg-yellow-100 text-yellow-700 text-xs font-bold px-2 py-0.5 rounded-full">
+      <AlertTriangle size={11} /> {dias}d sin visita
+    </span>
+  );
+};
 
 export const ProspectosView: React.FC = () => {
   const [prospectos, setProspectos] = useState<Medico[]>([]);
@@ -30,7 +53,6 @@ export const ProspectosView: React.FC = () => {
   const [convirtiendo, setConvirtiendo] = useState(false);
   const [eliminando, setEliminando]     = useState(false);
 
-  // Modal detalle
   const [modalProspecto, setModalProspecto] = useState<Medico | null>(null);
   const [confirmConvertir, setConfirmConvertir] = useState(false);
   const [confirmEliminar, setConfirmEliminar]   = useState(false);
@@ -41,7 +63,6 @@ export const ProspectosView: React.FC = () => {
   const [editClinica, setEditClinica]           = useState('');
   const [guardandoEdit, setGuardandoEdit]       = useState(false);
 
-  // Modal visita
   const [visitaProspecto, setVisitaProspecto] = useState<Medico | null>(null);
   const [ubicacionObtenida, setUbicacionObtenida] = useState(false);
   const [latitud, setLatitud]     = useState<number | null>(null);
@@ -51,13 +72,15 @@ export const ProspectosView: React.FC = () => {
   const [comentario, setComentario]         = useState('');
   const [guardandoVisita, setGuardandoVisita] = useState(false);
 
-  // Modal firma
   const [showFirmaModal, setShowFirmaModal] = useState(false);
   const [firmaGuardada, setFirmaGuardada]   = useState<string | null>(null);
   const canvasRef  = useRef<HTMLCanvasElement>(null);
   const [dibujando, setDibujando] = useState(false);
   const [firmaVacia, setFirmaVacia] = useState(true);
   const lastPos = useRef<{ x: number; y: number } | null>(null);
+
+  // Filtro de urgencia
+  const [filtroUrgencia, setFiltroUrgencia] = useState<'todos' | 'alerta' | 'urgente'>('todos');
 
   useEffect(() => { cargarDatos(); }, []);
 
@@ -74,15 +97,11 @@ export const ProspectosView: React.FC = () => {
 
   const visitasDe = (id: string) => visitas.filter(v => v.medico_id === id);
 
-  // ── Canvas firma ───────────────────────────────────────────────
+  // Canvas firma
   const getPos = (e: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
-    // Sin escalado: el canvas ahora tiene el mismo tamaño que su contenedor
-    if ('touches' in e) {
-      const t = e.touches[0];
-      return { x: t.clientX - rect.left, y: t.clientY - rect.top };
-    }
+    if ('touches' in e) { const t = e.touches[0]; return { x: t.clientX - rect.left, y: t.clientY - rect.top }; }
     const m = e as React.MouseEvent;
     return { x: m.clientX - rect.left, y: m.clientY - rect.top };
   };
@@ -97,30 +116,13 @@ export const ProspectosView: React.FC = () => {
     lastPos.current = pos; setFirmaVacia(false);
   };
   const endDraw = (e: React.MouseEvent | React.TouchEvent) => { e.preventDefault(); setDibujando(false); };
-  const limpiarFirma = () => { canvasRef.current?.getContext('2d')!.clearRect(0, 0, canvasRef.current?.width || 600, canvasRef.current?.height || 200); setFirmaVacia(true); };
-  const confirmarFirma = () => {
-    if (firmaVacia) { alert('Por favor dibuja la firma'); return; }
-    setFirmaGuardada(canvasRef.current!.toDataURL('image/png'));
-    setShowFirmaModal(false);
-  };
-  const sizearCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const container = canvas.parentElement;
-    if (!container) return;
-    canvas.width = container.clientWidth;
-    canvas.height = 200;
-  };
+  const limpiarFirma = () => { const c = canvasRef.current; if (c) { c.getContext('2d')!.clearRect(0, 0, c.width, c.height); setFirmaVacia(true); } };
+  const confirmarFirma = () => { if (firmaVacia) { alert('Dibuja la firma primero'); return; } setFirmaGuardada(canvasRef.current!.toDataURL('image/png')); setShowFirmaModal(false); };
+  const sizearCanvas = () => { const c = canvasRef.current; if (!c) return; const p = c.parentElement; if (!p) return; c.width = p.clientWidth; c.height = 200; };
+  const abrirFirmaModal = () => { setFirmaVacia(true); setShowFirmaModal(true); setTimeout(() => { sizearCanvas(); const c = canvasRef.current; if (c) c.getContext('2d')!.clearRect(0, 0, c.width, c.height); }, 80); };
 
-  const abrirFirma = () => {
-    setFirmaVacia(true);
-    setShowFirmaModal(true);
-    setTimeout(() => { sizearCanvas(); canvasRef.current?.getContext('2d')!.clearRect(0, 0, canvasRef.current?.width || 600, canvasRef.current?.height || 200); }, 100);
-  };
-
-  // ── GPS ────────────────────────────────────────────────────────
   const obtenerUbicacion = () => {
-    if (!navigator.geolocation) { alert('Sin soporte de geolocalización'); return; }
+    if (!navigator.geolocation) { alert('Sin soporte GPS'); return; }
     setObteniendoUbic(true);
     navigator.geolocation.getCurrentPosition(
       p => { setLatitud(p.coords.latitude); setLongitud(p.coords.longitude); setUbicacionObtenida(true); setObteniendoUbic(false); },
@@ -129,12 +131,38 @@ export const ProspectosView: React.FC = () => {
     );
   };
 
-  // ── Guardar visita ─────────────────────────────────────────────
-  const registrarVisita = async () => {
+  const convertirAReferente = async () => {
+    if (!modalProspecto) return;
+    setConvirtiendo(true);
+    await supabase.from('medicos').update({ es_referente: true }).eq('id', modalProspecto.id);
+    await cargarDatos();
+    setModalProspecto(null); setConfirmConvertir(false);
+    setConvirtiendo(false);
+  };
+
+  const eliminarProspecto = async () => {
+    if (!modalProspecto) return;
+    setEliminando(true);
+    await supabase.from('medicos').update({ activo: false }).eq('id', modalProspecto.id);
+    await cargarDatos();
+    setModalProspecto(null); setConfirmEliminar(false);
+    setEliminando(false);
+  };
+
+  const guardarEdicion = async () => {
+    if (!modalProspecto) return;
+    setGuardandoEdit(true);
+    await supabase.from('medicos').update({ nombre: editNombre, telefono: editTelefono, direccion: editDireccion, clinica: editClinica }).eq('id', modalProspecto.id);
+    await cargarDatos();
+    setModalProspecto(prev => prev ? { ...prev, nombre: editNombre, telefono: editTelefono, direccion: editDireccion, clinica: editClinica } : null);
+    setModoEdicion(false); setGuardandoEdit(false);
+  };
+
+  const registrarVisitaProspecto = async () => {
     if (!visitaProspecto) return;
     if (!ubicacionObtenida) { alert('Debes obtener la ubicación GPS'); return; }
-    if (!firmaGuardada) { alert('Se requiere la firma del receptor'); return; }
-    if (!nombreReceptor.trim()) { alert('Indica el nombre de quien recibió'); return; }
+    if (!firmaGuardada) { alert('Debes obtener la firma'); return; }
+    if (!nombreReceptor.trim()) { alert('Indica quién recibió la visita'); return; }
     setGuardandoVisita(true);
     try {
       const visitadora = localStorage.getItem('nombreUsuarioConrad') || 'Visitadora';
@@ -143,480 +171,321 @@ export const ProspectosView: React.FC = () => {
         medico_especialidad: visitaProspecto.especialidad || null,
         visitadora_nombre: visitadora, latitud, longitud,
         firma_receptor: firmaGuardada, nombre_receptor: nombreReceptor,
-        comentario: comentario || null,
+        comentario: comentario || null
       }]);
       await cargarDatos();
-      cerrarVisitaModal();
-      alert(`✅ Visita registrada para ${visitaProspecto.nombre}`);
-    } catch (e: any) { alert('Error: ' + e.message); }
+      setVisitaProspecto(null);
+      setUbicacionObtenida(false); setLatitud(null); setLongitud(null);
+      setFirmaGuardada(null); setNombreReceptor(''); setComentario('');
+      alert('✅ Visita registrada');
+    } catch { alert('Error al registrar visita'); }
     setGuardandoVisita(false);
   };
 
-  const cerrarVisitaModal = () => {
-    setVisitaProspecto(null); setUbicacionObtenida(false); setLatitud(null); setLongitud(null);
-    setNombreReceptor(''); setComentario(''); setFirmaGuardada(null);
-  };
-
-  const abrirVisita = (m: Medico) => {
-    cerrarVisitaModal();
-    setVisitaProspecto(m);
-    setModalProspecto(null);
-  };
-
-  // ── Convertir / Eliminar ───────────────────────────────────────
-  const abrirEdicion = (m: Medico) => {
-    setEditNombre(m.nombre);
-    setEditTelefono(m.telefono || '');
-    setEditDireccion(m.direccion || '');
-    setEditClinica(m.clinica || '');
-    setModoEdicion(true);
-  };
-
-  const guardarEdicion = async () => {
-    if (!modalProspecto || !editNombre.trim()) { alert('El nombre es obligatorio'); return; }
-    setGuardandoEdit(true);
-    try {
-      await supabase.from('medicos').update({
-        nombre: editNombre.trim(),
-        telefono: editTelefono.trim(),
-        direccion: editDireccion.trim(),
-        clinica: editClinica.trim() || null,
-      }).eq('id', modalProspecto.id);
-      await cargarDatos();
-      // Update local modal state
-      setModalProspecto({ ...modalProspecto,
-        nombre: editNombre.trim(), telefono: editTelefono.trim(),
-        direccion: editDireccion.trim(), clinica: editClinica.trim() || undefined,
-      });
-      setModoEdicion(false);
-    } catch (e: any) { alert('Error al guardar: ' + e.message); }
-    setGuardandoEdit(false);
-  };
-
-  const convertirAReferente = async (m: Medico) => {
-    setConvirtiendo(true);
-    try {
-      await supabase.from('medicos').update({ es_referente: true }).eq('id', m.id);
-      await cargarDatos();
-      setModalProspecto(null); setConfirmConvertir(false);
-      alert(`✅ ${m.nombre} ahora es médico referente`);
-    } catch (e: any) { alert('Error: ' + e.message); }
-    setConvirtiendo(false);
-  };
-
-  const eliminarProspecto = async (m: Medico) => {
-    setEliminando(true);
-    try {
-      await supabase.from('medicos').update({ activo: false }).eq('id', m.id);
-      await cargarDatos();
-      setModalProspecto(null); setConfirmEliminar(false);
-    } catch (e: any) { alert('Error: ' + e.message); }
-    setEliminando(false);
-  };
-
-  const filtrados = prospectos.filter(p =>
+  // Filtrado
+  let prospectosFiltrados = prospectos.filter(p =>
     p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-    (p.especialidad || '').toLowerCase().includes(busqueda.toLowerCase()) ||
-    getNombreDepto(p.departamento).toLowerCase().includes(busqueda.toLowerCase())
+    getNombreDepto(p.departamento).toLowerCase().includes(busqueda.toLowerCase()) ||
+    getNombreMun(p.municipio).toLowerCase().includes(busqueda.toLowerCase())
   );
-  const visitados  = filtrados.filter(p => visitasDe(p.id).length > 0);
-  const sinVisitar = filtrados.filter(p => visitasDe(p.id).length === 0);
+  if (filtroUrgencia === 'alerta') prospectosFiltrados = prospectosFiltrados.filter(p => diasSinVisita(p, visitas) >= 7 && diasSinVisita(p, visitas) < 15);
+  if (filtroUrgencia === 'urgente') prospectosFiltrados = prospectosFiltrados.filter(p => diasSinVisita(p, visitas) >= 15);
+
+  const urgentes = prospectos.filter(p => diasSinVisita(p, visitas) >= 15).length;
+  const alertas  = prospectos.filter(p => { const d = diasSinVisita(p, visitas); return d >= 7 && d < 15; }).length;
 
   return (
     <div>
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        {[
-          { v: sinVisitar.length, label: 'Sin visitar', color: 'text-orange-500' },
-          { v: visitados.length,  label: 'Visitados',   color: 'text-blue-600' },
-          { v: prospectos.length, label: 'Total',        color: 'text-gray-700' },
-        ].map(s => (
-          <div key={s.label} className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 text-center">
-            <p className={`text-2xl font-bold ${s.color}`}>{s.v}</p>
-            <p className="text-xs text-gray-500">{s.label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Búsqueda */}
-      <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2.5 mb-4 shadow-sm">
-        <Search size={15} className="text-gray-400 shrink-0" />
-        <input type="text" placeholder="Buscar por nombre, especialidad o departamento..."
-          value={busqueda} onChange={e => setBusqueda(e.target.value)}
-          className="flex-1 text-sm text-gray-700 focus:outline-none placeholder-gray-300" />
-        {busqueda && <button onClick={() => setBusqueda('')}><X size={14} className="text-gray-400" /></button>}
+      {/* Cabecera con filtros de urgencia */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-4 items-start sm:items-center justify-between">
+        <div className="relative flex-1 max-w-sm">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input type="text" placeholder="Buscar prospecto..." value={busqueda} onChange={e => setBusqueda(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-pink-500 focus:border-transparent" />
+        </div>
+        <div className="flex gap-2 text-xs font-semibold">
+          <button onClick={() => setFiltroUrgencia('todos')}
+            className={`px-3 py-1.5 rounded-lg transition-colors ${filtroUrgencia === 'todos' ? 'bg-gray-800 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+            Todos ({prospectos.length})
+          </button>
+          <button onClick={() => setFiltroUrgencia('alerta')}
+            className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 ${filtroUrgencia === 'alerta' ? 'bg-yellow-500 text-white' : 'bg-yellow-50 border border-yellow-200 text-yellow-700 hover:bg-yellow-100'}`}>
+            <AlertTriangle size={11} /> {alertas} alerta
+          </button>
+          <button onClick={() => setFiltroUrgencia('urgente')}
+            className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 ${filtroUrgencia === 'urgente' ? 'bg-red-500 text-white' : 'bg-red-50 border border-red-200 text-red-700 hover:bg-red-100'}`}>
+            <AlertCircle size={11} /> {urgentes} urgente
+          </button>
+        </div>
       </div>
 
       {loading ? (
         <div className="flex justify-center py-16"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-600" /></div>
-      ) : filtrados.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <UserPlus size={40} className="mx-auto mb-3 text-gray-200" />
-          <p className="font-medium text-gray-500">No hay prospectos registrados</p>
-          <p className="text-sm mt-1">Los médicos "No Referente" aparecerán aquí automáticamente</p>
+      ) : prospectosFiltrados.length === 0 ? (
+        <div className="text-center py-16 text-gray-400 bg-white rounded-xl border border-gray-100">
+          <UserPlus size={40} className="mx-auto mb-3 opacity-30" />
+          <p className="font-medium">Sin prospectos en este filtro</p>
         </div>
       ) : (
-        <div className="space-y-5">
-          {sinVisitar.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <AlertCircle size={14} className="text-orange-500" />
-                <span className="text-xs font-bold text-orange-600 uppercase tracking-wide">Pendientes de visita ({sinVisitar.length})</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {prospectosFiltrados.map(p => {
+            const vis = visitasDe(p.id);
+            const dias = diasSinVisita(p, visitas);
+            return (
+              <div key={p.id}
+                className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all overflow-hidden cursor-pointer"
+                onClick={() => { setModalProspecto(p); setModoEdicion(false); setConfirmConvertir(false); setConfirmEliminar(false); }}>
+                <div className="bg-gradient-to-br from-teal-500 to-cyan-600 p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="bg-white/20 rounded-xl p-2"><UserPlus size={18} className="text-white" /></div>
+                    <BadgeDias dias={dias} />
+                  </div>
+                  <p className="font-bold text-white text-sm mt-3 leading-tight">{p.nombre}</p>
+                  {p.clinica && <p className="text-teal-100 text-xs mt-0.5 truncate">{p.clinica}</p>}
+                  {p.especialidad && <span className="inline-flex mt-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-white/25 text-white">{p.especialidad}</span>}
+                </div>
+                <div className="p-4 space-y-2">
+                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                    <MapPin size={12} className="text-teal-400 shrink-0" />
+                    <span className="truncate">{getNombreMun(p.municipio)}, {getNombreDepto(p.departamento)}</span>
+                  </div>
+                  {p.telefono && (
+                    <div className="flex items-center gap-2 text-xs text-green-600 font-medium">
+                      <Phone size={12} className="text-green-400 shrink-0" />
+                      {p.telefono}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 text-xs text-gray-400">
+                    <Clock size={12} className="shrink-0" />
+                    {vis.length === 0 ? 'Sin visitas aún' : `${vis.length} visita${vis.length > 1 ? 's' : ''} · hace ${dias}d`}
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                {sinVisitar.map(p => (
-                  <Tarjeta key={p.id} medico={p} visitas={[]}
-                    onDetalle={() => setModalProspecto(p)}
-                    onVisitar={() => abrirVisita(p)} />
-                ))}
-              </div>
-            </div>
-          )}
-          {visitados.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <CheckCircle size={14} className="text-emerald-500" />
-                <span className="text-xs font-bold text-emerald-600 uppercase tracking-wide">Ya visitados ({visitados.length})</span>
-              </div>
-              <div className="space-y-2">
-                {visitados.map(p => (
-                  <Tarjeta key={p.id} medico={p} visitas={visitasDe(p.id)}
-                    onDetalle={() => setModalProspecto(p)}
-                    onVisitar={() => abrirVisita(p)} />
-                ))}
-              </div>
-            </div>
-          )}
+            );
+          })}
         </div>
       )}
 
-      {/* ═══ MODAL DETALLE ═══ */}
+      {/* ── MODAL DETALLE PROSPECTO ───────────────────────────── */}
       {modalProspecto && (
-        <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50">
-          <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center px-5 py-4 border-b sticky top-0 bg-white rounded-t-3xl sm:rounded-t-2xl z-10">
-              <h2 className="font-bold text-gray-800">{modoEdicion ? '✏️ Editar Prospecto' : 'Prospecto'}</h2>
-              <div className="flex items-center gap-1">
-                {!modoEdicion && (
-                  <button onClick={() => abrirEdicion(modalProspecto)}
-                    className="p-2 text-blue-500 hover:bg-blue-50 rounded-xl" title="Editar">
-                    <Edit2 size={17} />
-                  </button>
-                )}
-                <button onClick={() => { setModalProspecto(null); setConfirmConvertir(false); setConfirmEliminar(false); setModoEdicion(false); }}
-                  className="p-2 text-gray-400 hover:bg-gray-100 rounded-xl"><X size={20} /></button>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center px-5 py-4 border-b sticky top-0 bg-white z-10 rounded-t-2xl">
+              <div className="flex items-center gap-2">
+                <div className="bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl p-2"><UserPlus size={15} className="text-white" /></div>
+                <div>
+                  <p className="font-bold text-gray-900 text-sm">{modalProspecto.nombre}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <BadgeDias dias={diasSinVisita(modalProspecto, visitas)} />
+                    {visitasDe(modalProspecto.id).length > 0 && (
+                      <span className="text-xs text-gray-400">{visitasDe(modalProspecto.id).length} visita(s)</span>
+                    )}
+                  </div>
+                </div>
               </div>
+              <button onClick={() => setModalProspecto(null)} className="p-2 text-gray-400 hover:bg-gray-100 rounded-xl"><X size={20} /></button>
             </div>
-            <div className="p-5 space-y-4">
 
-              {/* ── MODO EDICIÓN ── */}
+            <div className="p-5 space-y-3">
               {modoEdicion ? (
                 <div className="space-y-3">
-                  <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
-                    <p className="text-xs text-blue-600 font-medium">Editando datos de {modalProspecto.nombre}</p>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Nombre *</label>
-                    <input type="text" value={editNombre} onChange={e => setEditNombre(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Teléfono</label>
-                    <input type="text" value={editTelefono} onChange={e => setEditTelefono(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"
-                      placeholder="55551234" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Clínica / Centro</label>
-                    <input type="text" value={editClinica} onChange={e => setEditClinica(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"
-                      placeholder="Nombre de la clínica u hospital" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Dirección</label>
-                    <textarea value={editDireccion} onChange={e => setEditDireccion(e.target.value)} rows={2}
-                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none resize-none"
-                      placeholder="Dirección exacta..." />
-                  </div>
-                  <div className="flex gap-2 pt-1">
-                    <button onClick={() => setModoEdicion(false)}
-                      className="flex-1 py-3 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50">
-                      Cancelar
-                    </button>
-                    <button onClick={guardarEdicion} disabled={guardandoEdit}
-                      className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-blue-700">
-                      <Save size={15} /> {guardandoEdit ? 'Guardando...' : 'Guardar cambios'}
+                  <input type="text" value={editNombre} onChange={e => setEditNombre(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-xl text-sm focus:ring-2 focus:ring-teal-400 outline-none" placeholder="Nombre" />
+                  <input type="text" value={editTelefono} onChange={e => setEditTelefono(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-xl text-sm focus:ring-2 focus:ring-teal-400 outline-none" placeholder="Teléfono" />
+                  <input type="text" value={editClinica} onChange={e => setEditClinica(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-xl text-sm focus:ring-2 focus:ring-teal-400 outline-none" placeholder="Clínica (opcional)" />
+                  <input type="text" value={editDireccion} onChange={e => setEditDireccion(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-xl text-sm focus:ring-2 focus:ring-teal-400 outline-none" placeholder="Dirección" />
+                  <div className="flex gap-2">
+                    <button onClick={() => setModoEdicion(false)} className="flex-1 py-2.5 border rounded-xl text-sm text-gray-600 hover:bg-gray-50 font-medium">Cancelar</button>
+                    <button onClick={guardarEdicion} disabled={guardandoEdit} className="flex-1 py-2.5 bg-teal-500 text-white rounded-xl text-sm font-bold hover:bg-teal-600 disabled:opacity-60 flex items-center justify-center gap-2">
+                      <Save size={14} />{guardandoEdit ? 'Guardando...' : 'Guardar'}
                     </button>
                   </div>
                 </div>
               ) : (
-              <>
-              {/* ── MODO VISTA ── */}
-              <div className="bg-orange-50 rounded-xl p-4 border border-orange-100">
-                <div className="flex items-start gap-3">
-                  <div className="bg-orange-100 rounded-xl p-2 shrink-0"><Stethoscope size={20} className="text-orange-600" /></div>
-                  <div>
-                    <p className="font-bold text-gray-900">{modalProspecto.nombre}</p>
-                    {modalProspecto.especialidad && (
-                      <span className="inline-block bg-orange-200 text-orange-800 text-xs px-2 py-0.5 rounded-full mt-1">{modalProspecto.especialidad}</span>
-                    )}
-                    {modalProspecto.clinica && <p className="text-sm text-gray-600 mt-1">{modalProspecto.clinica}</p>}
+                <>
+                  <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+                    {modalProspecto.especialidad && <div className="flex gap-2"><Stethoscope size={14} className="text-teal-400 mt-0.5 shrink-0" /><span className="text-gray-700">{modalProspecto.especialidad}</span></div>}
+                    <div className="flex gap-2"><MapPin size={14} className="text-pink-400 mt-0.5 shrink-0" /><span className="text-gray-700">{getNombreMun(modalProspecto.municipio)}, {getNombreDepto(modalProspecto.departamento)}</span></div>
+                    {modalProspecto.direccion && <div className="flex gap-2"><MapPin size={14} className="text-gray-300 mt-0.5 shrink-0" /><span className="text-gray-500 text-xs">{modalProspecto.direccion}</span></div>}
+                    {modalProspecto.telefono && <div className="flex gap-2"><Phone size={14} className="text-green-400 mt-0.5 shrink-0" /><a href={`tel:${modalProspecto.telefono}`} className="text-green-600 font-bold hover:underline">{modalProspecto.telefono}</a></div>}
                   </div>
-                </div>
-              </div>
-              <div className="grid gap-3">
-                <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3">
-                  <Phone size={15} className="text-gray-400 shrink-0" />
-                  <div><p className="text-xs text-gray-400">Teléfono</p>
-                    <a href={`tel:${modalProspecto.telefono}`} className="text-sm font-semibold text-blue-600">{modalProspecto.telefono || 'N/A'}</a></div>
-                </div>
-                <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3">
-                  <MapPin size={15} className="text-gray-400 shrink-0" />
-                  <div><p className="text-xs text-gray-400">Ubicación</p>
-                    <p className="text-sm font-semibold text-gray-800">{getNombreMun(modalProspecto.municipio)}, {getNombreDepto(modalProspecto.departamento)}</p>
-                    {modalProspecto.direccion && <p className="text-xs text-gray-500 mt-0.5">{modalProspecto.direccion}</p>}</div>
-                </div>
-              </div>
-
-              {/* Historial */}
-              {visitasDe(modalProspecto.id).length > 0 && (
-                <div>
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Visitas ({visitasDe(modalProspecto.id).length})</p>
-                  <div className="space-y-2">
-                    {visitasDe(modalProspecto.id).map(v => (
-                      <div key={v.id} className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle size={13} className="text-emerald-600" />
-                          <p className="text-xs font-medium text-emerald-700">{v.visitadora_nombre}</p>
-                          <p className="text-xs text-gray-400 ml-auto">{new Date(v.created_at).toLocaleDateString('es-GT')}</p>
-                        </div>
-                        {v.comentario && <p className="text-xs text-gray-600 mt-1 ml-5">{v.comentario}</p>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                  <button onClick={() => { setModoEdicion(true); setEditNombre(modalProspecto.nombre); setEditTelefono(modalProspecto.telefono); setEditDireccion(modalProspecto.direccion); setEditClinica(modalProspecto.clinica || ''); }}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors">
+                    <Edit2 size={14} /> Editar datos
+                  </button>
+                </>
               )}
 
-              {/* Acciones */}
-              <div className="space-y-2 pt-2 border-t border-gray-100">
-                {/* Botón visitar */}
-                <button onClick={() => abrirVisita(modalProspecto)}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-pink-600 text-white rounded-xl font-bold text-sm hover:bg-pink-700 transition-all shadow-sm">
-                  <MapPinIcon size={16} /> Registrar Visita
+              {/* Botón registrar visita */}
+              {!modoEdicion && !confirmConvertir && !confirmEliminar && (
+                <button onClick={() => { setModalProspecto(null); setVisitaProspecto(modalProspecto); setUbicacionObtenida(false); setFirmaGuardada(null); setNombreReceptor(''); setComentario(''); }}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-xl font-bold text-sm hover:from-orange-500 hover:to-amber-600 transition-all shadow-sm">
+                  <Plus size={16} /> Registrar visita
                 </button>
+              )}
 
-                {/* Convertir */}
-                {!confirmConvertir && !confirmEliminar && (
-                  <button onClick={() => setConfirmConvertir(true)}
-                    className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-sm">
-                    <Star size={16} /> Convertir a Médico Referente
-                  </button>
-                )}
-                {confirmConvertir && (
+              {/* Convertir */}
+              {!modoEdicion && !confirmEliminar && (
+                confirmConvertir ? (
                   <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-                    <p className="text-sm font-semibold text-gray-800 mb-1 text-center">¿Confirmar conversión?</p>
-                    <p className="text-xs text-gray-500 text-center mb-3">{modalProspecto.nombre} generará comisiones desde ahora</p>
+                    <p className="text-sm font-bold text-emerald-800 mb-3">¿Convertir a Médico Referente?</p>
                     <div className="flex gap-2">
-                      <button onClick={() => setConfirmConvertir(false)} className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm">Cancelar</button>
-                      <button onClick={() => convertirAReferente(modalProspecto)} disabled={convirtiendo}
-                        className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold disabled:opacity-50">
+                      <button onClick={() => setConfirmConvertir(false)} className="flex-1 py-2.5 border rounded-xl text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+                      <button onClick={convertirAReferente} disabled={convirtiendo} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-60">
                         {convirtiendo ? 'Convirtiendo...' : '✓ Confirmar'}
                       </button>
                     </div>
                   </div>
-                )}
-
-                {/* Eliminar */}
-                {!confirmConvertir && !confirmEliminar && (
-                  <button onClick={() => setConfirmEliminar(true)}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 border border-red-200 text-red-500 rounded-xl text-sm font-medium hover:bg-red-50 transition-all">
-                    <Trash2 size={15} /> Eliminar prospecto
+                ) : (
+                  <button onClick={() => setConfirmConvertir(true)}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-sm font-semibold hover:bg-emerald-100 transition-colors">
+                    <CheckCircle size={15} /> Convertir a Médico Referente
                   </button>
-                )}
-                {confirmEliminar && (
+                )
+              )}
+
+              {/* Eliminar */}
+              {!modoEdicion && !confirmConvertir && (
+                confirmEliminar ? (
                   <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                    <p className="text-sm font-semibold text-gray-800 mb-1 text-center">¿Eliminar este prospecto?</p>
-                    <p className="text-xs text-gray-500 text-center mb-3">Esta acción no se puede deshacer</p>
+                    <p className="text-sm font-bold text-red-800 mb-3">¿Eliminar este prospecto?</p>
                     <div className="flex gap-2">
-                      <button onClick={() => setConfirmEliminar(false)} className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm">Cancelar</button>
-                      <button onClick={() => eliminarProspecto(modalProspecto)} disabled={eliminando}
-                        className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-bold disabled:opacity-50">
-                        {eliminando ? 'Eliminando...' : '🗑 Eliminar'}
+                      <button onClick={() => setConfirmEliminar(false)} className="flex-1 py-2.5 border rounded-xl text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+                      <button onClick={eliminarProspecto} disabled={eliminando} className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-bold hover:bg-red-700 disabled:opacity-60">
+                        {eliminando ? 'Eliminando...' : 'Eliminar'}
                       </button>
                     </div>
                   </div>
-                )}
-              </div>
-            </>
-            )}
+                ) : (
+                  <button onClick={() => setConfirmEliminar(true)}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 text-red-500 text-sm font-semibold hover:bg-red-50 rounded-xl transition-colors border border-red-100">
+                    <Trash2 size={14} /> Eliminar prospecto
+                  </button>
+                )
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* ═══ MODAL REGISTRAR VISITA ═══ */}
+      {/* ── MODAL VISITA PROSPECTO ────────────────────────────── */}
       {visitaProspecto && (
-        <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50">
-          <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg max-h-[95vh] overflow-y-auto">
-            <div className="flex justify-between items-center px-5 pt-5 pb-4 border-b sticky top-0 bg-white rounded-t-3xl sm:rounded-t-2xl z-10">
-              <div>
-                <h2 className="text-base font-bold text-gray-800">📋 Registrar Visita</h2>
-                <p className="text-xs text-pink-600 font-medium">{visitaProspecto.nombre}</p>
-              </div>
-              <button onClick={cerrarVisitaModal} className="p-2 text-gray-400 hover:bg-gray-100 rounded-xl"><X size={20} /></button>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center px-5 py-4 border-b sticky top-0 bg-white z-10">
+              <h3 className="font-bold text-gray-900">Visita a Prospecto</h3>
+              <button onClick={() => setVisitaProspecto(null)} className="p-2 text-gray-400 hover:bg-gray-100 rounded-xl"><X size={20} /></button>
             </div>
-            <div className="px-5 pb-6 pt-4 space-y-4">
-              {/* Info médico */}
-              <div className="bg-pink-50 rounded-xl p-3.5 border border-pink-100">
+            <div className="p-5 space-y-4">
+              <div className="bg-teal-50 border border-teal-100 rounded-xl p-3">
                 <p className="font-bold text-gray-900 text-sm">{visitaProspecto.nombre}</p>
-                {visitaProspecto.clinica && <p className="text-xs text-gray-500">{visitaProspecto.clinica}</p>}
-                <p className="text-xs text-gray-400">{visitaProspecto.direccion} · {getNombreMun(visitaProspecto.municipio)}</p>
+                <p className="text-xs text-gray-500">{getNombreMun(visitaProspecto.municipio)}, {getNombreDepto(visitaProspecto.departamento)}</p>
               </div>
 
-              {/* GPS */}
               {ubicacionObtenida ? (
-                <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-                  <CheckCircle size={18} className="text-green-600 shrink-0" />
+                <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+                  <CheckCircle size={16} className="text-emerald-600" />
                   <div>
-                    <p className="text-sm font-semibold text-green-700">Ubicación obtenida ✓</p>
-                    <p className="text-xs text-green-500">{latitud?.toFixed(5)}, {longitud?.toFixed(5)}</p>
+                    <p className="text-sm font-bold text-emerald-700">Ubicación capturada ✓</p>
+                    <p className="text-xs text-emerald-500 font-mono">{latitud?.toFixed(5)}, {longitud?.toFixed(5)}</p>
                   </div>
                 </div>
               ) : (
                 <button onClick={obtenerUbicacion} disabled={obteniendoUbic}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 border-2 border-dashed border-gray-300 rounded-xl text-sm font-medium text-gray-600 hover:border-pink-400 hover:text-pink-600 hover:bg-pink-50 transition-all disabled:opacity-60">
-                  {obteniendoUbic ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-pink-600" /> Obteniendo...</>
-                    : <><MapPin size={16} /> 📍 Obtener mi ubicación</>}
+                  className="w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed border-gray-200 rounded-xl text-sm font-semibold text-gray-500 hover:border-teal-300 hover:text-teal-600 hover:bg-teal-50 transition-all disabled:opacity-60">
+                  {obteniendoUbic ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-teal-500" /> Obteniendo...</> : <><MapPin size={16} /> Obtener ubicación GPS</>}
                 </button>
               )}
 
-              {/* Receptor */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Nombre de quien recibió *</label>
+                <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">Recibido por *</label>
                 <input type="text" value={nombreReceptor} onChange={e => setNombreReceptor(e.target.value)}
-                  className="w-full px-3 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-pink-500"
-                  placeholder="Ej: Recepcionista, secretaria..." />
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-400 outline-none"
+                  placeholder="Ej: Dra. García / Recepcionista" />
               </div>
 
-              {/* Firma */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5">
-                  <PenTool size={13} /> Firma del receptor *
+                <label className="flex items-center gap-1.5 text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">
+                  <PenTool size={12} /> Firma del receptor *
                 </label>
                 {firmaGuardada ? (
-                  <div className="border border-green-200 rounded-xl overflow-hidden bg-green-50 relative">
+                  <div className="border-2 border-emerald-200 rounded-xl overflow-hidden bg-emerald-50 relative">
                     <img src={firmaGuardada} alt="Firma" className="w-full h-20 object-contain" />
-                    <div className="absolute inset-0 flex items-center justify-end p-2">
-                      <button onClick={() => setFirmaGuardada(null)}
-                        className="bg-white border border-gray-200 text-gray-500 rounded-lg p-1.5 shadow-sm hover:bg-red-50 hover:text-red-500">
-                        <Trash2 size={13} />
-                      </button>
+                    <div className="absolute top-2 left-3 flex items-center gap-1 bg-white/80 backdrop-blur rounded-lg px-2 py-0.5">
+                      <CheckCircle size={12} className="text-emerald-600" />
+                      <span className="text-xs font-bold text-emerald-700">Firma OK</span>
                     </div>
-                    <div className="absolute top-2 left-3 flex items-center gap-1">
-                      <CheckCircle size={14} className="text-green-600" />
-                      <span className="text-xs font-semibold text-green-700">Firma obtenida</span>
-                    </div>
+                    <button onClick={() => setFirmaGuardada(null)} className="absolute top-2 right-2 bg-white border border-gray-200 text-gray-500 rounded-lg p-1.5 shadow-sm hover:bg-red-50 hover:text-red-500">
+                      <Trash2 size={12} />
+                    </button>
                   </div>
                 ) : (
-                  <button onClick={abrirFirma}
-                    className="w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed border-gray-300 rounded-xl text-sm font-medium text-gray-500 hover:border-pink-400 hover:text-pink-600 hover:bg-pink-50 transition-all">
-                    <PenTool size={16} /> ✍️ Abrir panel de firma
+                  <button onClick={abrirFirmaModal}
+                    className="w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed border-gray-200 rounded-xl text-sm font-semibold text-gray-500 hover:border-teal-300 hover:text-teal-600 hover:bg-teal-50 transition-all">
+                    <PenTool size={16} /> Abrir panel de firma
                   </button>
                 )}
               </div>
 
-              {/* Comentario */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5">
-                  <MessageSquare size={13} /> Comentarios
+                <label className="flex items-center gap-1.5 text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">
+                  <MessageSquare size={12} /> Observaciones
                 </label>
                 <textarea value={comentario} onChange={e => setComentario(e.target.value)} rows={2}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-pink-500 resize-none"
-                  placeholder="Observaciones, interés del médico, seguimiento..." />
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-400 outline-none resize-none"
+                  placeholder="Seguimiento, intereses, próxima visita..." />
               </div>
 
-              <button onClick={registrarVisita}
+              <div className="flex gap-2 text-xs">
+                {[{ ok: ubicacionObtenida, label: 'GPS' }, { ok: !!firmaGuardada, label: 'Firma' }, { ok: !!nombreReceptor.trim(), label: 'Receptor' }].map(({ ok, label }) => (
+                  <div key={label} className={`flex items-center gap-1 px-2 py-1 rounded-lg font-medium transition-all ${ok ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'}`}>
+                    {ok ? <CheckCircle size={11} /> : <div className="w-2.5 h-2.5 rounded-full border-2 border-gray-300" />}
+                    {label}
+                  </div>
+                ))}
+              </div>
+
+              <button onClick={registrarVisitaProspecto}
                 disabled={guardandoVisita || !ubicacionObtenida || !firmaGuardada || !nombreReceptor.trim()}
-                className="w-full flex items-center justify-center gap-2 py-4 bg-pink-600 text-white rounded-xl font-bold text-sm hover:bg-pink-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm">
-                {guardandoVisita ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> Registrando...</>
-                  : <><CheckCircle size={17} /> Registrar Visita</>}
+                className="w-full flex items-center justify-center gap-2 py-4 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-xl font-bold text-sm hover:from-orange-500 hover:to-amber-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md">
+                {guardandoVisita ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> Registrando...</> : <><CheckCircle size={17} /> Registrar Visita</>}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ═══ MODAL FIRMA ═══ */}
+      {/* MODAL FIRMA */}
       {showFirmaModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-3">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
             <div className="flex justify-between items-center px-5 py-4 border-b">
               <div>
-                <h3 className="font-bold text-gray-800">✍️ Firma del receptor</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Dibuja la firma en el área de abajo</p>
+                <h3 className="font-bold text-gray-900">✍️ Firma del receptor</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Dibuja con el dedo o el mouse</p>
               </div>
               <button onClick={() => setShowFirmaModal(false)} className="p-2 text-gray-400 hover:bg-gray-100 rounded-xl"><X size={20} /></button>
             </div>
             <div className="p-4">
               <div className="border-2 border-gray-200 rounded-xl overflow-hidden bg-gray-50 relative" style={{ touchAction: 'none' }}>
-                <canvas ref={canvasRef} className="block w-full cursor-crosshair" style={{ height: 200, touchAction: 'none', userSelect: 'none' }}
+                <canvas ref={canvasRef} className="block w-full cursor-crosshair"
+                  style={{ height: 200, touchAction: 'none', userSelect: 'none' }}
                   onMouseDown={startDraw} onMouseMove={draw} onMouseUp={endDraw} onMouseLeave={endDraw}
                   onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={endDraw} />
-                {firmaVacia && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <p className="text-gray-300 text-sm font-medium">Firma aquí →</p>
-                  </div>
-                )}
+                {firmaVacia && <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><p className="text-gray-300 text-sm font-medium select-none">Firma aquí →</p></div>}
               </div>
-              <p className="text-xs text-center text-gray-400 mt-2">Usa el dedo o el mouse para firmar</p>
             </div>
             <div className="flex gap-3 px-4 pb-4">
-              <button onClick={limpiarFirma} className="flex-1 py-3 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50">🗑 Limpiar</button>
+              <button onClick={limpiarFirma} className="flex-1 py-3 border border-gray-200 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-50">🗑 Limpiar</button>
               <button onClick={confirmarFirma} disabled={firmaVacia}
-                className="flex-1 py-3 bg-pink-600 text-white rounded-xl text-sm font-bold hover:bg-pink-700 disabled:opacity-40">✓ Confirmar Firma</button>
+                className="flex-1 py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-xl text-sm font-bold hover:from-orange-500 hover:to-amber-600 disabled:opacity-40">✓ Confirmar</button>
             </div>
           </div>
         </div>
       )}
-    </div>
-  );
-};
-
-// ── Tarjeta compacta ──────────────────────────────────────────────────────────
-const Tarjeta: React.FC<{
-  medico: Medico; visitas: VisitaProspecto[];
-  onDetalle: () => void; onVisitar: () => void;
-}> = ({ medico, visitas, onDetalle, onVisitar }) => {
-  const yaVisitado = visitas.length > 0;
-  return (
-    <div className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${yaVisitado ? 'border-emerald-100' : 'border-orange-100'}`}>
-      <div className="flex items-center gap-3 px-4 py-3">
-        <div className={`rounded-xl p-2 shrink-0 ${yaVisitado ? 'bg-emerald-100' : 'bg-orange-100'}`}>
-          {yaVisitado ? <CheckCircle size={18} className="text-emerald-600" /> : <Clock size={18} className="text-orange-500" />}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-bold text-gray-900 text-sm truncate">{medico.nombre}</p>
-          <p className="text-xs text-gray-400 truncate">
-            {medico.especialidad && `${medico.especialidad} · `}
-            {getNombreMun(medico.municipio)}, {getNombreDepto(medico.departamento)}
-          </p>
-          {yaVisitado && visitas[0] && (
-            <p className="text-xs text-emerald-600 mt-0.5">
-              ✓ {new Date(visitas[0].created_at).toLocaleDateString('es-GT')} · {visitas.length} visita{visitas.length > 1 ? 's' : ''}
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button onClick={onVisitar}
-            className="flex items-center gap-1 px-3 py-1.5 bg-pink-600 text-white rounded-xl text-xs font-bold hover:bg-pink-700 transition-all shadow-sm">
-            <Plus size={12} /> Visitar
-          </button>
-          <button onClick={onDetalle} className="p-2 text-gray-400 hover:bg-gray-100 rounded-xl">
-            <ChevronRight size={16} />
-          </button>
-        </div>
-      </div>
-      {yaVisitado && <div className="h-0.5 bg-emerald-200" />}
     </div>
   );
 };
