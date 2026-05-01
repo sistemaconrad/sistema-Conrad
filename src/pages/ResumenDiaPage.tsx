@@ -1,25 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  ArrowLeft, 
-  Calendar, 
-  Users, 
-  DollarSign, 
-  TrendingUp, 
-  TrendingDown,
-  Activity,
-  Package,
-  FileText,
-  AlertCircle,
-  CheckCircle,
-  Edit,
-  Trash2,
-  PlusCircle,
-  Shield,
-  Clock
+  ArrowLeft, Calendar, Users, DollarSign, TrendingUp, TrendingDown,
+  Activity, Package, FileText, AlertCircle, CheckCircle, Edit, Trash2,
+  PlusCircle, Shield, Clock, Settings
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { GenerarCodigosPanel } from '../components/GenerarCodigosPanel';
 import { generarCuadreExcel } from '../utils/cuadre-excel-generator';
+import { PeriodosEspecialesPanel } from '../components/PeriodosEspecialesPanel';
 
 interface ResumenDiaPageProps {
   onBack: () => void;
@@ -46,7 +34,6 @@ interface ResumenDatos {
 
 export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNavigate }) => {
 
-  // ✅ CORREGIDO: Helper para obtener fecha/hora en zona horaria de Guatemala
   const getGuatemalaTime = () => {
     const ahora = new Date();
     return new Date(ahora.toLocaleString('en-US', { timeZone: 'America/Guatemala' }));
@@ -60,103 +47,74 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
     return `${yyyy}-${mm}-${dd}`;
   };
 
-  // ✅ CORREGIDO: Inicializar con fecha de Guatemala (no UTC)
   const [fecha, setFecha] = useState(getFechaGuatemala);
-
   const [resumen, setResumen] = useState<ResumenDatos>({
-    pacientesNuevos: 0,
-    consultasRegulares: 0,
-    consultasMoviles: 0,
-    totalConsultas: 0,
-    ingresosConsultas: 0,
-    ingresosMoviles: 0,
-    totalIngresos: 0,
-    gastosDelDia: 0,
-    ingresoNeto: 0,
-    productosAgregados: 0,
-    productosEditados: 0,
-    productosEliminados: 0,
-    usuariosActivos: [],
-    accionesConAutorizacion: 0,
-    actividadReciente: []
+    pacientesNuevos: 0, consultasRegulares: 0, consultasMoviles: 0,
+    totalConsultas: 0, ingresosConsultas: 0, ingresosMoviles: 0,
+    totalIngresos: 0, gastosDelDia: 0, ingresoNeto: 0,
+    productosAgregados: 0, productosEditados: 0, productosEliminados: 0,
+    usuariosActivos: [], accionesConAutorizacion: 0, actividadReciente: []
   });
-
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    cargarResumen();
-  }, [fecha]);
+  // ── tabs: ahora incluye 'horarios' solo para admin ─────────────
+  const rolUsuario = localStorage.getItem('rolUsuarioConrad');
+  const esAdmin = rolUsuario === 'admin';
+  const [tabActiva, setTabActiva] = useState<'resumen' | 'auditoria' | 'horarios'>('resumen');
+
+  const [filtroUsuario, setFiltroUsuario] = useState('');
+  const [filtroModulo, setFiltroModulo] = useState('');
+  const [filtroAccion, setFiltroAccion] = useState('');
+  const [logDetalle, setLogDetalle] = useState<any | null>(null);
+  const [mostrarTokens, setMostrarTokens] = useState(false);
+
+  useEffect(() => { cargarResumen(); }, [fecha]);
 
   const cargarResumen = async () => {
     setLoading(true);
     try {
       const { data: consultas } = await supabase
         .from('consultas')
-        .select(`
-          *,
-          pacientes(id),
-          detalle_consultas(precio)
-        `)
+        .select(`*, pacientes(id), detalle_consultas(precio)`)
         .eq('fecha', fecha)
         .or('anulado.is.null,anulado.eq.false');
 
       const consultasRegulares = consultas?.filter(c => !c.es_servicio_movil) || [];
-      const consultasMoviles = consultas?.filter(c => c.es_servicio_movil) || [];
-
-      const ingresosConsultas = consultasRegulares.reduce((sum, c) =>
-        sum + c.detalle_consultas.reduce((s: number, d: any) => s + d.precio, 0), 0
-      );
-
-      const ingresosMoviles = consultasMoviles.reduce((sum, c) =>
-        sum + c.detalle_consultas.reduce((s: number, d: any) => s + d.precio, 0), 0
-      );
-
+      const consultasMoviles   = consultas?.filter(c =>  c.es_servicio_movil) || [];
+      const ingresosConsultas  = consultasRegulares.reduce((sum, c) => sum + c.detalle_consultas.reduce((s: number, d: any) => s + d.precio, 0), 0);
+      const ingresosMoviles    = consultasMoviles.reduce((sum, c)   => sum + c.detalle_consultas.reduce((s: number, d: any) => s + d.precio, 0), 0);
       const pacientesIds = new Set(consultas?.map(c => c.paciente_id));
 
-      const { data: gastos } = await supabase
-        .from('gastos')
-        .select('monto')
-        .eq('fecha', fecha);
-
+      const { data: gastos } = await supabase.from('gastos').select('monto').eq('fecha', fecha);
       const gastosDelDia = gastos?.reduce((sum, g) => sum + g.monto, 0) || 0;
 
-      // Buscar logs en rango UTC que corresponda al día GT (UTC-6)
       const inicioDiaUTC = new Date(fecha + 'T06:00:00.000Z');
       const finDiaUTC    = new Date(fecha + 'T06:00:00.000Z');
       finDiaUTC.setDate(finDiaUTC.getDate() + 1);
 
       const { data: logs } = await supabase
-        .from('log_actividad')
-        .select('*')
+        .from('log_actividad').select('*')
         .gte('created_at', inicioDiaUTC.toISOString())
         .lt('created_at',  finDiaUTC.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(200);
+        .order('created_at', { ascending: false }).limit(200);
 
-      const usuariosActivos = [...new Set(logs?.map(l => l.nombre_usuario) || [])] as string[];
+      const usuariosActivos        = [...new Set(logs?.map(l => l.nombre_usuario) || [])] as string[];
       const accionesConAutorizacion = logs?.filter(l => l.requirio_autorizacion).length || 0;
-      const productosAgregados  = logs?.filter(l => l.modulo === 'inventario' && l.accion === 'crear').length || 0;
-      const productosEditados   = logs?.filter(l => l.modulo === 'inventario' && l.accion === 'editar').length || 0;
-      const productosEliminados = logs?.filter(l => l.modulo === 'inventario' && l.accion === 'eliminar').length || 0;
+      const productosAgregados     = logs?.filter(l => l.modulo === 'inventario' && l.accion === 'crear').length   || 0;
+      const productosEditados      = logs?.filter(l => l.modulo === 'inventario' && l.accion === 'editar').length  || 0;
+      const productosEliminados    = logs?.filter(l => l.modulo === 'inventario' && l.accion === 'eliminar').length|| 0;
 
       setResumen({
         pacientesNuevos: pacientesIds.size,
         consultasRegulares: consultasRegulares.length,
         consultasMoviles: consultasMoviles.length,
         totalConsultas: consultas?.length || 0,
-        ingresosConsultas,
-        ingresosMoviles,
+        ingresosConsultas, ingresosMoviles,
         totalIngresos: ingresosConsultas + ingresosMoviles,
-        gastosDelDia,
-        ingresoNeto: (ingresosConsultas + ingresosMoviles) - gastosDelDia,
-        productosAgregados,
-        productosEditados,
-        productosEliminados,
-        usuariosActivos,
-        accionesConAutorizacion,
-        actividadReciente: logs || []
+        gastosDelDia, ingresoNeto: (ingresosConsultas + ingresosMoviles) - gastosDelDia,
+        productosAgregados, productosEditados, productosEliminados,
+        usuariosActivos, accionesConAutorizacion, actividadReciente: logs || []
       });
-
     } catch (error) {
       console.error('Error al cargar resumen:', error);
       alert('Error al cargar resumen del día');
@@ -168,76 +126,51 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
   const descargarExcelCuadre = async () => {
     try {
       const { data: cuadreGuardado, error } = await supabase
-        .from('cuadres_diarios')
-        .select('*')
-        .eq('fecha', fecha)
-        .maybeSingle();
-
+        .from('cuadres_diarios').select('*').eq('fecha', fecha).maybeSingle();
       if (error) { alert('❌ Error al cargar cuadre guardado'); return; }
       if (!cuadreGuardado) { alert('⚠️ No hay cuadre guardado para esta fecha'); return; }
 
       const { data: consultas } = await supabase
-        .from('consultas')
-        .select('*, detalle_consultas(precio)')
-        .eq('fecha', fecha)
-        .or('anulado.is.null,anulado.eq.false');
+        .from('consultas').select('*, detalle_consultas(precio)')
+        .eq('fecha', fecha).or('anulado.is.null,anulado.eq.false');
 
       const cuadrePorForma: any = {};
       const consultasRegulares = consultas?.filter((c: any) => !c.es_servicio_movil) || [];
-      const consultasMoviles   = consultas?.filter((c: any) => c.es_servicio_movil)  || [];
+      const consultasMoviles   = consultas?.filter((c: any) =>  c.es_servicio_movil) || [];
 
       consultasRegulares.forEach((c: any) => {
         const total = c.detalle_consultas?.reduce((s: number, d: any) => s + d.precio, 0) || 0;
         const forma = c.forma_pago;
         if (!cuadrePorForma[forma]) cuadrePorForma[forma] = { forma_pago: forma, cantidad: 0, total: 0, es_servicio_movil: false };
-        cuadrePorForma[forma].cantidad++;
-        cuadrePorForma[forma].total += total;
+        cuadrePorForma[forma].cantidad++; cuadrePorForma[forma].total += total;
       });
-
       consultasMoviles.forEach((c: any) => {
         const total = c.detalle_consultas?.reduce((s: number, d: any) => s + d.precio, 0) || 0;
         const key = `${c.forma_pago}_movil`;
         if (!cuadrePorForma[key]) cuadrePorForma[key] = { forma_pago: c.forma_pago, cantidad: 0, total: 0, es_servicio_movil: true };
-        cuadrePorForma[key].cantidad++;
-        cuadrePorForma[key].total += total;
+        cuadrePorForma[key].cantidad++; cuadrePorForma[key].total += total;
       });
 
-      // Gastos del día
       const { data: gastosDia } = await supabase
-        .from('gastos')
-        .select('*, categorias_gastos(nombre)')
-        .eq('fecha', fecha)
-        .order('created_at', { ascending: true });
-      const totalGastos = gastosDia?.reduce((s: number, g: any) => s + parseFloat(g.monto || 0), 0) || 0;
+        .from('gastos').select('*, categorias_gastos(nombre)').eq('fecha', fecha).order('created_at', { ascending: true });
+      const totalGastos     = gastosDia?.reduce((s: number, g: any) => s + parseFloat(g.monto || 0), 0) || 0;
       const gastosParaExcel = (gastosDia || []).map((g: any) => ({
-        concepto: g.concepto || '',
-        monto: parseFloat(g.monto || 0),
-        categoria: g.categorias_gastos?.nombre || g.categoria || '',
-        created_at: g.created_at || ''
+        concepto: g.concepto || '', monto: parseFloat(g.monto || 0),
+        categoria: g.categorias_gastos?.nombre || g.categoria || '', created_at: g.created_at || ''
       }));
 
-      // Calcular esperados igual que CuadreDiarioPage
-      const efectivoEsperado =
-        ((cuadrePorForma['efectivo']?.total || 0) + (cuadrePorForma['efectivo_movil']?.total || 0)) - totalGastos;
-      const tarjetaEsperada =
-        (cuadrePorForma['tarjeta']?.total || 0) + (cuadrePorForma['tarjeta_movil']?.total || 0);
-      const transferenciaEsperada =
-        (cuadrePorForma['efectivo_facturado']?.total || 0) +
-        (cuadrePorForma['transferencia']?.total || 0) +
-        (cuadrePorForma['efectivo_facturado_movil']?.total || 0) +
-        (cuadrePorForma['transferencia_movil']?.total || 0);
-      const estadoCuentaEsperada =
-        (cuadrePorForma['estado_cuenta']?.total || 0) +
-        (cuadrePorForma['estado_cuenta_movil']?.total || 0);
+      const efectivoEsperado    = ((cuadrePorForma['efectivo']?.total || 0) + (cuadrePorForma['efectivo_movil']?.total || 0)) - totalGastos;
+      const tarjetaEsperada     = (cuadrePorForma['tarjeta']?.total || 0) + (cuadrePorForma['tarjeta_movil']?.total || 0);
+      const transferenciaEsperada = (cuadrePorForma['efectivo_facturado']?.total || 0) + (cuadrePorForma['transferencia']?.total || 0) + (cuadrePorForma['efectivo_facturado_movil']?.total || 0) + (cuadrePorForma['transferencia_movil']?.total || 0);
+      const estadoCuentaEsperada  = (cuadrePorForma['estado_cuenta']?.total || 0) + (cuadrePorForma['estado_cuenta_movil']?.total || 0);
 
-      // Efectivo contado: campo directo o calculado desde billetes
       const efectivoContado =
         (cuadreGuardado.efectivo_contado != null && cuadreGuardado.efectivo_contado > 0)
           ? parseFloat(cuadreGuardado.efectivo_contado)
-          : ((cuadreGuardado.billetes_200 || 0) * 200 + (cuadreGuardado.billetes_100 || 0) * 100 +
-             (cuadreGuardado.billetes_50  || 0) * 50  + (cuadreGuardado.billetes_20  || 0) * 20  +
-             (cuadreGuardado.billetes_10  || 0) * 10  + (cuadreGuardado.billetes_5   || 0) * 5   +
-             (cuadreGuardado.billetes_1   || 0) * 1);
+          : ((cuadreGuardado.billetes_200||0)*200 + (cuadreGuardado.billetes_100||0)*100 +
+             (cuadreGuardado.billetes_50 ||0)*50  + (cuadreGuardado.billetes_20 ||0)*20  +
+             (cuadreGuardado.billetes_10 ||0)*10  + (cuadreGuardado.billetes_5  ||0)*5   +
+             (cuadreGuardado.billetes_1  ||0)*1);
 
       const tarjetaContado       = parseFloat(cuadreGuardado.tarjeta_contado       || 0);
       const transferenciaContado = parseFloat(cuadreGuardado.transferencia_contado || 0);
@@ -249,34 +182,19 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
         estado_cuenta: 0
       };
 
-      const cuadreCorrecto =
-        Math.abs(diferencias.efectivo)   < 0.01 &&
-        Math.abs(diferencias.tarjeta)    < 0.01 &&
-        Math.abs(diferencias.depositado) < 0.01;
-
+      const cuadreCorrecto = Math.abs(diferencias.efectivo) < 0.01 && Math.abs(diferencias.tarjeta) < 0.01 && Math.abs(diferencias.depositado) < 0.01;
       const [yyyy, mm, dd] = fecha.split('-');
       const horaActual = getGuatemalaTime().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', hour12: false });
 
       await generarCuadreExcel({
-        fecha: `${dd}/${mm}/${yyyy}`,
-        horaActual,
-        totalConsultas: consultas?.length || 0,
-        totalVentas: resumen.totalIngresos,
-        efectivoEsperado,
-        efectivoContado,
-        tarjetaEsperada,
-        tarjetaContado,
-        transferenciaEsperada,
-        transferenciaContado,
-        diferencias,
-        cuadreCorrecto,
-        observaciones: cuadreGuardado.observaciones,
-        cajero: cuadreGuardado.nombre_cajero,
+        fecha: `${dd}/${mm}/${yyyy}`, horaActual,
+        totalConsultas: consultas?.length || 0, totalVentas: resumen.totalIngresos,
+        efectivoEsperado, efectivoContado, tarjetaEsperada, tarjetaContado,
+        transferenciaEsperada, transferenciaContado, diferencias, cuadreCorrecto,
+        observaciones: cuadreGuardado.observaciones, cajero: cuadreGuardado.nombre_cajero,
         cuadresPorFormaPago: Object.values(cuadrePorForma).map((c: any) => ({
-          forma_pago: getFormaPagoNombre(c.forma_pago),
-          cantidad: c.cantidad,
-          total: c.total,
-          es_servicio_movil: c.es_servicio_movil
+          forma_pago: getFormaPagoNombre(c.forma_pago), cantidad: c.cantidad,
+          total: c.total, es_servicio_movil: c.es_servicio_movil
         })),
         gastos: gastosParaExcel
       });
@@ -296,47 +214,43 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
 
   const getIconoAccion = (accion: string) => {
     switch (accion.toLowerCase()) {
-      case 'crear':   return <PlusCircle className="text-green-600" size={16} />;
-      case 'editar':  return <Edit       className="text-blue-600"  size={16} />;
-      case 'eliminar':return <Trash2     className="text-red-600"   size={16} />;
-      default:        return <Activity   className="text-gray-600"  size={16} />;
+      case 'crear':    return <PlusCircle className="text-green-600" size={16} />;
+      case 'editar':   return <Edit       className="text-blue-600"  size={16} />;
+      case 'eliminar': return <Trash2     className="text-red-600"   size={16} />;
+      default:         return <Activity   className="text-gray-600"  size={16} />;
     }
   };
 
   const getColorModulo = (modulo: string) => {
     const colores: { [key: string]: string } = {
-      'sanatorio':     'bg-blue-100 text-blue-700',
-      'inventario':    'bg-green-100 text-green-700',
-      'contabilidad':  'bg-purple-100 text-purple-700',
-      'personal':      'bg-orange-100 text-orange-700',
-      'doctores':      'bg-indigo-100 text-indigo-700',
-      'sistema':       'bg-gray-100 text-gray-700'
+      'sanatorio': 'bg-blue-100 text-blue-700', 'inventario': 'bg-green-100 text-green-700',
+      'contabilidad': 'bg-purple-100 text-purple-700', 'personal': 'bg-orange-100 text-orange-700',
+      'doctores': 'bg-indigo-100 text-indigo-700', 'sistema': 'bg-gray-100 text-gray-700'
     };
     return colores[modulo] || 'bg-gray-100 text-gray-700';
   };
 
-  const [tabActiva, setTabActiva] = useState<'resumen' | 'auditoria'>('resumen');
-  const [filtroUsuario, setFiltroUsuario] = useState('');
-  const [filtroModulo, setFiltroModulo] = useState('');
-  const [filtroAccion, setFiltroAccion] = useState('');
-  const [logDetalle, setLogDetalle] = useState<any | null>(null);
-
-  const logsAuditoria = resumen.actividadReciente;
-  const [mostrarTokens, setMostrarTokens] = useState(false);
-
-  const logsFiltrados = logsAuditoria.filter(l => {
+  const logsAuditoria  = resumen.actividadReciente;
+  const logsFiltrados  = logsAuditoria.filter(l => {
     const u = !filtroUsuario || l.nombre_usuario?.toLowerCase().includes(filtroUsuario.toLowerCase());
     const m = !filtroModulo  || l.modulo === filtroModulo;
     const a = !filtroAccion  || l.accion?.toLowerCase().includes(filtroAccion.toLowerCase());
-    const t = mostrarTokens || (l.tipo_registro !== 'token_autorizacion' && l.tipo_registro !== 'autorizacion');
+    const t = mostrarTokens  || (l.tipo_registro !== 'token_autorizacion' && l.tipo_registro !== 'autorizacion');
     return u && m && a && t;
   });
+
+  // ── Tab definitions ────────────────────────────────────────────
+  const tabs = [
+    { id: 'resumen'   as const, label: 'Resumen del Día', icon: Activity  },
+    { id: 'auditoria' as const, label: 'Auditoría',       icon: Shield    },
+    ...(esAdmin ? [{ id: 'horarios' as const, label: 'Horarios / Feriados', icon: Settings }] : []),
+  ];
 
   return (
     <div className="min-h-screen bg-slate-50">
 
-      {/* ── HEADER ── */}
-      <div style={{background:'linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#312e81 100%)'}}>
+      {/* ── HEADER ──────────────────────────────────────────────── */}
+      <div style={{ background: 'linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#312e81 100%)' }}>
         <div className="max-w-7xl mx-auto px-6 py-6">
           <button onClick={onBack} className="flex items-center gap-2 text-indigo-300 hover:text-white mb-5 text-sm font-medium transition-colors group">
             <ArrowLeft size={15} className="group-hover:-translate-x-1 transition-transform" /> Volver al Dashboard
@@ -351,24 +265,24 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                 <p className="text-indigo-300 text-sm mt-0.5">Panel de actividades, movimientos y auditoría</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <div className="bg-white/10 border border-white/15 rounded-xl px-4 py-2.5 flex items-center gap-2">
                 <Calendar size={14} className="text-indigo-300" />
-                <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)}
+                <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
                   className="bg-transparent text-white font-bold text-sm border-none outline-none cursor-pointer" />
               </div>
               <button onClick={descargarExcelCuadre}
                 className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-emerald-900/30">
                 <FileText size={14} /> Descargar Excel
               </button>
-              {localStorage.getItem('rolUsuarioConrad') === 'admin' && (
+              {esAdmin && (
                 <div className="flex items-center gap-1.5 bg-white/10 border border-white/15 rounded-xl px-3 py-2" title="Contraseña para desproteger el Excel">
                   <Shield size={12} className="text-yellow-300 shrink-0" />
                   <span className="text-xs text-white/60 font-medium">Excel:</span>
                   <span className="text-xs text-yellow-300 font-bold tracking-wide">Conrad2024!</span>
                 </div>
               )}
-              {localStorage.getItem('rolUsuarioConrad') === 'admin' && onNavigate && (
+              {esAdmin && onNavigate && (
                 <button onClick={() => onNavigate('usuarios')}
                   className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all">
                   <Shield size={14} /> Usuarios
@@ -379,10 +293,7 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
 
           {/* ── TABS ── */}
           <div className="flex gap-1 mt-6 border-b border-white/10">
-            {([
-              { id: 'resumen',   label: 'Resumen del Día',  icon: Activity },
-              { id: 'auditoria', label: 'Auditoría',        icon: Shield   },
-            ] as const).map(tab => {
+            {tabs.map(tab => {
               const Icon = tab.icon;
               return (
                 <button key={tab.id} onClick={() => setTabActiva(tab.id)}
@@ -402,20 +313,31 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
         </div>
       </div>
 
+      {/* ── CONTENT ─────────────────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {loading ? (
+
+        {/* ══ TAB: HORARIOS / FERIADOS ══ */}
+        {tabActiva === 'horarios' && (
+          <div className="max-w-3xl">
+            <PeriodosEspecialesPanel />
+          </div>
+        )}
+
+        {/* ══ LOADING ══ */}
+        {tabActiva !== 'horarios' && loading && (
           <div className="flex flex-col items-center justify-center py-24 gap-4">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent" />
             <p className="text-sm text-slate-400 font-medium">Cargando datos...</p>
           </div>
-        ) : tabActiva === 'resumen' ? (
+        )}
 
+        {/* ══ TAB: RESUMEN ══ */}
+        {tabActiva === 'resumen' && !loading && (
           <div className="space-y-6">
 
-            {/* ── Códigos Panel ── */}
             <GenerarCodigosPanel />
 
-            {/* ── KPI Cards ── */}
+            {/* KPI Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
                 <div className="flex items-center justify-between mb-4">
@@ -441,7 +363,7 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                 </div>
               </div>
 
-              <div className="rounded-2xl p-5 text-white shadow-lg" style={{background:'linear-gradient(135deg,#4f46e5,#7c3aed)'}}>
+              <div className="rounded-2xl p-5 text-white shadow-lg" style={{ background: 'linear-gradient(135deg,#4f46e5,#7c3aed)' }}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="bg-white/20 rounded-xl p-2"><DollarSign size={16} className="text-white" /></div>
                   <span className="text-xs font-bold text-indigo-200 uppercase tracking-wider">Total</span>
@@ -450,8 +372,8 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                 <p className="text-sm text-indigo-200 mt-2 font-medium">{resumen.totalConsultas} consultas totales</p>
               </div>
 
-              <div className={`rounded-2xl p-5 text-white shadow-lg ${resumen.ingresoNeto >= 0 ? '' : ''}`}
-                style={{background: resumen.ingresoNeto >= 0 ? 'linear-gradient(135deg,#059669,#0d9488)' : 'linear-gradient(135deg,#dc2626,#e11d48)'}}>
+              <div className="rounded-2xl p-5 text-white shadow-lg"
+                style={{ background: resumen.ingresoNeto >= 0 ? 'linear-gradient(135deg,#059669,#0d9488)' : 'linear-gradient(135deg,#dc2626,#e11d48)' }}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="bg-white/20 rounded-xl p-2">
                     {resumen.ingresoNeto >= 0 ? <TrendingUp size={16} className="text-white" /> : <TrendingDown size={16} className="text-white" />}
@@ -463,7 +385,7 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
               </div>
             </div>
 
-            {/* ── Detalle operativo ── */}
+            {/* Detalle operativo */}
             <div className="grid md:grid-cols-3 gap-4">
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                 <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2.5">
@@ -490,8 +412,8 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                 <div className="p-5 space-y-3">
                   {[
                     { icon: <PlusCircle size={13} className="text-emerald-500" />, label: 'Agregados',  val: resumen.productosAgregados,  color: 'text-emerald-600' },
-                    { icon: <Edit        size={13} className="text-blue-500"    />, label: 'Editados',   val: resumen.productosEditados,   color: 'text-blue-600'   },
-                    { icon: <Trash2      size={13} className="text-red-500"     />, label: 'Eliminados', val: resumen.productosEliminados, color: 'text-red-600'    },
+                    { icon: <Edit       size={13} className="text-blue-500"    />, label: 'Editados',   val: resumen.productosEditados,   color: 'text-blue-600'   },
+                    { icon: <Trash2     size={13} className="text-red-500"     />, label: 'Eliminados', val: resumen.productosEliminados, color: 'text-red-600'    },
                   ].map((row, i) => (
                     <div key={i} className={`flex justify-between items-center py-1 ${i > 0 ? 'border-t border-slate-50' : ''}`}>
                       <span className="text-sm text-slate-500 flex items-center gap-1.5">{row.icon}{row.label}</span>
@@ -526,7 +448,7 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
               </div>
             </div>
 
-            {/* ── Actividad Reciente ── */}
+            {/* Actividad Reciente */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -578,13 +500,12 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                 ))}
               </div>
             </div>
-
           </div>
+        )}
 
-        ) : (
-          /* ═══════════════ TAB AUDITORÍA ═══════════════ */
+        {/* ══ TAB: AUDITORÍA ══ */}
+        {tabActiva === 'auditoria' && !loading && (
           <div className="space-y-5">
-
             {/* Filtros */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
               <div className="flex items-center gap-2 mb-4">
@@ -592,8 +513,7 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                 <span className="text-sm font-black text-slate-800">Filtrar registros</span>
                 <div className="ml-auto flex items-center gap-3">
                   <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer select-none">
-                    <input type="checkbox" checked={mostrarTokens} onChange={e => setMostrarTokens(e.target.checked)}
-                      className="rounded" />
+                    <input type="checkbox" checked={mostrarTokens} onChange={e => setMostrarTokens(e.target.checked)} className="rounded" />
                     Mostrar autorizaciones con token
                   </label>
                   {(filtroUsuario || filtroModulo || filtroAccion) && (
@@ -630,13 +550,13 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
               </div>
             </div>
 
-            {/* Stats de auditoría */}
+            {/* Stats auditoría */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
-                { label: 'Total registros', val: logsAuditoria.length,                                                          color: 'text-slate-800',  bg: 'bg-slate-50'   },
-                { label: 'Con autorización', val: logsAuditoria.filter(l => l.requirio_autorizacion).length,                    color: 'text-amber-700',  bg: 'bg-amber-50'   },
-                { label: 'Eliminaciones',    val: logsAuditoria.filter(l => l.accion?.toLowerCase() === 'eliminar').length,     color: 'text-red-700',    bg: 'bg-red-50'     },
-                { label: 'Usuarios únicos',  val: new Set(logsAuditoria.map(l => l.nombre_usuario)).size,                       color: 'text-indigo-700', bg: 'bg-indigo-50'  },
+                { label: 'Total registros',  val: logsAuditoria.length,                                                       color: 'text-slate-800',  bg: 'bg-slate-50'  },
+                { label: 'Con autorización', val: logsAuditoria.filter(l => l.requirio_autorizacion).length,                  color: 'text-amber-700',  bg: 'bg-amber-50'  },
+                { label: 'Eliminaciones',    val: logsAuditoria.filter(l => l.accion?.toLowerCase() === 'eliminar').length,   color: 'text-red-700',    bg: 'bg-red-50'    },
+                { label: 'Usuarios únicos',  val: new Set(logsAuditoria.map(l => l.nombre_usuario)).size,                     color: 'text-indigo-700', bg: 'bg-indigo-50' },
               ].map((s, i) => (
                 <div key={i} className={`${s.bg} rounded-2xl p-4 border border-slate-100`}>
                   <p className={`text-2xl font-black ${s.color}`}>{s.val}</p>
@@ -645,7 +565,7 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
               ))}
             </div>
 
-            {/* Tabla de auditoría */}
+            {/* Tabla auditoría */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
                 <span className="text-sm font-black text-slate-800">
@@ -664,13 +584,9 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100">
-                      <th className="text-left px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-wider">Hora</th>
-                      <th className="text-left px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-wider">Usuario</th>
-                      <th className="text-left px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-wider">Módulo</th>
-                      <th className="text-left px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-wider">Acción</th>
-                      <th className="text-left px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-wider">Tipo</th>
-                      <th className="text-left px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-wider">Descripción</th>
-                      <th className="text-left px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-wider">Auth</th>
+                      {['Hora','Usuario','Módulo','Acción','Tipo','Descripción','Auth'].map(h => (
+                        <th key={h} className="text-left px-4 py-3 text-xs font-black text-slate-400 uppercase tracking-wider">{h}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -697,8 +613,7 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                         <td className="px-4 py-3">
                           {log.requirio_autorizacion
                             ? <span className="flex items-center gap-1 text-amber-600 font-bold text-xs"><CheckCircle size={12} />Sí</span>
-                            : <span className="text-slate-300 text-xs">—</span>
-                          }
+                            : <span className="text-slate-300 text-xs">—</span>}
                         </td>
                       </tr>
                     ))}
@@ -715,7 +630,7 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setLogDetalle(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100"
-              style={{background:'linear-gradient(135deg,#1e1b4b,#312e81)'}}>
+              style={{ background: 'linear-gradient(135deg,#1e1b4b,#312e81)' }}>
               <div className="flex items-center gap-3">
                 <div className="bg-white/15 rounded-xl p-2"><FileText size={16} className="text-white" /></div>
                 <div>
@@ -728,14 +643,14 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
             <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: 'Usuario',   val: logDetalle.nombre_usuario },
-                  { label: 'Login',     val: logDetalle.usuario        },
-                  { label: 'Rol',       val: logDetalle.rol            },
-                  { label: 'Módulo',    val: logDetalle.modulo         },
-                  { label: 'Acción',    val: logDetalle.accion         },
-                  { label: 'Tipo',      val: logDetalle.tipo_registro  },
-                  { label: 'Hora',      val: logDetalle.hora           },
-                  { label: 'Fecha',     val: logDetalle.fecha          },
+                  { label: 'Usuario', val: logDetalle.nombre_usuario },
+                  { label: 'Login',   val: logDetalle.usuario        },
+                  { label: 'Rol',     val: logDetalle.rol            },
+                  { label: 'Módulo',  val: logDetalle.modulo         },
+                  { label: 'Acción',  val: logDetalle.accion         },
+                  { label: 'Tipo',    val: logDetalle.tipo_registro  },
+                  { label: 'Hora',    val: logDetalle.hora           },
+                  { label: 'Fecha',   val: logDetalle.fecha          },
                 ].map((row, i) => row.val && (
                   <div key={i} className="bg-slate-50 rounded-xl p-3">
                     <p className="text-xs font-black text-slate-400 uppercase tracking-wide mb-0.5">{row.label}</p>
@@ -754,15 +669,12 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
               )}
               {logDetalle.detalles && (
                 <div className="space-y-3">
-                  {/* Cambio antes/después */}
                   {logDetalle.detalles.antes && logDetalle.detalles.despues && (
                     <div>
                       <p className="text-xs font-black text-slate-400 uppercase tracking-wide mb-2">Cambios realizados</p>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="bg-red-50 border border-red-100 rounded-xl p-3">
-                          <p className="text-xs font-black text-red-400 uppercase tracking-wide mb-2 flex items-center gap-1">
-                            <span>←</span> Antes
-                          </p>
+                          <p className="text-xs font-black text-red-400 uppercase tracking-wide mb-2">← Antes</p>
                           {Object.entries(logDetalle.detalles.antes).map(([k, v]) => (
                             <div key={k} className="mb-1.5">
                               <p className="text-xs text-red-400 font-bold capitalize">{k}</p>
@@ -771,9 +683,7 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                           ))}
                         </div>
                         <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
-                          <p className="text-xs font-black text-emerald-400 uppercase tracking-wide mb-2 flex items-center gap-1">
-                            <span>→</span> Después
-                          </p>
+                          <p className="text-xs font-black text-emerald-400 uppercase tracking-wide mb-2">→ Después</p>
                           {Object.entries(logDetalle.detalles.despues).map(([k, v]) => {
                             const cambiado = String(logDetalle.detalles.antes[k]) !== String(v);
                             return (
@@ -787,25 +697,8 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                           })}
                         </div>
                       </div>
-                      {/* Resumen de qué cambió */}
-                      <div className="mt-2 bg-slate-50 border border-slate-100 rounded-xl p-3">
-                        <p className="text-xs font-black text-slate-400 uppercase tracking-wide mb-1.5">Campos modificados</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {Object.entries(logDetalle.detalles.despues)
-                            .filter(([k, v]) => String(logDetalle.detalles.antes[k]) !== String(v))
-                            .map(([k]) => (
-                              <span key={k} className="bg-indigo-100 text-indigo-700 text-xs font-black px-2.5 py-1 rounded-lg capitalize">{k}</span>
-                            ))}
-                          {Object.entries(logDetalle.detalles.despues)
-                            .filter(([k, v]) => String(logDetalle.detalles.antes[k]) !== String(v)).length === 0 && (
-                            <span className="text-xs text-slate-400">Sin cambios detectados</span>
-                          )}
-                        </div>
-                      </div>
                     </div>
                   )}
-
-                  {/* Precio anterior/nuevo */}
                   {logDetalle.detalles.precio_anterior !== undefined && (
                     <div>
                       <p className="text-xs font-black text-slate-400 uppercase tracking-wide mb-2">Cambio de precio</p>
@@ -819,23 +712,13 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                           <p className="text-xl font-black text-emerald-600">Q {Number(logDetalle.detalles.precio_nuevo).toFixed(2)}</p>
                         </div>
                       </div>
-                      {logDetalle.detalles.justificacion && (
-                        <div className="mt-2 bg-amber-50 border border-amber-100 rounded-xl p-3">
-                          <p className="text-xs font-black text-amber-500 uppercase tracking-wide mb-1">Justificación</p>
-                          <p className="text-xs text-amber-700">{logDetalle.detalles.justificacion}</p>
-                        </div>
-                      )}
                     </div>
                   )}
-
-                  {/* Otros campos del detalle (sin antes/despues ni precio) */}
                   {!logDetalle.detalles.antes && logDetalle.detalles.precio_anterior === undefined && (
                     <div>
                       <p className="text-xs font-black text-slate-400 uppercase tracking-wide mb-2">Información adicional</p>
                       <div className="grid grid-cols-2 gap-2">
-                        {Object.entries(logDetalle.detalles)
-                          .filter(([k]) => k !== 'descripcion')
-                          .map(([k, v]) => (
+                        {Object.entries(logDetalle.detalles).filter(([k]) => k !== 'descripcion').map(([k, v]) => (
                           <div key={k} className="bg-slate-50 rounded-xl p-3">
                             <p className="text-xs font-black text-slate-400 capitalize mb-0.5">{k.replace(/_/g,' ')}</p>
                             <p className="text-sm font-semibold text-slate-700 break-words">{String(v)}</p>
@@ -844,8 +727,6 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                       </div>
                     </div>
                   )}
-
-                  {/* JSON raw toggle */}
                   <details className="mt-1">
                     <summary className="text-xs text-slate-400 cursor-pointer hover:text-slate-600 font-semibold">Ver JSON completo</summary>
                     <pre className="mt-2 bg-slate-900 text-emerald-400 text-xs p-4 rounded-xl overflow-x-auto font-mono leading-relaxed">
@@ -858,7 +739,6 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
           </div>
         </div>
       )}
-
     </div>
   );
 };

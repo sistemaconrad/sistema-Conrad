@@ -59,31 +59,52 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const [showModalTipoRecibo, setShowModalTipoRecibo] = useState(false);
   const [datosReciboTemp, setDatosReciboTemp] = useState<any>(null);
 
-  const esHorarioNormal = () => {
+  // Cache del resultado de horario normal (se recarga al montar y cada 5 min)
+  const [_horarioNormalCache, setHorarioNormalCache] = useState<boolean | null>(null);
+
+  const esHorarioNormalBase = (): boolean => {
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Guatemala' }));
-    const dia = now.getDay();
+    const dia  = now.getDay();
     const hora = now.getHours();
-    const minuto = now.getMinutes();
-    const año = now.getFullYear();
-    const mes = now.getMonth();
-    const diaNum = now.getDate();
-
-    // SEMANA SANTA 2026: especial desde Mié 1 abril 12:00 hasta Lun 6 abril 7:00am
-    if (año === 2026 && mes === 3) {
-      if (diaNum === 1 && hora >= 12) return false;
-      if (diaNum >= 2 && diaNum <= 5) return false;
-      if (diaNum === 6 && hora < 7) return false;
-    }
-
     if (dia >= 1 && dia <= 5) return hora >= 7 && hora < 16;
-    if (dia === 6) return hora >= 7 && hora < 11;
+    if (dia === 6)            return hora >= 7 && hora < 11;
     return false;
   };
 
+  const verificarPeriodosEspeciales = async (): Promise<boolean> => {
+    try {
+      const ahora = new Date().toISOString();
+      const { data } = await supabase
+        .from('periodos_especiales')
+        .select('id')
+        .eq('activo', true)
+        .lte('fecha_inicio', ahora)
+        .gte('fecha_fin', ahora)
+        .limit(1);
+      // Si hay algún periodo especial activo ahora → NO es horario normal
+      if (data && data.length > 0) return false;
+    } catch { /* Si falla la consulta, usa lógica base */ }
+    return esHorarioNormalBase();
+  };
+
+  // Precarga el estado de horario al montar
   useEffect(() => {
-    const horarioNormal = esHorarioNormal();
-    setTipoCobro(horarioNormal ? 'normal' : 'especial');
+    verificarPeriodosEspeciales().then(r => {
+      setHorarioNormalCache(r);
+      setTipoCobro(r ? 'normal' : 'especial');
+    });
+    // Refresca cada 5 minutos
+    const interval = setInterval(() => {
+      verificarPeriodosEspeciales().then(r => setHorarioNormalCache(r));
+    }, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
+
+  // Función sincrónica para el render — usa el cache
+  const esHorarioNormal = (): boolean => {
+    if (_horarioNormalCache !== null) return _horarioNormalCache;
+    return esHorarioNormalBase(); // fallback mientras carga
+  };
 
   useEffect(() => {
     cargarEstudios();

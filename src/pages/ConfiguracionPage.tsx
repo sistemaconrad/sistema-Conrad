@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Edit2, Trash2, Briefcase, Building, Settings } from 'lucide-react';
+import { ArrowLeft, Plus, Edit2, Trash2, Briefcase, Building, Settings, Calendar } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { PeriodosEspecialesPanel } from '../components/PeriodosEspecialesPanel';
 
 interface ConfiguracionPageProps {
   onBack: () => void;
@@ -193,6 +194,11 @@ export const ConfiguracionPage: React.FC<ConfiguracionPageProps> = ({ onBack }) 
               )}
             </div>
           </div>
+        </div>
+
+        {/* Periodos de Precio Especial */}
+        <div className="mt-6 bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          <PeriodosEspecialesPanel />
         </div>
       </div>
 
