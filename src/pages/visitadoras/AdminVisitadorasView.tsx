@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabaseVisitadoras } from '../../lib/supabaseVisitadoras';
+import { supabase } from '../../lib/supabase';
 import { Users, Eye, Plus, Trash2, X, Save, Stethoscope, DollarSign, Download } from 'lucide-react';
 
 interface Visitadora {
@@ -12,6 +13,16 @@ interface Visitadora {
   activo: boolean;
 }
 
+interface Prospecto {
+  id: string;
+  nombre: string;
+  telefono: string;
+  departamento: string;
+  municipio: string;
+  direccion: string;
+  created_at: string;
+}
+
 interface AdminVisitadorasViewProps {
   adminUsuario: string | null;
 }
@@ -19,6 +30,8 @@ interface AdminVisitadorasViewProps {
 export const AdminVisitadorasView: React.FC<AdminVisitadorasViewProps> = ({ adminUsuario }) => {
   const [activeTab, setActiveTab] = useState('visitadoras');
   const [visitadoras, setVisitadoras] = useState<Visitadora[]>([]);
+  const [prospectos, setProspectos] = useState<Prospecto[]>([]);
+  const [loadingProspectos, setLoadingProspectos] = useState(false);
   const [loading, setLoading] = useState(true);
   const [visitadoraSeleccionada, setVisitadoraSeleccionada] = useState<string | null>(null);
   
@@ -36,7 +49,22 @@ export const AdminVisitadorasView: React.FC<AdminVisitadorasViewProps> = ({ admi
     if (activeTab === 'visitadoras') {
       loadVisitadoras();
     }
+    if (activeTab === 'medicos') {
+      loadProspectos();
+    }
   }, [activeTab]);
+
+  const loadProspectos = async () => {
+    setLoadingProspectos(true);
+    const { data } = await supabase
+      .from('medicos')
+      .select('*')
+      .eq('es_referente', false)
+      .eq('activo', true)
+      .order('nombre');
+    setProspectos(data || []);
+    setLoadingProspectos(false);
+  };
 
   const loadVisitadoras = async () => {
     setLoading(true);
@@ -297,10 +325,58 @@ export const AdminVisitadorasView: React.FC<AdminVisitadorasViewProps> = ({ admi
       )}
 
       {activeTab === 'medicos' && (
-        <div className="bg-white rounded-lg shadow-md p-12 text-center">
-          <Stethoscope size={48} className="mx-auto mb-4 text-gray-400" />
-          <h3 className="text-xl font-bold text-gray-800 mb-2">Módulo de Médicos</h3>
-          <p className="text-gray-600">En desarrollo - Próximamente</p>
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Stethoscope size={24} className="text-pink-600" />
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">Prospectos Médicos</h2>
+                <p className="text-sm text-gray-500">Médicos no referentes registrados en el sistema</p>
+              </div>
+            </div>
+            <span className="bg-pink-100 text-pink-700 text-sm font-semibold px-3 py-1 rounded-full">
+              {prospectos.length} registros
+            </span>
+          </div>
+
+          {loadingProspectos ? (
+            <div className="p-12 text-center text-gray-500">Cargando prospectos...</div>
+          ) : prospectos.length === 0 ? (
+            <div className="p-12 text-center">
+              <Stethoscope size={40} className="mx-auto mb-3 text-gray-300" />
+              <p className="text-gray-500">No hay prospectos registrados aún.</p>
+              <p className="text-sm text-gray-400 mt-1">Aparecerán aquí cuando se registre un paciente con médico no referente.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-gray-600 uppercase text-xs">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Nombre</th>
+                    <th className="px-4 py-3 text-left">Teléfono</th>
+                    <th className="px-4 py-3 text-left">Municipio</th>
+                    <th className="px-4 py-3 text-left">Departamento</th>
+                    <th className="px-4 py-3 text-left">Dirección</th>
+                    <th className="px-4 py-3 text-left">Registrado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {prospectos.map((p) => (
+                    <tr key={p.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-medium text-gray-800">{p.nombre}</td>
+                      <td className="px-4 py-3 text-gray-600">{p.telefono || '—'}</td>
+                      <td className="px-4 py-3 text-gray-600">{p.municipio || '—'}</td>
+                      <td className="px-4 py-3 text-gray-600">{p.departamento || '—'}</td>
+                      <td className="px-4 py-3 text-gray-600">{p.direccion || '—'}</td>
+                      <td className="px-4 py-3 text-gray-400 text-xs">
+                        {new Date(p.created_at).toLocaleDateString('es-GT')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

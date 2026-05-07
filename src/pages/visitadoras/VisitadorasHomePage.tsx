@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   ArrowLeft, Users, Stethoscope, DollarSign, FileSpreadsheet,
-  MapPin, CreditCard, LogOut, UserPlus, LayoutDashboard, CalendarDays, Menu, X
+  MapPin, CreditCard, LogOut, UserPlus, LayoutDashboard, CalendarDays, Menu, X, Globe
 } from 'lucide-react';
 import { MedicosView }              from './MedicosView';
 import { VisitasView }              from './VisitasView';
@@ -11,12 +11,13 @@ import { PagosComisionesView }      from './PagosComisionesView';
 import { ProspectosView }           from './ProspectosView';
 import { DashboardView }            from './DashboardView';
 import { PlanificadorView }         from './PlanificadorView';
+import { PortalAccesosView }        from './PortalAccesosView';
 
 interface VisitadorasHomePageProps {
   onBack: () => void;
 }
 
-type TabKey = 'dashboard' | 'visitas' | 'prospectos' | 'medicos' | 'comisiones' | 'pagos' | 'reportes' | 'planificador';
+type TabKey = 'dashboard' | 'visitas' | 'prospectos' | 'medicos' | 'comisiones' | 'pagos' | 'reportes' | 'planificador' | 'portal';
 
 export const VisitadorasHomePage: React.FC<VisitadorasHomePageProps> = ({ onBack }) => {
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
@@ -43,6 +44,7 @@ export const VisitadorasHomePage: React.FC<VisitadorasHomePageProps> = ({ onBack
     { key: 'comisiones',   label: 'Comisiones',         icon: <DollarSign size={15} />, soloAdmin: true },
     { key: 'pagos',        label: 'Pagos',              icon: <CreditCard size={15} />, soloAdmin: true },
     { key: 'reportes',     label: 'Reportes',           icon: <FileSpreadsheet size={15} /> },
+    { key: 'portal',      label: 'Portal Web',         icon: <Globe size={15} />, soloAdmin: true },
   ];
 
   const tabsVisibles = tabs.filter(t => !t.soloAdmin || !esVisitadora);
@@ -57,6 +59,7 @@ export const VisitadorasHomePage: React.FC<VisitadorasHomePageProps> = ({ onBack
       case 'comisiones':   return <ComisionesView />;
       case 'pagos':        return <PagosComisionesView />;
       case 'reportes':     return <ReportesVisitadorasView />;
+      case 'portal':       return <PortalAccesosView />;
     }
   };
 
