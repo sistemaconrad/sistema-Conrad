@@ -78,7 +78,11 @@ export const PortalAccesosView: React.FC = () => {
         .order('activo', { ascending: false })
         .order('created_at', { ascending: false });
 
-      setAccesos(acc || []);
+      const accNormalized: AccesoMedico[] = (acc || []).map((a: any) => ({
+        ...a,
+        medico: Array.isArray(a.medico) ? a.medico[0] ?? undefined : a.medico,
+      }));
+      setAccesos(accNormalized);
 
       // Médicos referentes sin acceso
       const idsConAcceso = new Set((acc || []).map((a: any) => a.medico_id));
@@ -106,7 +110,10 @@ export const PortalAccesosView: React.FC = () => {
         .is('consulta_id', null)
         .order('created_at', { ascending: false })
         .limit(100);
-      const msgs = (data || []) as Mensaje[];
+      const msgs: Mensaje[] = (data || []).map((m: any) => ({
+        ...m,
+        medico: Array.isArray(m.medico) ? m.medico[0] ?? undefined : m.medico,
+      }));
       setMensajes(msgs);
       setMensajesNoLeidos(msgs.filter(m => !m.nota.startsWith('[TEAM]')).length);
     } catch(e) { console.error(e); }
