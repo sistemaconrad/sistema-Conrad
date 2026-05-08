@@ -3,7 +3,6 @@ import { ArrowLeft, Calendar, DollarSign, CheckCircle2, Plus, Trash2, X, Chevron
 import { supabase } from '../lib/supabase';
 import { format, subDays } from 'date-fns';
 import { generarCuadreExcel } from '../utils/cuadre-excel-generator';
-import { registrarLog } from '../utils/registrarLog';
 import { AutorizacionModal } from '../components/AutorizacionModal';
 
 interface CuadrePorFormaPago {
@@ -115,6 +114,8 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
   const [showModalGasto, setShowModalGasto] = useState(false);
   const [conceptoGasto, setConceptoGasto] = useState('');
   const [montoGasto, setMontoGasto] = useState('');
+  const [categoriaGasto, setCategoriaGasto] = useState('');
+  const [categoriasGasto, setCategoriasGasto] = useState<any[]>([]);
 
   const [mostrarGastos, setMostrarGastos] = useState(true);
   const [mostrarAnuladas, setMostrarAnuladas] = useState(false);
@@ -150,7 +151,13 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
   useEffect(() => {
     cargarCuadre();
     resetearCuadre();
+    cargarCategorias();
   }, [fecha]);
+
+  const cargarCategorias = async () => {
+    const { data } = await supabase.from('categorias_gastos').select('*').order('nombre');
+    setCategoriasGasto(data || []);
+  };
 
   const resetearCuadre = () => {
     setBilletes({ b200: '', b100: '', b50: '', b20: '', b10: '', b5: '', b1: '' });
@@ -314,15 +321,6 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
         .upsert(cuadreData, { onConflict: 'fecha' });
 
       if (error) throw error;
-
-      await registrarLog({
-        modulo: 'cuadre',
-        accion: 'guardar',
-        tipo_registro: 'cuadre_diario',
-        descripcion: `Cuadre del día ${fecha} guardado`,
-        detalles: { fecha, cajero: nombreCajero, efectivo_contado: efectivoContadoNum }
-      });
-
       alert('✅ Cuadre guardado correctamente');
     } catch (error) {
       console.error('Error al guardar cuadre:', error);
@@ -373,43 +371,28 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
   };
 
   const agregarGasto = async () => {
-    if (!conceptoGasto.trim() || !montoGasto) {
+    if (!conceptoGasto.trim() || !montoGasto || !categoriaGasto) {
       alert('Complete todos los campos del gasto');
       return;
     }
 
     try {
-      let { data: categoria, error: catError } = await supabase
-        .from('categorias_gastos')
-        .select('id')
-        .eq('nombre', 'Gastos Operativos')
-        .maybeSingle();
-
-      if (catError || !categoria) {
-        const { data: nuevaCategoria, error: nuevaCatError } = await supabase
-          .from('categorias_gastos')
-          .insert([{ nombre: 'Gastos Operativos', descripcion: 'Gastos diarios operacionales' }])
-          .select()
-          .single();
-
-        if (nuevaCatError) throw nuevaCatError;
-        categoria = nuevaCategoria;
-      }
-
       const { error } = await supabase
         .from('gastos')
         .insert([{
           fecha,
-          categoria_id: categoria.id,
+          categoria_id: categoriaGasto,
           concepto: conceptoGasto,
           monto: parseFloat(montoGasto),
-          forma_pago: 'efectivo'
+          forma_pago: 'efectivo',
+          nombre_usuario: localStorage.getItem('nombreUsuarioConrad') || ''
         }]);
 
       if (error) throw error;
 
       setConceptoGasto('');
       setMontoGasto('');
+      setCategoriaGasto('');
       setShowModalGasto(false);
       cargarGastos();
       alert('✅ Gasto agregado exitosamente');
@@ -422,21 +405,8 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
   const eliminarGasto = async (id: string) => {
     if (!confirm('¿Eliminar este gasto?')) return;
     try {
-      const gastoAEliminar = gastos.find((g: any) => g.id === id);
       const { error } = await supabase.from('gastos').delete().eq('id', id);
       if (error) throw error;
-
-      await registrarLog({
-        modulo: 'gastos',
-        accion: 'eliminar',
-        tipo_registro: 'gasto',
-        registro_id: id,
-        descripcion: gastoAEliminar
-          ? `Gasto eliminado desde cuadre: ${gastoAEliminar.concepto} - Q${Number(gastoAEliminar.monto).toFixed(2)}`
-          : `Gasto eliminado desde cuadre (id: ${id})`,
-        detalles: gastoAEliminar ? { concepto: gastoAEliminar.concepto, monto: gastoAEliminar.monto } : {}
-      });
-
       cargarGastos();
       alert('Gasto eliminado');
     } catch (error) {
@@ -571,14 +541,6 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
     const horaActual = format(new Date(), 'HH:mm');
 
     if (formato === 'csv') {
-      // Usar los gastos ya cargados en el estado de la página
-      const gastosParaExcel = gastos.map((g: any) => ({
-        concepto: g.concepto || '',
-        monto: parseFloat(g.monto || 0),
-        categoria: g.categorias_gastos?.nombre || g.categoria || '',
-        created_at: g.created_at || ''
-      }));
-
       await generarCuadreExcel({
         fecha: fechaFormateada,
         horaActual,
@@ -599,8 +561,7 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
           cantidad: c.cantidad,
           total: c.total,
           es_servicio_movil: c.es_servicio_movil || false
-        })) || [],
-        gastos: gastosParaExcel
+        })) || []
       });
     }
   };
@@ -1142,9 +1103,22 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
             <div className="flex justify-between items-center mb-5">
               <h2 className="text-xl font-bold text-gray-900">Agregar Gasto</h2>
-              <button onClick={() => { setShowModalGasto(false); setConceptoGasto(''); setMontoGasto(''); }} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+              <button onClick={() => { setShowModalGasto(false); setConceptoGasto(''); setMontoGasto(''); setCategoriaGasto(''); }} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
             </div>
             <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Categoría *</label>
+                <select
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={categoriaGasto}
+                  onChange={(e) => setCategoriaGasto(e.target.value)}
+                >
+                  <option value="">Seleccione una categoría</option>
+                  {categoriasGasto.map(c => (
+                    <option key={c.id} value={c.id}>{c.nombre}</option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Concepto *</label>
                 <input type="text" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: Diesel, Papelería, Mantenimiento" value={conceptoGasto} onChange={(e) => setConceptoGasto(e.target.value)} />
@@ -1155,7 +1129,7 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
               </div>
             </div>
             <div className="flex gap-3 justify-end mt-6">
-              <button onClick={() => { setShowModalGasto(false); setConceptoGasto(''); setMontoGasto(''); }} className="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors">Cancelar</button>
+              <button onClick={() => { setShowModalGasto(false); setConceptoGasto(''); setMontoGasto(''); setCategoriaGasto(''); }} className="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors">Cancelar</button>
               <button onClick={agregarGasto} className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors">Guardar Gasto</button>
             </div>
           </div>

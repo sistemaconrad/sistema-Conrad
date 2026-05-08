@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, Edit2, Search, Calendar, ChevronDown, ChevronUp, TrendingDown } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Search, Calendar, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { registrarLog } from '../utils/registrarLog';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { generarReporteGastosDiario, generarReporteGastosMensual } from '../utils/gastos-excel-generator';
 
 interface GastosPageProps {
   onBack: () => void;
@@ -38,6 +38,7 @@ export const GastosPage: React.FC<GastosPageProps> = ({ onBack }) => {
   const [mes, setMes] = useState(new Date().getMonth() + 1);
   const [anio, setAnio] = useState(new Date().getFullYear());
   const [diasExpandidos, setDiasExpandidos] = useState<Set<string>>(new Set());
+  const [descargando, setDescargando] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -107,18 +108,10 @@ export const GastosPage: React.FC<GastosPageProps> = ({ onBack }) => {
         .insert([{
           ...formData,
           monto: parseFloat(formData.monto),
-          usuario_registro: 'Admin' // Cambiar por usuario actual
+          nombre_usuario: localStorage.getItem('nombreUsuarioConrad') || ''
         }]);
 
       if (error) throw error;
-
-      await registrarLog({
-        modulo: 'gastos',
-        accion: 'crear',
-        tipo_registro: 'gasto',
-        descripcion: `Gasto registrado: ${formData.concepto} - Q${parseFloat(formData.monto).toFixed(2)}`,
-        detalles: { concepto: formData.concepto, monto: parseFloat(formData.monto), fecha: formData.fecha }
-      });
 
       alert('Gasto registrado exitosamente');
       setShowModal(false);
@@ -134,26 +127,12 @@ export const GastosPage: React.FC<GastosPageProps> = ({ onBack }) => {
     if (!confirm('¿Eliminar este gasto?')) return;
 
     try {
-      const gastoAEliminar = gastos.find((g: any) => g.id === id);
-
       const { error } = await supabase
         .from('gastos')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
-
-      await registrarLog({
-        modulo: 'gastos',
-        accion: 'eliminar',
-        tipo_registro: 'gasto',
-        registro_id: id,
-        descripcion: gastoAEliminar
-          ? `Gasto eliminado: ${gastoAEliminar.concepto} - Q${Number(gastoAEliminar.monto).toFixed(2)}`
-          : `Gasto eliminado (id: ${id})`,
-        detalles: gastoAEliminar ? { concepto: gastoAEliminar.concepto, monto: gastoAEliminar.monto, fecha: gastoAEliminar.fecha } : {}
-      });
-
       cargarGastos();
     } catch (error) {
       console.error('Error:', error);
@@ -219,24 +198,34 @@ export const GastosPage: React.FC<GastosPageProps> = ({ onBack }) => {
 
   const totalGastos = gastosFiltrados.reduce((sum, g) => sum + g.monto, 0);
 
+  const handleDescargarDiario = async () => {
+    const fechaHoy = format(new Date(), 'yyyy-MM-dd');
+    setDescargando(true);
+    try { await generarReporteGastosDiario(fechaHoy); }
+    catch { alert('Error al generar reporte diario'); }
+    finally { setDescargando(false); }
+  };
+
+  const handleDescargarMensual = async () => {
+    setDescargando(true);
+    try { await generarReporteGastosMensual(mes, anio); }
+    catch { alert('Error al generar reporte mensual'); }
+    finally { setDescargando(false); }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div style={{background:'linear-gradient(135deg,#0f172a 0%,#064e3b 50%,#065f46 100%)'}}>
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <button onClick={onBack} className="flex items-center gap-2 text-emerald-200 hover:text-white mb-4 text-sm font-medium transition-colors group">
-            <ArrowLeft size={15} className="group-hover:-translate-x-1 transition-transform" /> Volver a Contabilidad
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <button onClick={onBack} className="text-white hover:text-red-100 mb-4 flex items-center gap-2">
+            <ArrowLeft size={20} />
+            Volver a Contabilidad
           </button>
-          <div className="flex items-center gap-4">
-            <div className="bg-white/10 rounded-2xl p-3 border border-white/10">
-              <TrendingDown size={24} className="text-red-200" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-black text-white tracking-tight">Gastos</h1>
-              <p className="text-emerald-300 text-sm mt-0.5">Registro y control de gastos operativos</p>
-            </div>
-          </div>
+          <h1 className="text-3xl font-bold">📉 Gestión de Gastos</h1>
+          <p className="text-red-100 mt-2">Registro y control de gastos operativos</p>
         </div>
-      </div>
+      </header>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Controles */}
@@ -279,13 +268,31 @@ export const GastosPage: React.FC<GastosPageProps> = ({ onBack }) => {
                 />
               </div>
             </div>
-            <button
-              onClick={() => setShowModal(true)}
-              className="btn-primary flex items-center gap-2 mt-auto"
-            >
-              <Plus size={20} />
-              Nuevo Gasto
-            </button>
+            <div className="flex gap-2 mt-auto flex-wrap">
+              <button
+                onClick={handleDescargarDiario}
+                disabled={descargando}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:bg-gray-400 text-sm"
+              >
+                <Download size={16} />
+                Gastos Hoy
+              </button>
+              <button
+                onClick={handleDescargarMensual}
+                disabled={descargando}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:bg-gray-400 text-sm"
+              >
+                <Download size={16} />
+                Gastos del Mes
+              </button>
+              <button
+                onClick={() => setShowModal(true)}
+                className="btn-primary flex items-center gap-2"
+              >
+                <Plus size={20} />
+                Nuevo Gasto
+              </button>
+            </div>
           </div>
         </div>
 

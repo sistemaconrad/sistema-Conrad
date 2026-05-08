@@ -360,7 +360,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           es_servicio_movil: esServicioMovil,
           // ✅ ELIMINADO: movil_incluye_placas, movil_precio_placas, movil_incluye_informe, movil_precio_informe
           movil_establecimiento: esServicioMovil ? establecimientoMovil : null,
-          detalle_pagos_multiples: detallePagosMultiples
+          detalle_pagos_multiples: detallePagosMultiples,
+          nombre_usuario: localStorage.getItem('nombreUsuarioConrad') || ''
         }])
         .select()
         .single();

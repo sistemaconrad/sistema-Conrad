@@ -18,12 +18,11 @@ interface Consulta {
   };
   medicos?: {
     nombre: string;
-    es_referente?: boolean;
   };
   medico_recomendado?: string;
+  medico_id?: string | null;
   sin_informacion_medico?: boolean;
-  sin_orden_medica?: boolean;
-  medico_es_referente?: boolean;
+  nombre_usuario?: string;
   numero_factura?: string;
   tipo_cobro: string;
   forma_pago: string;
@@ -128,7 +127,7 @@ async function crearHojaDiaria(
   // Calcular número total de columnas
   const numColumnasFijas = 9; // ✅ Cambiado de 8 a 9 (agregamos HORA)
   const numColumnasEstudios = estudiosDisponibles.length;
-  const numColumnasFinales = 2;
+  const numColumnasFinales = 3; // Cuenta, Tipo, Atendido Por
   const totalColumnas = numColumnasFijas + numColumnasEstudios + numColumnasFinales;
 
   // Configurar anchos de columna
@@ -139,7 +138,7 @@ async function crearHojaDiaria(
     { width: 6 },   // Edad
     { width: 13 },  // No. Factura
     { width: 28 },  // Estudio
-    { width: 20 },  // Médico
+    { width: 22 },  // Médico
     { width: 13 },  // Precio Social
     { width: 13 },  // Forma de Pago
   ];
@@ -148,8 +147,9 @@ async function crearHojaDiaria(
     columnWidths.push({ width: 11 });
   });
 
-  columnWidths.push({ width: 11 });
-  columnWidths.push({ width: 6 });
+  columnWidths.push({ width: 11 }); // Cuenta
+  columnWidths.push({ width: 6 });  // Tipo
+  columnWidths.push({ width: 16 }); // Atendido Por
 
   worksheet.columns = columnWidths;
 
@@ -209,7 +209,8 @@ async function crearHojaDiaria(
     'FORMA DE PAGO',
     ...estudiosDisponibles.map(e => e.nombre.toUpperCase()),
     'CUENTA',
-    'TIPO'
+    'TIPO',
+    'ATENDIDO POR'
   ];
   
   worksheet.getRow(2).values = headers;
@@ -267,29 +268,16 @@ async function crearHojaDiaria(
     const precioTotal = consulta.detalle_consultas.reduce((sum, det) => sum + det.precio, 0);
       
     let nombreMedico: string;
-    // Color para celda médico: verde=referente, azul=no referente, ámbar=sin orden, gris=sin info
-    let medicoColorArgb: string | null = null;
-
+    const esNoReferente = !consulta.sin_informacion_medico && !consulta.medicos?.nombre && !!consulta.medico_recomendado;
+    
     if (consulta.sin_informacion_medico) {
       nombreMedico = 'SIN INFORMACIÓN';
-      medicoColorArgb = null; // sin color especial
-    } else if (consulta.sin_orden_medica) {
-      // Sin orden médica — ámbar
-      const nm = consulta.medicos?.nombre || consulta.medico_recomendado || 'TRATANTE';
-      nombreMedico = `${nm} (SIN ORDEN MÉDICA)`;
-      medicoColorArgb = 'FFFFF3CD'; // ámbar claro
-    } else if (consulta.medicos?.es_referente || consulta.medico_es_referente) {
-      // Referente — verde, sin etiqueta extra
-      nombreMedico = consulta.medicos?.nombre || consulta.medico_recomendado || 'TRATANTE';
-      medicoColorArgb = 'FFD4EDDA'; // verde claro
-    } else if (consulta.medicos?.nombre || consulta.medico_recomendado) {
-      // No referente — azul claro con etiqueta
-      const nm = consulta.medicos?.nombre || consulta.medico_recomendado || '';
-      nombreMedico = `${nm} (NO REFERENTE)`;
-      medicoColorArgb = 'FFD1ECF1'; // azul claro
+    } else if (consulta.medicos?.nombre) {
+      nombreMedico = consulta.medicos.nombre;
+    } else if (consulta.medico_recomendado) {
+      nombreMedico = `${consulta.medico_recomendado} (NO REFERENTE)`;
     } else {
       nombreMedico = 'TRATANTE';
-      medicoColorArgb = null;
     }
 
     // Formatear edad correctamente
@@ -383,6 +371,7 @@ async function crearHojaDiaria(
 
     valoresFila.push(consulta.forma_pago === 'estado_cuenta' ? precioTotal : '');
     valoresFila.push(tipoCobroTexto);
+    valoresFila.push((consulta.nombre_usuario || '').toUpperCase());
 
     worksheet.getRow(filaActual).values = valoresFila;
 
@@ -392,10 +381,8 @@ async function crearHojaDiaria(
       // ✅ Actualizado: colIdx 5 es ESTUDIO (antes era 4)
       if (colIdx === 5 && esInhabil) {
         cell.font = { name: 'Arial', size: 10, color: { argb: 'FFFF0000' }, bold: true };
-      } else if (colIdx === 6 && medicoColorArgb) {
-        // Color de fondo para columna MEDICO REFERENTE según tipo
-        cell.font = { name: 'Arial', size: 10, bold: true };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: medicoColorArgb } };
+      } else if (colIdx === 6 && esNoReferente) {
+        cell.font = { name: 'Arial', size: 10, color: { argb: 'FFE67E22' }, bold: true };
       } else {
         cell.font = { name: 'Arial', size: 10 };
       }
@@ -901,7 +888,7 @@ export const generarReporteMensualUnificado = async (
   const estudios = estudiosDisponibles || [];
   const numColumnasFijas = 8; // No., Fecha, Paciente, Edad, No. Factura, Estudio, Médico, Precio Social
   const numColumnasEstudios = estudios.length;
-  const numColumnasFinales = 3; // Forma Pago, Cuenta, Tipo
+  const numColumnasFinales = 4; // Forma Pago, Cuenta, Tipo, Atendido Por
   const totalColumnas = numColumnasFijas + numColumnasEstudios + numColumnasFinales;
 
   // Configurar anchos de columna
@@ -912,7 +899,7 @@ export const generarReporteMensualUnificado = async (
     { width: 6 },   // Edad
     { width: 13 },  // No. Factura
     { width: 28 },  // Estudio
-    { width: 20 },  // Médico
+    { width: 22 },  // Médico
     { width: 13 },  // Precio Social
   ];
 
@@ -923,6 +910,7 @@ export const generarReporteMensualUnificado = async (
   columnWidths.push({ width: 13 }); // Forma de pago
   columnWidths.push({ width: 11 }); // Cuenta
   columnWidths.push({ width: 6 });  // Tipo
+  columnWidths.push({ width: 16 }); // Atendido Por
 
   worksheet.columns = columnWidths;
 
@@ -983,7 +971,8 @@ export const generarReporteMensualUnificado = async (
     ...estudios.map(e => e.nombre.toUpperCase()),
     'FORMA DE PAGO',
     'CUENTA',
-    'TIPO'
+    'TIPO',
+    'ATENDIDO POR'
   ];
 
   worksheet.getRow(2).values = headers;
@@ -1034,9 +1023,14 @@ export const generarReporteMensualUnificado = async (
 
     const estudioTexto = esInhabil ? `${nombresEstudios.toUpperCase()} INHABIL` : nombresEstudios.toUpperCase();
 
+    const esNoReferenteUnif = !consulta.sin_informacion_medico && !consulta.medicos?.nombre && !!consulta.medico_recomendado;
     const medicoNombre = consulta.sin_informacion_medico 
       ? 'SIN INFORMACIÓN'
-      : (consulta.medicos?.nombre || consulta.medico_recomendado || 'N/A');
+      : consulta.medicos?.nombre
+        ? consulta.medicos.nombre
+        : consulta.medico_recomendado
+          ? `${consulta.medico_recomendado} (NO REFERENTE)`
+          : 'N/A';
 
     // ✅ FIX: La columna "PRECIO SOCIAL" solo debe tener valor si tipo_cobro es 'social'
     const precioTotal = consulta.detalle_consultas.reduce((sum, d) => sum + d.precio, 0);
@@ -1097,13 +1091,19 @@ export const generarReporteMensualUnificado = async (
     valoresFila.push(formaPagoTexto);
     valoresFila.push(precioTotal); // Cuenta (total real cobrado)
     valoresFila.push(consulta.tipo_cobro?.toUpperCase() || 'NORMAL');
+    valoresFila.push((consulta.nombre_usuario || '').toUpperCase());
 
     worksheet.getRow(filaActual).values = valoresFila;
 
     // Aplicar estilos
     valoresFila.forEach((valor, colIdx) => {
       const cell = worksheet.getCell(filaActual, colIdx + 1);
-      cell.font = { name: 'Arial', size: 10 };
+      // colIdx 6 = MEDICO REFERENTE
+      if (colIdx === 6 && esNoReferenteUnif) {
+        cell.font = { name: 'Arial', size: 10, color: { argb: 'FFE67E22' }, bold: true };
+      } else {
+        cell.font = { name: 'Arial', size: 10 };
+      }
 
       if (colIdx === 0 || colIdx === 3) {
         cell.alignment = { horizontal: 'center', vertical: 'middle' };

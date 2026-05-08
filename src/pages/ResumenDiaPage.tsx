@@ -7,6 +7,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { GenerarCodigosPanel } from '../components/GenerarCodigosPanel';
 import { generarCuadreExcel } from '../utils/cuadre-excel-generator';
+import { generarReporteGastosDiario } from '../utils/gastos-excel-generator';
 import { PeriodosEspecialesPanel } from '../components/PeriodosEspecialesPanel';
 
 interface ResumenDiaPageProps {
@@ -56,6 +57,7 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
     usuariosActivos: [], accionesConAutorizacion: 0, actividadReciente: []
   });
   const [loading, setLoading] = useState(false);
+  const [descargandoGastos, setDescargandoGastos] = useState(false);
 
   // ── tabs: ahora incluye 'horarios' solo para admin ─────────────
   const rolUsuario = localStorage.getItem('rolUsuarioConrad');
@@ -239,7 +241,6 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
     return u && m && a && t;
   });
 
-  // ── Tab definitions ────────────────────────────────────────────
   const tabs = [
     { id: 'resumen'   as const, label: 'Resumen del Día', icon: Activity  },
     { id: 'auditoria' as const, label: 'Auditoría',       icon: Shield    },
@@ -248,8 +249,6 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
 
   return (
     <div className="min-h-screen bg-slate-50">
-
-      {/* ── HEADER ──────────────────────────────────────────────── */}
       <div style={{ background: 'linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#312e81 100%)' }}>
         <div className="max-w-7xl mx-auto px-6 py-6">
           <button onClick={onBack} className="flex items-center gap-2 text-indigo-300 hover:text-white mb-5 text-sm font-medium transition-colors group">
@@ -275,6 +274,17 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                 className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-emerald-900/30">
                 <FileText size={14} /> Descargar Excel
               </button>
+              <button
+                onClick={async () => {
+                  setDescargandoGastos(true);
+                  try { await generarReporteGastosDiario(fecha); }
+                  catch { alert('Error al generar reporte de gastos'); }
+                  finally { setDescargandoGastos(false); }
+                }}
+                disabled={descargandoGastos}
+                className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-red-900/30 disabled:opacity-50">
+                <FileText size={14} /> {descargandoGastos ? 'Generando...' : 'Gastos del Día'}
+              </button>
               {esAdmin && (
                 <div className="flex items-center gap-1.5 bg-white/10 border border-white/15 rounded-xl px-3 py-2" title="Contraseña para desproteger el Excel">
                   <Shield size={12} className="text-yellow-300 shrink-0" />
@@ -290,8 +300,6 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
               )}
             </div>
           </div>
-
-          {/* ── TABS ── */}
           <div className="flex gap-1 mt-6 border-b border-white/10">
             {tabs.map(tab => {
               const Icon = tab.icon;
@@ -313,31 +321,19 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
         </div>
       </div>
 
-      {/* ── CONTENT ─────────────────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-6 py-8">
-
-        {/* ══ TAB: HORARIOS / FERIADOS ══ */}
         {tabActiva === 'horarios' && (
-          <div className="max-w-3xl">
-            <PeriodosEspecialesPanel />
-          </div>
+          <div className="max-w-3xl"><PeriodosEspecialesPanel /></div>
         )}
-
-        {/* ══ LOADING ══ */}
         {tabActiva !== 'horarios' && loading && (
           <div className="flex flex-col items-center justify-center py-24 gap-4">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent" />
             <p className="text-sm text-slate-400 font-medium">Cargando datos...</p>
           </div>
         )}
-
-        {/* ══ TAB: RESUMEN ══ */}
         {tabActiva === 'resumen' && !loading && (
           <div className="space-y-6">
-
             <GenerarCodigosPanel />
-
-            {/* KPI Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
                 <div className="flex items-center justify-between mb-4">
@@ -350,7 +346,6 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                   <p className="text-sm text-blue-600 font-bold">Q {resumen.ingresosConsultas.toFixed(2)}</p>
                 </div>
               </div>
-
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
                 <div className="flex items-center justify-between mb-4">
                   <div className="bg-emerald-50 rounded-xl p-2"><Activity size={16} className="text-emerald-600" /></div>
@@ -362,7 +357,6 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                   <p className="text-sm text-emerald-600 font-bold">Q {resumen.ingresosMoviles.toFixed(2)}</p>
                 </div>
               </div>
-
               <div className="rounded-2xl p-5 text-white shadow-lg" style={{ background: 'linear-gradient(135deg,#4f46e5,#7c3aed)' }}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="bg-white/20 rounded-xl p-2"><DollarSign size={16} className="text-white" /></div>
@@ -371,7 +365,6 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                 <p className="text-3xl font-black">Q {resumen.totalIngresos.toFixed(2)}</p>
                 <p className="text-sm text-indigo-200 mt-2 font-medium">{resumen.totalConsultas} consultas totales</p>
               </div>
-
               <div className="rounded-2xl p-5 text-white shadow-lg"
                 style={{ background: resumen.ingresoNeto >= 0 ? 'linear-gradient(135deg,#059669,#0d9488)' : 'linear-gradient(135deg,#dc2626,#e11d48)' }}>
                 <div className="flex items-center justify-between mb-4">
@@ -384,8 +377,6 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                 <p className="text-sm text-white/70 mt-2 font-medium">Gastos: Q {resumen.gastosDelDia.toFixed(2)}</p>
               </div>
             </div>
-
-            {/* Detalle operativo */}
             <div className="grid md:grid-cols-3 gap-4">
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                 <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2.5">
@@ -403,7 +394,6 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                   </div>
                 </div>
               </div>
-
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                 <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2.5">
                   <div className="bg-emerald-50 rounded-lg p-1.5"><Package size={14} className="text-emerald-600" /></div>
@@ -422,7 +412,6 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                   ))}
                 </div>
               </div>
-
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                 <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2.5">
                   <div className="bg-orange-50 rounded-lg p-1.5"><Shield size={14} className="text-orange-600" /></div>
@@ -447,8 +436,6 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                 )}
               </div>
             </div>
-
-            {/* Actividad Reciente */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -502,11 +489,8 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
             </div>
           </div>
         )}
-
-        {/* ══ TAB: AUDITORÍA ══ */}
         {tabActiva === 'auditoria' && !loading && (
           <div className="space-y-5">
-            {/* Filtros */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
               <div className="flex items-center gap-2 mb-4">
                 <div className="bg-indigo-50 rounded-lg p-1.5"><Shield size={14} className="text-indigo-600" /></div>
@@ -549,8 +533,6 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                 </div>
               </div>
             </div>
-
-            {/* Stats auditoría */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
                 { label: 'Total registros',  val: logsAuditoria.length,                                                       color: 'text-slate-800',  bg: 'bg-slate-50'  },
@@ -564,8 +546,6 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                 </div>
               ))}
             </div>
-
-            {/* Tabla auditoría */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
                 <span className="text-sm font-black text-slate-800">
@@ -625,7 +605,6 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
         )}
       </div>
 
-      {/* ── Modal detalle log ── */}
       {logDetalle && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setLogDetalle(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
