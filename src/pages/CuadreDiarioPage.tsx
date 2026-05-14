@@ -561,7 +561,13 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
           cantidad: c.cantidad,
           total: c.total,
           es_servicio_movil: c.es_servicio_movil || false
-        })) || []
+        })) || [],
+        gastos: gastos.map(g => ({
+          concepto: g.concepto || '',
+          monto: parseFloat(g.monto || 0),
+          categoria: g.categorias_gastos?.nombre || '',
+          created_at: g.created_at || ''
+        }))
       });
     }
   };

@@ -48,7 +48,21 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
     return `${yyyy}-${mm}-${dd}`;
   };
 
-  const [fecha, setFecha] = useState(getFechaGuatemala);
+  // Si es antes de la 1:00 AM Guatemala, la fecha operativa es ayer
+  const getFechaOperativa = () => {
+    const gt = getGuatemalaTime();
+    if (gt.getHours() < 1) {
+      const ayer = new Date(gt);
+      ayer.setDate(ayer.getDate() - 1);
+      const yyyy = ayer.getFullYear();
+      const mm = String(ayer.getMonth() + 1).padStart(2, '0');
+      const dd = String(ayer.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+    return getFechaGuatemala();
+  };
+
+  const [fecha, setFecha] = useState(getFechaOperativa);
   const [resumen, setResumen] = useState<ResumenDatos>({
     pacientesNuevos: 0, consultasRegulares: 0, consultasMoviles: 0,
     totalConsultas: 0, ingresosConsultas: 0, ingresosMoviles: 0,
