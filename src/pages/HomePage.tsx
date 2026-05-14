@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, FileText, Users, BarChart3, Trash2, FileSpreadsheet, Settings, Calendar, DollarSign } from 'lucide-react';
+import { Plus, FileText, Users, BarChart3, Trash2, FileSpreadsheet, Settings, Calendar, DollarSign, Activity, ChevronRight } from 'lucide-react';
 import { NuevoPacienteModal } from '../components/NuevoPacienteModal';
 import { Autocomplete } from '../components/Autocomplete';
 import { Paciente, Medico, SubEstudio, TipoCobro, FormaPago, DetalleConsulta } from '../types';
@@ -7,6 +7,522 @@ import { supabase } from '../lib/supabase';
 import { format } from 'date-fns';
 import { generarReciboCompleto, generarReciboMedico, abrirRecibo } from '../lib/recibos';
 
+// ─── Inline styles (design-only, zero logic change) ──────────────────────────
+const btnSaveStyle = (state: 'idle' | 'saving' | 'saved'): React.CSSProperties => ({
+  width: '100%',
+  padding: '14px',
+  borderRadius: 12,
+  fontWeight: 700,
+  fontSize: 15,
+  border: 'none',
+  cursor: state === 'saved' ? 'default' : state === 'saving' ? 'wait' : 'pointer',
+  background: state === 'saved'
+    ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)'
+    : state === 'saving'
+    ? '#f59e0b'
+    : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+  color: '#fff',
+  boxShadow: state === 'idle' ? '0 4px 14px rgba(37,99,235,0.35)' : 'none',
+  transition: 'all .2s',
+  letterSpacing: '0.2px',
+});
+
+const btnPrintStyle = (active: boolean): React.CSSProperties => ({
+  width: '100%',
+  padding: '14px',
+  borderRadius: 12,
+  fontWeight: 700,
+  fontSize: 15,
+  border: 'none',
+  cursor: active ? 'pointer' : 'not-allowed',
+  background: active
+    ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
+    : '#e5e7eb',
+  color: active ? '#fff' : '#9ca3af',
+  boxShadow: active ? '0 4px 14px rgba(5,150,105,0.3)' : 'none',
+  transition: 'all .2s',
+  letterSpacing: '0.2px',
+});
+
+const S: Record<string, React.CSSProperties> = {
+  /* Layout */
+  root: {
+    minHeight: '100vh',
+    background: '#f0f4f8',
+    fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
+  },
+
+  /* Header */
+  header: {
+    background: 'linear-gradient(135deg, #0f2942 0%, #1a4a7a 60%, #1d5c9e 100%)',
+    color: '#fff',
+    boxShadow: '0 4px 24px rgba(15,41,66,0.25)',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  headerInner: {
+    maxWidth: 1400,
+    margin: '0 auto',
+    padding: '22px 32px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerAccent: {
+    position: 'absolute',
+    right: -60,
+    top: -60,
+    width: 300,
+    height: 300,
+    background: 'rgba(255,255,255,0.04)',
+    borderRadius: '50%',
+    pointerEvents: 'none',
+  },
+  headerAccent2: {
+    position: 'absolute',
+    right: 80,
+    top: 30,
+    width: 120,
+    height: 120,
+    background: 'rgba(255,255,255,0.05)',
+    borderRadius: '50%',
+    pointerEvents: 'none',
+  },
+  logoMark: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    background: 'rgba(255,255,255,0.15)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+    flexShrink: 0,
+  },
+  h1: {
+    fontSize: 22,
+    fontWeight: 700,
+    letterSpacing: '-0.3px',
+    margin: 0,
+    lineHeight: 1.2,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.55)',
+    marginTop: 3,
+    letterSpacing: '0.3px',
+    textTransform: 'uppercase' as const,
+  },
+  dateBlock: {
+    textAlign: 'right' as const,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+    lineHeight: 1.6,
+  },
+
+  /* Nav bar */
+  navbar: {
+    background: '#fff',
+    borderBottom: '1px solid #e8edf3',
+    boxShadow: '0 2px 8px rgba(15,41,66,0.06)',
+  },
+  navInner: {
+    maxWidth: 1400,
+    margin: '0 auto',
+    padding: '0 32px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    overflowX: 'auto' as const,
+    scrollbarWidth: 'none' as const,
+  },
+
+  /* Content */
+  content: {
+    maxWidth: 1400,
+    margin: '0 auto',
+    padding: '28px 32px 48px',
+    display: 'grid',
+    gridTemplateColumns: '1fr 360px',
+    gap: 24,
+  },
+  leftCol: { display: 'flex', flexDirection: 'column' as const, gap: 20 },
+  rightCol: { display: 'flex', flexDirection: 'column' as const, gap: 20 },
+
+  /* Cards */
+  card: {
+    background: '#fff',
+    borderRadius: 16,
+    padding: '24px 28px',
+    boxShadow: '0 2px 12px rgba(15,41,66,0.07)',
+    border: '1px solid #e8edf3',
+  },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: '#0f2942',
+    marginBottom: 18,
+    letterSpacing: '0.2px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+  },
+  titleDot: {
+    width: 6,
+    height: 6,
+    borderRadius: '50%',
+    background: '#2563eb',
+    flexShrink: 0,
+  },
+
+  /* Welcome card */
+  welcomeCard: {
+    background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+    borderRadius: 16,
+    padding: '48px 32px',
+    border: '1px solid #bfdbfe',
+    textAlign: 'center' as const,
+    boxShadow: '0 2px 12px rgba(37,99,235,0.08)',
+  },
+  welcomeIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+    display: 'block',
+  },
+  welcomeTitle: {
+    fontSize: 20,
+    fontWeight: 700,
+    color: '#1e40af',
+    marginBottom: 8,
+  },
+  welcomeText: {
+    fontSize: 14,
+    color: '#3b82f6',
+    marginBottom: 24,
+  },
+
+  /* Patient info */
+  patientGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '10px 20px',
+  },
+  patientField: {
+    fontSize: 13,
+    color: '#374151',
+    lineHeight: 1.5,
+  },
+  fieldLabel: {
+    color: '#9ca3af',
+    fontSize: 11,
+    fontWeight: 600,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+    display: 'block',
+    marginBottom: 2,
+  },
+  fieldValue: {
+    color: '#111827',
+    fontWeight: 500,
+    fontSize: 13,
+  },
+
+  /* Badges */
+  badgeMobile: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 5,
+    fontSize: 11,
+    fontWeight: 600,
+    background: '#fff7ed',
+    color: '#c2410c',
+    border: '1px solid #fed7aa',
+    padding: '3px 10px',
+    borderRadius: 20,
+  },
+  badgeSaved: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 5,
+    fontSize: 11,
+    fontWeight: 600,
+    background: '#f0fdf4',
+    color: '#16a34a',
+    border: '1px solid #bbf7d0',
+    padding: '3px 10px',
+    borderRadius: 20,
+  },
+
+  /* Tipo cobro radios */
+  radioGroup: {
+    display: 'flex',
+    flexWrap: 'wrap' as const,
+    gap: 10,
+  },
+  radioLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 7,
+    padding: '9px 16px',
+    borderRadius: 10,
+    border: '1.5px solid #e5e7eb',
+    cursor: 'pointer',
+    fontSize: 13,
+    color: '#374151',
+    fontWeight: 500,
+    transition: 'all .15s',
+    background: '#fafafa',
+    userSelect: 'none' as const,
+  },
+
+  /* Justificacion box */
+  justBox: {
+    marginTop: 16,
+    padding: '16px 18px',
+    background: '#fffbeb',
+    border: '1px solid #fde68a',
+    borderRadius: 12,
+  },
+
+  /* Descripcion items */
+  descItem: {
+    borderRadius: 12,
+    border: '1px solid #e5e7eb',
+    padding: '14px 16px',
+    background: '#fafafa',
+    marginBottom: 10,
+    transition: 'box-shadow .15s',
+  },
+  descItemHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  descName: {
+    fontWeight: 600,
+    fontSize: 14,
+    color: '#111827',
+    marginBottom: 4,
+  },
+  descPrice: {
+    fontSize: 13,
+    color: '#6b7280',
+  },
+  tagRef: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    fontSize: 11,
+    fontWeight: 600,
+    background: '#f0fdf4',
+    color: '#16a34a',
+    border: '1px solid #bbf7d0',
+    padding: '2px 8px',
+    borderRadius: 20,
+  },
+  tagNoRef: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    fontSize: 11,
+    fontWeight: 600,
+    background: '#f9fafb',
+    color: '#6b7280',
+    border: '1px solid #e5e7eb',
+    padding: '2px 8px',
+    borderRadius: 20,
+  },
+
+  /* Totales card */
+  totalesCard: {
+    background: 'linear-gradient(160deg, #0f2942 0%, #1a4a7a 100%)',
+    borderRadius: 16,
+    padding: '24px 28px',
+    color: '#fff',
+    boxShadow: '0 8px 24px rgba(15,41,66,0.25)',
+    border: 'none',
+  },
+  totalesTitle: {
+    fontSize: 13,
+    fontWeight: 700,
+    letterSpacing: '0.8px',
+    textTransform: 'uppercase' as const,
+    color: 'rgba(255,255,255,0.55)',
+    marginBottom: 18,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+  },
+  totalesRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.65)',
+    marginBottom: 10,
+  },
+  totalesTotal: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    borderTop: '1px solid rgba(255,255,255,0.15)',
+    paddingTop: 14,
+    marginTop: 8,
+    fontSize: 20,
+    fontWeight: 700,
+    color: '#fff',
+  },
+
+  /* Action buttons */
+  btnPrimary: {
+    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 11,
+    padding: '12px 20px',
+    fontWeight: 600,
+    fontSize: 14,
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    transition: 'all .15s',
+    boxShadow: '0 3px 10px rgba(37,99,235,0.3)',
+    letterSpacing: '0.1px',
+  },
+  btnSecondary: {
+    background: '#fff',
+    color: '#374151',
+    border: '1.5px solid #e5e7eb',
+    borderRadius: 10,
+    padding: '9px 16px',
+    fontWeight: 500,
+    fontSize: 13,
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 7,
+    transition: 'all .15s',
+  },
+  btnDanger: {
+    background: 'transparent',
+    color: '#ef4444',
+    border: 'none',
+    cursor: 'pointer',
+    padding: 6,
+    borderRadius: 8,
+    display: 'flex',
+    alignItems: 'center',
+    transition: 'background .12s',
+  },
+
+  btnClear: {
+    width: '100%',
+    padding: '11px',
+    borderRadius: 12,
+    fontWeight: 600,
+    fontSize: 13,
+    border: '1.5px solid #e5e7eb',
+    background: '#fff',
+    color: '#6b7280',
+    cursor: 'pointer',
+    letterSpacing: '0.1px',
+  },
+
+  /* Input / select */
+  input: {
+    width: '100%',
+    padding: '10px 14px',
+    border: '1.5px solid #e5e7eb',
+    borderRadius: 10,
+    fontSize: 13,
+    color: '#111827',
+    background: '#fff',
+    outline: 'none',
+    transition: 'border .15s',
+    boxSizing: 'border-box' as const,
+  },
+  label: {
+    fontSize: 11,
+    fontWeight: 600,
+    color: '#6b7280',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+    marginBottom: 6,
+    display: 'block',
+  },
+  select: {
+    width: '100%',
+    padding: '10px 14px',
+    border: '1.5px solid #e5e7eb',
+    borderRadius: 10,
+    fontSize: 13,
+    color: '#111827',
+    background: '#fff',
+    outline: 'none',
+    cursor: 'pointer',
+    appearance: 'auto' as const,
+  },
+
+  /* Divider */
+  divider: {
+    height: 1,
+    background: '#f0f4f8',
+    margin: '18px 0',
+  },
+
+  /* Moville alert */
+  mobileAlert: {
+    background: '#fff7ed',
+    border: '1px solid #fed7aa',
+    borderRadius: 10,
+    padding: '12px 16px',
+    fontSize: 13,
+    color: '#9a3412',
+    marginTop: 14,
+  },
+};
+
+// ─── Nav button helper ────────────────────────────────────────────────────────
+const NavBtn: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  primary?: boolean;
+}> = ({ icon, label, onClick, primary }) => (
+  <button
+    onClick={onClick}
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 7,
+      padding: primary ? '10px 20px' : '10px 16px',
+      margin: '10px 0',
+      border: primary ? 'none' : '1px solid transparent',
+      borderRadius: 9,
+      fontSize: 13,
+      fontWeight: primary ? 700 : 500,
+      cursor: 'pointer',
+      whiteSpace: 'nowrap' as const,
+      transition: 'all .15s',
+      background: primary
+        ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
+        : 'transparent',
+      color: primary ? '#fff' : '#4b5563',
+      boxShadow: primary ? '0 3px 10px rgba(37,99,235,0.25)' : 'none',
+    }}
+    onMouseEnter={e => {
+      if (!primary) (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6';
+    }}
+    onMouseLeave={e => {
+      if (!primary) (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+    }}
+  >
+    {icon}
+    {label}
+  </button>
+);
+
+// ─── Interfaces (unchanged) ───────────────────────────────────────────────────
 interface HomePageProps {
   onNavigate: (page: string) => void;
 }
@@ -17,6 +533,7 @@ interface PagoMultiple {
   numero_referencia?: string;
 }
 
+// ─── Component ────────────────────────────────────────────────────────────────
 export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const [showNuevoModal, setShowNuevoModal] = useState(false);
   const [pacienteActual, setPacienteActual] = useState<(Paciente & { id: string }) | null>(null);
@@ -24,8 +541,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const [sinInfoMedico, setSinInfoMedico] = useState(false);
   const [esServicioMovil, setEsServicioMovil] = useState(false);
 
-  // ✅ ELIMINADO: incluyePlacas, precioPlacas, incluyeInforme, precioInforme
-  // ✅ establecimientoMovil ahora viene del modal de NuevoPaciente
   const [establecimientoMovil, setEstablecimientoMovil] = useState('');
 
   const [consultaGuardada, setConsultaGuardada] = useState<string | null>(null);
@@ -57,6 +572,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const [showModalTipoRecibo, setShowModalTipoRecibo] = useState(false);
   const [datosReciboTemp, setDatosReciboTemp] = useState<any>(null);
 
+  // ─── All logic functions UNCHANGED ────────────────────────────────────────
   const esHorarioNormal = () => {
     const now = new Date();
     const dia = now.getDay();
@@ -189,13 +705,12 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     return { subTotal, descuento, montoGravable, impuesto, total };
   };
 
-  // ✅ MODIFICADO: handleGuardarPaciente ahora recibe establecimiento desde el modal
   const handleGuardarPaciente = async (
     paciente: Paciente,
     medico: Medico | null,
     sinInfo: boolean,
     esServicioMovilParam: boolean = false,
-    establecimiento: string = ''          // ✅ NUEVO parámetro
+    establecimiento: string = ''
   ) => {
     try {
       const { data: pacienteData, error: pacienteError } = await supabase
@@ -222,8 +737,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       setMedicoActual(medico);
       setSinInfoMedico(sinInfo);
       setEsServicioMovil(esServicioMovilParam);
-
-      // ✅ Guardar establecimiento recibido del modal
       setEstablecimientoMovil(esServicioMovilParam ? establecimiento : '');
 
       if (esServicioMovilParam) {
@@ -289,7 +802,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       alert('Debe agregar al menos un estudio');
       return;
     }
-    // ✅ Validar establecimiento (ya viene del modal, pero verificar que no esté vacío)
     if (esServicioMovil && !establecimientoMovil.trim()) {
       alert('El establecimiento es requerido para servicios móviles.\n\nPor favor, crea un nuevo paciente e ingresa el establecimiento.');
       return;
@@ -358,7 +870,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           justificacion_especial: ((tipoCobro === 'normal' && !esHorarioNormal()) || (tipoCobro === 'personalizado' && !esServicioMovil)) ? justificacionEspecial : null,
           fecha: format(new Date(), 'yyyy-MM-dd'),
           es_servicio_movil: esServicioMovil,
-          // ✅ ELIMINADO: movil_incluye_placas, movil_precio_placas, movil_incluye_informe, movil_precio_informe
           movil_establecimiento: esServicioMovil ? establecimientoMovil : null,
           detalle_pagos_multiples: detallePagosMultiples,
           nombre_usuario: localStorage.getItem('nombreUsuarioConrad') || ''
@@ -474,197 +985,205 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
 
   const totales = calcularTotales();
   const horarioNormal = esHorarioNormal();
+  const saveState: 'idle'|'saving'|'saved' = guardando ? 'saving' : consultaGuardada ? 'saved' : 'idle';
 
+  // ─── RENDER ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* HEADER */}
-      <header className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">Centro de Diagnóstico</h1>
-              <p className="text-blue-100 mt-2">Sistema de Gestión de Consultas</p>
+    <div style={S.root}>
+
+      {/* ── HEADER ── */}
+      <header style={S.header as React.CSSProperties}>
+        <div style={S.headerAccent as React.CSSProperties} />
+        <div style={S.headerAccent2 as React.CSSProperties} />
+        <div style={S.headerInner}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <div style={S.logoMark}>
+              <Activity size={22} color="#fff" />
             </div>
-            <div className="text-right text-sm text-blue-100">
-              <p>{format(new Date(), 'EEEE, dd MMMM yyyy')}</p>
-              <p>{format(new Date(), 'HH:mm')}</p>
+            <div>
+              <h1 style={S.h1}>Centro de Diagnóstico</h1>
+              <p style={S.subtitle}>Sistema de Gestión de Consultas</p>
+            </div>
+          </div>
+          <div style={S.dateBlock}>
+            <div style={{ fontWeight: 600, color: 'rgba(255,255,255,0.9)', fontSize: 14 }}>
+              {format(new Date(), "EEEE, dd 'de' MMMM yyyy")}
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 700, marginTop: 2 }}>
+              {format(new Date(), 'HH:mm')}
             </div>
           </div>
         </div>
       </header>
 
-      {/* Barra de botones principales */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex flex-wrap gap-3">
-            <button onClick={() => setShowNuevoModal(true)} className="btn-primary flex items-center gap-2">
-              <Plus size={20} /> Nuevo
-            </button>
-            <button onClick={() => onNavigate('productos')} className="btn-secondary flex items-center gap-2">
-              <FileText size={20} /> Productos
-            </button>
-            <button onClick={() => onNavigate('referentes')} className="btn-secondary flex items-center gap-2">
-              <Users size={20} /> Referentes
-            </button>
-            <button onClick={() => onNavigate('pacientes')} className="btn-secondary flex items-center gap-2">
-              <Users size={20} /> Pacientes
-            </button>
-            <button onClick={() => onNavigate('cuadre')} className="btn-secondary flex items-center gap-2">
-              <BarChart3 size={20} /> Cuadre Diario
-            </button>
-            <button onClick={() => onNavigate('cuadre-quincenal')} className="btn-secondary flex items-center gap-2">
-              <Calendar size={20} /> Cuadre Quincenal
-            </button>
-            <button onClick={() => onNavigate('reportes')} className="btn-secondary flex items-center gap-2">
-              <FileSpreadsheet size={20} /> Reportes
-            </button>
-            <button onClick={() => onNavigate('comisiones')} className="btn-secondary flex items-center gap-2">
-              <DollarSign size={20} /> Comisiones
-            </button>
-          </div>
+      {/* ── NAVBAR ── */}
+      <nav style={S.navbar}>
+        <div style={S.navInner}>
+          <NavBtn primary icon={<Plus size={15} />} label="Nuevo" onClick={() => setShowNuevoModal(true)} />
+          <NavBtn icon={<FileText size={15} />} label="Productos" onClick={() => onNavigate('productos')} />
+          <NavBtn icon={<Users size={15} />} label="Referentes" onClick={() => onNavigate('referentes')} />
+          <NavBtn icon={<Users size={15} />} label="Pacientes" onClick={() => onNavigate('pacientes')} />
+          <NavBtn icon={<BarChart3 size={15} />} label="Cuadre Diario" onClick={() => onNavigate('cuadre')} />
+          <NavBtn icon={<Calendar size={15} />} label="Cuadre Quincenal" onClick={() => onNavigate('cuadre-quincenal')} />
+          <NavBtn icon={<FileSpreadsheet size={15} />} label="Reportes" onClick={() => onNavigate('reportes')} />
+          <NavBtn icon={<DollarSign size={15} />} label="Comisiones" onClick={() => onNavigate('comisiones')} />
         </div>
-      </div>
+      </nav>
 
-      {/* Contenido principal */}
-      <div className="container mx-auto px-4 pb-8 pt-6">
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Columna izquierda */}
-          <div className="lg:col-span-2 space-y-6">
-            {pacienteActual && (
-              <div className="card">
-                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                  Información del Paciente
-                  {esServicioMovil && (
-                    <span className="text-sm bg-orange-500 text-white px-3 py-1 rounded-full">
-                      📱 SERVICIO MÓVIL
-                    </span>
-                  )}
-                  {consultaGuardada && (
-                    <span className="text-sm bg-green-500 text-white px-3 py-1 rounded-full">
-                      ✅ GUARDADO
-                    </span>
-                  )}
-                </h3>
-                <div className="grid md:grid-cols-2 gap-3 text-sm">
-                  <div><strong>Nombre:</strong> {pacienteActual.nombre}</div>
-                  <div><strong>Edad:</strong> {pacienteActual.edad} años</div>
-                  <div><strong>Teléfono:</strong> {pacienteActual.telefono}</div>
-                  <div><strong>Departamento:</strong> {pacienteActual.departamento}</div>
-                  <div><strong>Municipio:</strong> {pacienteActual.municipio}</div>
-                  {/* ✅ Mostrar establecimiento si es servicio móvil */}
-                  {esServicioMovil && establecimientoMovil && (
-                    <div className="col-span-2">
-                      <strong>🏥 Establecimiento:</strong>{' '}
-                      <span className="text-orange-700 font-medium">{establecimientoMovil}</span>
-                    </div>
-                  )}
+      {/* ── MAIN CONTENT ── */}
+      <div style={S.content}>
+
+        {/* ── LEFT COLUMN ── */}
+        <div style={S.leftCol}>
+
+          {/* Patient info or welcome */}
+          {pacienteActual ? (
+            <div style={S.card}>
+              <div style={{ ...S.cardTitle, marginBottom: 12 }}>
+                <div style={S.titleDot} />
+                Información del Paciente
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                  {esServicioMovil && <span style={S.badgeMobile}>📱 Servicio Móvil</span>}
+                  {consultaGuardada && <span style={S.badgeSaved}>✓ Guardado</span>}
                 </div>
-                {medicoActual && !sinInfoMedico && (
-                  <>
-                    <h4 className="text-md font-semibold mt-4 mb-2">Médico</h4>
-                    <div className="grid md:grid-cols-2 gap-3 text-sm">
-                      <div><strong>Nombre:</strong> {medicoActual.nombre}</div>
-                      <div><strong>Teléfono:</strong> {medicoActual.telefono}</div>
-                      <div><strong>Departamento:</strong> {medicoActual.departamento}</div>
-                      <div><strong>Municipio:</strong> {medicoActual.municipio}</div>
-                    </div>
-                  </>
+              </div>
+              <div style={S.patientGrid}>
+                {[
+                  ['Nombre', pacienteActual.nombre],
+                  ['Edad', `${pacienteActual.edad} años`],
+                  ['Teléfono', pacienteActual.telefono],
+                  ['Departamento', pacienteActual.departamento],
+                  ['Municipio', pacienteActual.municipio],
+                ].map(([label, value]) => (
+                  <div key={label} style={S.patientField}>
+                    <span style={S.fieldLabel}>{label}</span>
+                    <span style={S.fieldValue}>{value}</span>
+                  </div>
+                ))}
+                {esServicioMovil && establecimientoMovil && (
+                  <div style={{ ...S.patientField, gridColumn: '1 / -1' }}>
+                    <span style={S.fieldLabel}>🏥 Establecimiento</span>
+                    <span style={{ ...S.fieldValue, color: '#c2410c' }}>{establecimientoMovil}</span>
+                  </div>
                 )}
               </div>
-            )}
 
-            {!pacienteActual && (
-              <div className="card bg-blue-50 border-2 border-blue-200">
-                <div className="text-center py-8">
-                  <div className="text-4xl mb-4">🏥</div>
-                  <h3 className="text-xl font-bold text-blue-900 mb-2">Bienvenido al Centro de Diagnóstico</h3>
-                  <p className="text-blue-700 mb-4">Para comenzar, registra un nuevo paciente</p>
-                  <button onClick={() => setShowNuevoModal(true)} className="btn-primary inline-flex items-center gap-2">
-                    <Plus size={20} /> Crear Nuevo Paciente
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Tipo de cobro */}
-            <div className="card">
-              <h3 className="text-lg font-semibold mb-3">Tipo de Cobro</h3>
-              <div className="flex gap-4 flex-wrap">
-                <label className="flex items-center">
-                  <input type="radio" name="tipoCobro" checked={tipoCobro === 'social'}
-                    onChange={() => { setTipoCobro('social'); setShowJustificacion(false); setJustificacionEspecial(''); }}
-                    disabled={esServicioMovil || !!consultaGuardada} className="mr-2" />
-                  Social {esServicioMovil && <span className="text-gray-400 text-xs ml-1">(No disponible para móviles)</span>}
-                </label>
-                <label className="flex items-center">
-                  <input type="radio" name="tipoCobro" checked={tipoCobro === 'normal'}
-                    onChange={() => { if (!horarioNormal) setShowJustificacion(true); setTipoCobro('normal'); }}
-                    disabled={esServicioMovil || !!consultaGuardada} className="mr-2" />
-                  Normal {!horarioNormal && '(Requiere justificación)'} {esServicioMovil && <span className="text-gray-400 text-xs ml-1">(No disponible para móviles)</span>}
-                </label>
-                <label className="flex items-center">
-                  <input type="radio" name="tipoCobro" checked={tipoCobro === 'especial'}
-                    onChange={() => { setTipoCobro('especial'); setShowJustificacion(false); setJustificacionEspecial(''); }}
-                    disabled={(horarioNormal && !esServicioMovil) || !!consultaGuardada} className="mr-2" />
-                  Especial {horarioNormal && !esServicioMovil && '(Solo fuera de horario)'}
-                  {esServicioMovil && <span className="text-orange-600 font-medium ml-1">(Precio del sistema)</span>}
-                </label>
-                <label className="flex items-center">
-                  <input type="radio" name="tipoCobro" checked={tipoCobro === 'personalizado'}
-                    onChange={() => { setTipoCobro('personalizado'); setShowJustificacion(!esServicioMovil); }}
-                    disabled={!!consultaGuardada} className="mr-2" />
-                  <span className="text-purple-600 font-medium">Personalizado</span>
-                  {esServicioMovil && <span className="text-orange-600 text-xs ml-1">(Editar precios manualmente)</span>}
-                </label>
-              </div>
-
-              {showJustificacion && (tipoCobro === 'normal' && !horarioNormal || (tipoCobro === 'personalizado' && !esServicioMovil)) && (
-                <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded">
-                  <label className="label">
-                    {tipoCobro === 'personalizado' ? 'Justificación y precio personalizado:' : 'Justificación para tarifa normal fuera de horario:'}
-                  </label>
-                  <textarea
-                    className="input-field mt-2"
-                    value={justificacionEspecial}
-                    onChange={(e) => setJustificacionEspecial(e.target.value)}
-                    placeholder={tipoCobro === 'personalizado' ? "Ej: Por orden del Dr. García, precio especial Q150" : "Ej: Médico referente solicitó tarifa normal"}
-                    rows={2}
-                    required
-                    disabled={!!consultaGuardada}
-                  />
-                  <p className="text-xs text-gray-600 mt-1">* Esta justificación quedará registrada en el sistema</p>
-                </div>
-              )}
-
-              {esServicioMovil && (
-                <div className="mt-4 p-3 bg-orange-100 border border-orange-300 rounded">
-                  <p className="text-sm text-orange-800">
-                    <strong>📱 Servicio Móvil:</strong>
-                    {tipoCobro === 'especial' && ' Usando precios especiales del sistema'}
-                    {tipoCobro === 'personalizado' && ' Puedes editar el precio de cada estudio manualmente en la sección de Descripción'}
-                  </p>
-                </div>
+              {medicoActual && !sinInfoMedico && (
+                <>
+                  <div style={S.divider} />
+                  <div style={{ ...S.cardTitle, marginBottom: 12 }}>
+                    <div style={{ ...S.titleDot, background: '#059669' }} />
+                    Médico Referente
+                  </div>
+                  <div style={S.patientGrid}>
+                    {[
+                      ['Nombre', medicoActual.nombre],
+                      ['Teléfono', medicoActual.telefono],
+                      ['Departamento', medicoActual.departamento],
+                      ['Municipio', medicoActual.municipio],
+                    ].map(([label, value]) => (
+                      <div key={label} style={S.patientField}>
+                        <span style={S.fieldLabel}>{label}</span>
+                        <span style={S.fieldValue}>{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
+          ) : (
+            <div style={S.welcomeCard}>
+              <span style={S.welcomeIcon}>🏥</span>
+              <div style={S.welcomeTitle}>Bienvenido al Centro de Diagnóstico</div>
+              <p style={S.welcomeText}>Para comenzar, registra un nuevo paciente</p>
+              <button onClick={() => setShowNuevoModal(true)} style={S.btnPrimary}>
+                <Plus size={18} /> Crear Nuevo Paciente
+              </button>
+            </div>
+          )}
 
-            {/* ✅ ELIMINADA: Sección "Opciones Extras - Servicio Móvil" */}
+          {/* Tipo de cobro */}
+          <div style={S.card}>
+            <div style={S.cardTitle}><div style={S.titleDot} /> Tipo de Cobro</div>
+            <div style={S.radioGroup}>
+              {([
+                { key: 'social', label: 'Social', disabled: esServicioMovil || !!consultaGuardada, note: esServicioMovil ? 'No disponible' : '' },
+                { key: 'normal', label: 'Normal', disabled: esServicioMovil || !!consultaGuardada, note: !horarioNormal ? '(Requiere justificación)' : '' },
+                { key: 'especial', label: 'Especial', disabled: (horarioNormal && !esServicioMovil) || !!consultaGuardada, note: esServicioMovil ? 'Precio del sistema' : horarioNormal && !esServicioMovil ? 'Solo fuera de horario' : '' },
+                { key: 'personalizado', label: 'Personalizado', disabled: !!consultaGuardada, note: esServicioMovil ? 'Editar precios' : '', purple: true },
+              ] as any[]).map(opt => (
+                <label key={opt.key} style={{
+                  ...S.radioLabel,
+                  borderColor: tipoCobro === opt.key ? (opt.purple ? '#7c3aed' : '#2563eb') : '#e5e7eb',
+                  background: tipoCobro === opt.key ? (opt.purple ? '#f5f3ff' : '#eff6ff') : '#fafafa',
+                  color: opt.disabled ? '#9ca3af' : opt.purple ? '#7c3aed' : '#374151',
+                  cursor: opt.disabled ? 'not-allowed' : 'pointer',
+                  opacity: opt.disabled ? 0.6 : 1,
+                }}>
+                  <input type="radio" name="tipoCobro" checked={tipoCobro === opt.key}
+                    onChange={() => {
+                      if (opt.key === 'normal' && !horarioNormal) setShowJustificacion(true);
+                      else if (opt.key === 'personalizado') setShowJustificacion(!esServicioMovil);
+                      else { setShowJustificacion(false); setJustificacionEspecial(''); }
+                      setTipoCobro(opt.key as TipoCobro);
+                    }}
+                    disabled={opt.disabled}
+                    style={{ accentColor: opt.purple ? '#7c3aed' : '#2563eb' }}
+                  />
+                  <span style={{ fontWeight: tipoCobro === opt.key ? 600 : 500 }}>{opt.label}</span>
+                  {opt.note && <span style={{ fontSize: 11, color: '#9ca3af', marginLeft: 2 }}>{opt.note}</span>}
+                </label>
+              ))}
+            </div>
 
-            {/* Estudios */}
-            <div className="card">
-              <h3 className="text-lg font-semibold mb-3">Estudios</h3>
-              <div className="grid md:grid-cols-2 gap-4">
+            {showJustificacion && (tipoCobro === 'normal' && !horarioNormal || (tipoCobro === 'personalizado' && !esServicioMovil)) && (
+              <div style={S.justBox}>
+                <label style={S.label}>
+                  {tipoCobro === 'personalizado' ? 'Justificación y precio personalizado' : 'Justificación para tarifa normal fuera de horario'}
+                </label>
+                <textarea
+                  style={{ ...S.input, resize: 'vertical', minHeight: 68 }}
+                  value={justificacionEspecial}
+                  onChange={(e) => setJustificacionEspecial(e.target.value)}
+                  placeholder={tipoCobro === 'personalizado' ? 'Ej: Por orden del Dr. García, precio especial Q150' : 'Ej: Médico referente solicitó tarifa normal'}
+                  rows={2}
+                  required
+                  disabled={!!consultaGuardada}
+                />
+                <p style={{ fontSize: 11, color: '#92400e', marginTop: 6 }}>* Esta justificación quedará registrada en el sistema</p>
+              </div>
+            )}
+
+            {esServicioMovil && (
+              <div style={S.mobileAlert}>
+                <strong>📱 Servicio Móvil:</strong>{' '}
+                {tipoCobro === 'especial' && 'Usando precios especiales del sistema'}
+                {tipoCobro === 'personalizado' && 'Puedes editar el precio de cada estudio manualmente'}
+              </div>
+            )}
+          </div>
+
+          {/* Estudios */}
+          <div style={S.card}>
+            <div style={S.cardTitle}><div style={S.titleDot} /> Estudios</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+              <div>
+                <label style={S.label}>Estudio</label>
                 <Autocomplete
-                  label="Estudio"
+                  label=""
                   options={estudios
                     .filter(e => !esServicioMovil || e.nombre.toUpperCase() === 'RX')
                     .map(e => ({ id: e.id, nombre: e.nombre }))}
                   value={estudioSeleccionado}
                   onChange={(val) => { setEstudioSeleccionado(val); setSubEstudioSeleccionado(''); }}
-                  placeholder={esServicioMovil ? "Solo estudios RX disponibles" : "Seleccione estudio"}
+                  placeholder={esServicioMovil ? 'Solo estudios RX' : 'Seleccione estudio'}
                   disabled={!!consultaGuardada}
                 />
+              </div>
+              <div>
+                <label style={S.label}>Sub-Estudio</label>
                 <Autocomplete
-                  label="Sub-Estudio"
+                  label=""
                   options={subEstudiosFiltrados.map(se => ({ id: se.id || '', nombre: se.nombre }))}
                   value={subEstudioSeleccionado}
                   onChange={setSubEstudioSeleccionado}
@@ -672,308 +1191,347 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                   disabled={!estudioSeleccionado || !!consultaGuardada}
                 />
               </div>
-              <button
-                onClick={agregarSubEstudio}
-                className="btn-primary mt-4 flex items-center gap-2 justify-center w-full"
-                disabled={!subEstudioSeleccionado || !!consultaGuardada}
-              >
-                <Plus size={18} />
-                Agregar {estudioSeleccionado && descripcion.length > 0 ? 'Otro' : 'a Descripción'}
-              </button>
-              {estudioSeleccionado && descripcion.length > 0 && !consultaGuardada && (
-                <p className="text-sm text-green-600 mt-2 text-center">✓ Puedes seguir agregando más estudios del mismo tipo</p>
-              )}
-              {consultaGuardada && (
-                <p className="text-sm text-yellow-600 mt-2 text-center">⚠️ Consulta guardada - No se pueden agregar más estudios</p>
-              )}
+            </div>
+            <button
+              onClick={agregarSubEstudio}
+              disabled={!subEstudioSeleccionado || !!consultaGuardada}
+              style={{
+                ...S.btnPrimary,
+                width: '100%',
+                justifyContent: 'center',
+                opacity: (!subEstudioSeleccionado || !!consultaGuardada) ? 0.5 : 1,
+                cursor: (!subEstudioSeleccionado || !!consultaGuardada) ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <Plus size={16} />
+              Agregar {estudioSeleccionado && descripcion.length > 0 ? 'Otro Estudio' : 'a Descripción'}
+            </button>
+            {estudioSeleccionado && descripcion.length > 0 && !consultaGuardada && (
+              <p style={{ fontSize: 12, color: '#059669', textAlign: 'center', marginTop: 10 }}>
+                ✓ Puedes seguir agregando más estudios del mismo tipo
+              </p>
+            )}
+            {consultaGuardada && (
+              <p style={{ fontSize: 12, color: '#d97706', textAlign: 'center', marginTop: 10 }}>
+                ⚠️ Consulta guardada — No se pueden agregar más estudios
+              </p>
+            )}
+          </div>
+
+          {/* Descripción */}
+          <div style={S.card}>
+            <div style={S.cardTitle}><div style={S.titleDot} /> Descripción</div>
+            {descripcion.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '28px 0', color: '#9ca3af', fontSize: 13 }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
+                No hay estudios agregados
+              </div>
+            ) : (
+              <div>
+                {descripcion.map((item, index) => {
+                  const subEstudio = subEstudios.find(se => se.id === item.sub_estudio_id);
+                  return (
+                    <div key={index} style={{
+                      ...S.descItem,
+                      borderLeft: `3px solid ${item.es_referido ? '#10b981' : '#d1d5db'}`,
+                    }}>
+                      <div style={S.descItemHeader}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                            <span style={S.descName}>{subEstudio?.nombre}</span>
+                            {item.es_referido
+                              ? <span style={S.tagRef}>✓ Genera comisión</span>
+                              : <span style={S.tagNoRef}>Sin comisión</span>}
+                          </div>
+                          {tipoCobro === 'personalizado' ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontSize: 13, color: '#6b7280' }}>Q</span>
+                              <input
+                                type="number" step="0.01" min="0"
+                                value={item.precio}
+                                onChange={(e) => {
+                                  const nuevaDescripcion = [...descripcion];
+                                  nuevaDescripcion[index].precio = parseFloat(e.target.value) || 0;
+                                  setDescripcion(nuevaDescripcion);
+                                }}
+                                style={{ width: 90, padding: '5px 10px', border: '1.5px solid #a78bfa', borderRadius: 8, fontSize: 13, outline: 'none' }}
+                                disabled={!!consultaGuardada}
+                              />
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: 14, fontWeight: 600, color: '#1d4ed8' }}>Q {item.precio.toFixed(2)}</span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          {!consultaGuardada && medicoActual && !sinInfoMedico && (
+                            <button
+                              onClick={() => toggleReferido(index)}
+                              style={{
+                                padding: '5px 12px',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                borderRadius: 8,
+                                border: 'none',
+                                cursor: 'pointer',
+                                background: item.es_referido ? '#d1fae5' : '#f3f4f6',
+                                color: item.es_referido ? '#065f46' : '#6b7280',
+                                transition: 'all .15s',
+                              }}
+                            >
+                              {item.es_referido ? '✓ Referido' : 'No referido'}
+                            </button>
+                          )}
+                          <button onClick={() => eliminarDeDescripcion(index)} style={S.btnDanger} disabled={!!consultaGuardada}>
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {!consultaGuardada && (
+                        <div style={{ marginTop: 10, borderTop: '1px solid #f0f4f8', paddingTop: 10 }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: '#6b7280', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={!!item.comentarios && item.comentarios.trim() !== ''}
+                              onChange={(e) => { if (!e.target.checked) actualizarComentarios(index, ''); }}
+                              style={{ accentColor: '#2563eb' }}
+                            />
+                            Agregar comentarios opcionales
+                          </label>
+                          {(item.comentarios !== undefined && item.comentarios !== '') || item.comentarios === '' ? (
+                            <textarea
+                              value={item.comentarios || ''}
+                              onChange={(e) => actualizarComentarios(index, e.target.value)}
+                              placeholder="Comentarios adicionales sobre este estudio..."
+                              style={{ ...S.input, marginTop: 8, resize: 'vertical', minHeight: 56, fontSize: 12 }}
+                              rows={2}
+                              maxLength={500}
+                            />
+                          ) : null}
+                        </div>
+                      )}
+                      {consultaGuardada && item.comentarios && item.comentarios.trim() !== '' && (
+                        <div style={{ marginTop: 8, padding: '8px 12px', background: '#eff6ff', borderRadius: 8, fontSize: 12 }}>
+                          <strong style={{ color: '#1d4ed8' }}>Comentarios:</strong>
+                          <p style={{ color: '#374151', marginTop: 4 }}>{item.comentarios}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {medicoActual && !sinInfoMedico && descripcion.length > 0 && !consultaGuardada && (
+              <div style={{ marginTop: 12, padding: '10px 14px', background: '#eff6ff', borderRadius: 10, fontSize: 12, color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
+                💡 <strong>Control de comisiones:</strong> Usa el botón "Referido" para controlar qué estudios generan comisión al médico.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── RIGHT COLUMN ── */}
+        <div style={S.rightCol}>
+
+          {/* Facturación */}
+          <div style={S.card}>
+            <div style={S.cardTitle}><div style={S.titleDot} /> Facturación</div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={S.label}>Requiere Factura</label>
+              <div style={{ display: 'flex', gap: 12 }}>
+                {[['Sí', true], ['No', false]].map(([lbl, val]) => (
+                  <label key={String(lbl)} style={{
+                    display: 'flex', alignItems: 'center', gap: 7,
+                    padding: '8px 18px', borderRadius: 9, border: '1.5px solid',
+                    borderColor: requiereFactura === val ? '#2563eb' : '#e5e7eb',
+                    background: requiereFactura === val ? '#eff6ff' : '#fafafa',
+                    cursor: 'pointer', fontSize: 13, fontWeight: 500,
+                  }}>
+                    <input type="radio" name="factura"
+                      checked={requiereFactura === val}
+                      onChange={() => { if (val) setRequiereFactura(true); else { setRequiereFactura(false); setNit(''); } }}
+                      disabled={!!consultaGuardada}
+                      style={{ accentColor: '#2563eb' }}
+                    />
+                    {String(lbl)}
+                  </label>
+                ))}
+              </div>
             </div>
 
-            {/* Descripción */}
-            <div className="card">
-              <h3 className="text-lg font-semibold mb-3">Descripción</h3>
-              {descripcion.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">No hay estudios agregados</p>
-              ) : (
-                <div className="space-y-2">
-                  {descripcion.map((item, index) => {
-                    const subEstudio = subEstudios.find(se => se.id === item.sub_estudio_id);
-                    return (
-                      <div key={index} className="p-3 bg-gray-50 rounded border-l-4"
-                        style={{ borderLeftColor: item.es_referido ? '#10b981' : '#94a3b8' }}>
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex-1">
-                            <div className="font-medium flex items-center gap-2">
-                              {subEstudio?.nombre}
-                              {item.es_referido ? (
-                                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">✓ Genera comisión</span>
-                              ) : (
-                                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">Sin comisión</span>
-                              )}
-                            </div>
-                            {tipoCobro === 'personalizado' ? (
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="text-sm text-gray-600">Q</span>
-                                <input
-                                  type="number" step="0.01" min="0"
-                                  value={item.precio}
-                                  onChange={(e) => {
-                                    const nuevaDescripcion = [...descripcion];
-                                    nuevaDescripcion[index].precio = parseFloat(e.target.value) || 0;
-                                    setDescripcion(nuevaDescripcion);
-                                  }}
-                                  className="w-24 px-2 py-1 border border-purple-300 rounded focus:ring-2 focus:ring-purple-500"
-                                  disabled={!!consultaGuardada}
-                                />
-                              </div>
-                            ) : (
-                              <div className="text-sm text-gray-600">Q {item.precio.toFixed(2)}</div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {!consultaGuardada && medicoActual && !sinInfoMedico && (
-                              <button
-                                onClick={() => toggleReferido(index)}
-                                className={`px-3 py-1 text-xs rounded font-medium transition-colors ${
-                                  item.es_referido ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-                                }`}
-                                title={item.es_referido ? 'Click para no generar comisión' : 'Click para generar comisión'}
-                              >
-                                {item.es_referido ? '✓ Referido' : 'No referido'}
-                              </button>
-                            )}
-                            <button onClick={() => eliminarDeDescripcion(index)} className="text-red-600 hover:text-red-800 p-1" disabled={!!consultaGuardada}>
-                              <Trash2 size={18} />
-                            </button>
-                          </div>
-                        </div>
-                        {!consultaGuardada && (
-                          <div className="mt-2 border-t pt-2">
-                            <label className="flex items-center text-xs text-gray-600 mb-1">
-                              <input
-                                type="checkbox"
-                                checked={!!item.comentarios && item.comentarios.trim() !== ''}
-                                onChange={(e) => { if (!e.target.checked) actualizarComentarios(index, ''); }}
-                                className="mr-2"
-                              />
-                              Agregar comentarios opcionales
-                            </label>
-                            {(item.comentarios !== undefined && item.comentarios !== '') || item.comentarios === '' ? (
-                              <textarea
-                                value={item.comentarios || ''}
-                                onChange={(e) => actualizarComentarios(index, e.target.value)}
-                                placeholder="Comentarios adicionales sobre este estudio..."
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 resize-none"
-                                rows={2}
-                                maxLength={500}
-                              />
-                            ) : null}
-                          </div>
-                        )}
-                        {consultaGuardada && item.comentarios && item.comentarios.trim() !== '' && (
-                          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
-                            <strong className="text-blue-700">Comentarios:</strong>
-                            <p className="text-gray-700 mt-1">{item.comentarios}</p>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+            <div style={{ marginBottom: 14 }}>
+              <label style={S.label}>NIT</label>
+              <input type="text" style={S.input} value={nit} onChange={(e) => setNit(e.target.value)}
+                placeholder="NIT (si aplica)" disabled={!requiereFactura || !!consultaGuardada} />
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={S.label}>Forma de Pago</label>
+              <select
+                style={S.select}
+                value={formaPago}
+                onChange={(e) => {
+                  const valor = e.target.value as FormaPago | 'multiple';
+                  setFormaPago(valor);
+                  setNumeroTransferencia('');
+                  setNumeroVoucher('');
+                  if (valor === 'multiple') setShowModalPagosMultiples(true);
+                }}
+                disabled={!!consultaGuardada}
+              >
+                {requiereFactura ? (
+                  <>
+                    <option value="efectivo_facturado">Efectivo Facturado (Depósito)</option>
+                    <option value="tarjeta">Tarjeta Facturado</option>
+                    <option value="transferencia">Transferencia Bancaria</option>
+                    <option value="multiple">💳 Pago Múltiple (Dividir)</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="efectivo">Efectivo</option>
+                    <option value="tarjeta">Tarjeta</option>
+                    <option value="transferencia">Transferencia Bancaria</option>
+                    <option value="estado_cuenta">Estado de Cuenta</option>
+                    <option value="multiple">💳 Pago Múltiple (Dividir)</option>
+                  </>
+                )}
+              </select>
+            </div>
+
+            {formaPago === 'transferencia' && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={S.label}>Número de Transferencia *</label>
+                <input type="text" style={S.input} value={numeroTransferencia}
+                  onChange={(e) => setNumeroTransferencia(e.target.value)}
+                  placeholder="Número de referencia" required disabled={!!consultaGuardada} />
+              </div>
+            )}
+
+            {formaPago === 'tarjeta' && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={S.label}>
+                  Número de Voucher{' '}
+                  <span style={{ color: '#d97706', textTransform: 'none', fontWeight: 400 }}>(Opcional)</span>
+                </label>
+                <input type="text" style={S.input} value={numeroVoucher}
+                  onChange={(e) => setNumeroVoucher(e.target.value)}
+                  placeholder="Número de voucher" disabled={!!consultaGuardada} />
+                {!numeroVoucher && <p style={{ fontSize: 11, color: '#d97706', marginTop: 4 }}>⚠️ Sin voucher — pendiente de agregar</p>}
+              </div>
+            )}
+
+            <div>
+              <label style={S.label}>Número de Factura</label>
+              <input type="text" style={S.input} value={numeroFactura}
+                onChange={(e) => setNumeroFactura(e.target.value)}
+                placeholder="Número de factura" disabled={!!consultaGuardada} />
+            </div>
+
+            {formaPago === 'multiple' && pagosMultiples.length > 0 && (
+              <div style={{ marginTop: 14, background: '#f5f3ff', border: '1px solid #e9d5ff', borderRadius: 12, padding: '14px 16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <span style={{ fontWeight: 600, color: '#7c3aed', fontSize: 13 }}>💳 Pagos Configurados</span>
+                  <button onClick={() => setShowModalPagosMultiples(true)} style={{ fontSize: 12, color: '#7c3aed', background: 'none', border: 'none', cursor: 'pointer' }} disabled={!!consultaGuardada}>Editar</button>
                 </div>
-              )}
-              {medicoActual && !sinInfoMedico && descripcion.length > 0 && !consultaGuardada && (
-                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded text-sm">
-                  <p className="text-blue-800">
-                    <strong>💡 Control de comisiones:</strong> Usa el botón "Referido" para controlar qué estudios generan comisión al médico.
-                  </p>
+                {pagosMultiples.map((pago, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151', marginBottom: 6 }}>
+                    <span style={{ textTransform: 'capitalize' }}>{pago.forma_pago.replace('_', ' ')}</span>
+                    <span style={{ fontWeight: 600 }}>Q {pago.monto.toFixed(2)}</span>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, borderTop: '1px solid #e9d5ff', paddingTop: 8, marginTop: 4, fontSize: 14, color: '#7c3aed' }}>
+                  <span>Total</span>
+                  <span>Q {pagosMultiples.reduce((sum, p) => sum + p.monto, 0).toFixed(2)}</span>
                 </div>
-              )}
+              </div>
+            )}
+          </div>
+
+          {/* Totales */}
+          <div style={S.totalesCard}>
+            <div style={S.totalesTitle}>
+              <Activity size={14} />
+              Resumen de Cobro
+            </div>
+            {[
+              ['Sub-Total Estudios', totales.subTotal],
+              ['Descuento', totales.descuento],
+              ['Monto Gravable', totales.montoGravable],
+              ['Impuesto', totales.impuesto],
+            ].map(([label, val]) => (
+              <div key={String(label)} style={S.totalesRow}>
+                <span>{label}</span>
+                <span style={{ fontWeight: 500 }}>Q {(val as number).toFixed(2)}</span>
+              </div>
+            ))}
+            <div style={S.totalesTotal}>
+              <span>Total Ventas</span>
+              <span>Q {totales.total.toFixed(2)}</span>
             </div>
           </div>
 
-          {/* Columna derecha */}
-          <div className="space-y-6">
-            {/* Facturación */}
-            <div className="card">
-              <h3 className="text-lg font-semibold mb-3">Facturación</h3>
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <label className="font-medium">Factura:</label>
-                  <label className="flex items-center">
-                    <input type="radio" name="factura" checked={requiereFactura} onChange={() => setRequiereFactura(true)} className="mr-1" disabled={!!consultaGuardada} />Sí
-                  </label>
-                  <label className="flex items-center">
-                    <input type="radio" name="factura" checked={!requiereFactura} onChange={() => { setRequiereFactura(false); setNit(''); }} className="mr-1" disabled={!!consultaGuardada} />No
-                  </label>
-                </div>
-                <div>
-                  <label className="label">NIT</label>
-                  <input type="text" className="input-field" value={nit} onChange={(e) => setNit(e.target.value)} placeholder="NIT (si aplica)" disabled={!requiereFactura || !!consultaGuardada} />
-                </div>
-                <div>
-                  <label className="label">Forma de Pago</label>
-                  <select
-                    className="input-field"
-                    value={formaPago}
-                    onChange={(e) => {
-                      const valor = e.target.value as FormaPago | 'multiple';
-                      setFormaPago(valor);
-                      setNumeroTransferencia('');
-                      setNumeroVoucher('');
-                      if (valor === 'multiple') setShowModalPagosMultiples(true);
-                    }}
-                    disabled={!!consultaGuardada}
-                  >
-                    {requiereFactura ? (
-                      <>
-                        <option value="efectivo_facturado">Efectivo Facturado (Depósito)</option>
-                        <option value="tarjeta">Tarjeta Facturado</option>
-                        <option value="transferencia">Transferencia Bancaria</option>
-                        <option value="multiple">💳 Pago Múltiple (Dividir)</option>
-                      </>
-                    ) : (
-                      <>
-                        <option value="efectivo">Efectivo</option>
-                        <option value="tarjeta">Tarjeta</option>
-                        <option value="transferencia">Transferencia Bancaria</option>
-                        <option value="estado_cuenta">Estado de Cuenta</option>
-                        <option value="multiple">💳 Pago Múltiple (Dividir)</option>
-                      </>
-                    )}
-                  </select>
-                </div>
-                {formaPago === 'transferencia' && (
-                  <div>
-                    <label className="label">Número de Transferencia *</label>
-                    <input type="text" className="input-field" value={numeroTransferencia} onChange={(e) => setNumeroTransferencia(e.target.value)} placeholder="Número de referencia" required disabled={!!consultaGuardada} />
-                  </div>
-                )}
-                {formaPago === 'tarjeta' && (
-                  <div>
-                    <label className="label">Número de Voucher/Baucher <span className="text-yellow-600 ml-2">(Opcional - se puede agregar después)</span></label>
-                    <input type="text" className="input-field" value={numeroVoucher} onChange={(e) => setNumeroVoucher(e.target.value)} placeholder="Número de voucher" disabled={!!consultaGuardada} />
-                    {!numeroVoucher && <p className="text-xs text-yellow-600 mt-1">⚠️ Sin voucher - pendiente de agregar</p>}
-                  </div>
-                )}
-                <div>
-                  <label className="label">Número de Factura</label>
-                  <input type="text" className="input-field" value={numeroFactura} onChange={(e) => setNumeroFactura(e.target.value)} placeholder="Número de factura" disabled={!!consultaGuardada} />
-                </div>
-                {formaPago === 'multiple' && pagosMultiples.length > 0 && (
-                  <div className="bg-purple-50 border border-purple-200 rounded p-3">
-                    <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-semibold text-purple-800">💳 Pagos Configurados</h4>
-                      <button onClick={() => setShowModalPagosMultiples(true)} className="text-xs text-purple-600 hover:text-purple-800" disabled={!!consultaGuardada}>Editar</button>
-                    </div>
-                    <div className="space-y-1 text-sm">
-                      {pagosMultiples.map((pago, idx) => (
-                        <div key={idx} className="flex justify-between">
-                          <span className="capitalize">{pago.forma_pago.replace('_', ' ')}:</span>
-                          <span className="font-medium">Q {pago.monto.toFixed(2)}</span>
-                        </div>
-                      ))}
-                      <div className="flex justify-between border-t pt-1 font-bold">
-                        <span>Total:</span>
-                        <span>Q {pagosMultiples.reduce((sum, p) => sum + p.monto, 0).toFixed(2)}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Totales */}
-            <div className="card bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300">
-              <h3 className="text-lg font-semibold mb-3 text-blue-800">💰 Totales</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Sub-Total Estudios:</span>
-                  <span className="font-semibold">Q {totales.subTotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Descuento:</span>
-                  <span className="font-semibold">Q {totales.descuento.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Monto Gravable:</span>
-                  <span className="font-semibold">Q {totales.montoGravable.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Impuesto:</span>
-                  <span className="font-semibold">Q {totales.impuesto.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-lg border-t-2 border-blue-400 pt-2 mt-2">
-                  <span className="font-bold">Total Ventas:</span>
-                  <span className="font-bold text-blue-700">Q {totales.total.toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Botones de acción */}
-            <div className="space-y-3">
-              <button onClick={handleLimpiar} className="btn-secondary w-full">🗑️ Limpiar</button>
-              <button
-                onClick={handleGuardar}
-                className={`w-full font-semibold py-3 px-4 rounded-lg transition-all ${
-                  guardando ? 'bg-yellow-500 text-white cursor-wait'
-                  : consultaGuardada ? 'bg-green-600 text-white cursor-default'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl'
-                }`}
-                disabled={!pacienteActual || descripcion.length === 0 || guardando || !!consultaGuardada}
-              >
-                {guardando ? '⏳ Guardando...' : consultaGuardada ? '✅ Consulta Guardada' : '💾 Guardar Consulta'}
-              </button>
-              <button
-                onClick={handleImprimir}
-                className={`w-full font-semibold py-3 px-4 rounded-lg transition-all ${
-                  consultaGuardada ? 'bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-xl' : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
-                disabled={!consultaGuardada}
-              >
-                🖨️ Imprimir Recibo
-              </button>
-              {!consultaGuardada && pacienteActual && descripcion.length > 0 && (
-                <p className="text-xs text-blue-600 text-center font-medium">ℹ️ Primero debe guardar la consulta</p>
-              )}
-              {consultaGuardada && (
-                <p className="text-xs text-green-600 text-center font-medium">✅ Consulta guardada correctamente. Puede imprimir ahora.</p>
-              )}
-            </div>
+          {/* Action buttons */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button style={S.btnClear} onClick={handleLimpiar}>🗑️ Limpiar todo</button>
+            <button
+              onClick={handleGuardar}
+              style={btnSaveStyle(saveState)}
+              disabled={!pacienteActual || descripcion.length === 0 || guardando || !!consultaGuardada}
+            >
+              {guardando ? '⏳ Guardando...' : consultaGuardada ? '✅ Consulta Guardada' : '💾 Guardar Consulta'}
+            </button>
+            <button
+              onClick={handleImprimir}
+              style={btnPrintStyle(!!consultaGuardada)}
+              disabled={!consultaGuardada}
+            >
+              🖨️ Imprimir Recibo
+            </button>
+            {!consultaGuardada && pacienteActual && descripcion.length > 0 && (
+              <p style={{ fontSize: 11, color: '#2563eb', textAlign: 'center', fontWeight: 500 }}>
+                ℹ️ Primero debe guardar la consulta para imprimir
+              </p>
+            )}
+            {consultaGuardada && (
+              <p style={{ fontSize: 11, color: '#16a34a', textAlign: 'center', fontWeight: 500 }}>
+                ✅ Consulta guardada — puede imprimir ahora
+              </p>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Modal de nuevo paciente */}
+      {/* ── MODAL nuevo paciente ── */}
       <NuevoPacienteModal
         isOpen={showNuevoModal}
         onClose={() => setShowNuevoModal(false)}
         onSave={handleGuardarPaciente}
       />
 
-      {/* Modal pagos múltiples */}
+      {/* ── MODAL pagos múltiples ── */}
       {showModalPagosMultiples && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">💳 Configurar Pagos Múltiples</h2>
-              <button onClick={() => setShowModalPagosMultiples(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,41,66,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+          <div style={{ background: '#fff', borderRadius: 20, padding: '32px', maxWidth: 560, width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: '#0f2942', margin: 0 }}>💳 Configurar Pagos Múltiples</h2>
+              <button onClick={() => setShowModalPagosMultiples(false)} style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', color: '#6b7280', fontWeight: 700 }}>✕</button>
             </div>
-            <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-4">
-              <p className="text-sm text-blue-800"><strong>Total a pagar:</strong> Q {totales.total.toFixed(2)}</p>
-              <p className="text-xs text-blue-600 mt-1">La suma de todos los pagos debe coincidir con el total</p>
+            <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 12, padding: '12px 16px', marginBottom: 20 }}>
+              <p style={{ fontSize: 13, color: '#1e40af', margin: 0 }}><strong>Total a pagar: Q {totales.total.toFixed(2)}</strong></p>
+              <p style={{ fontSize: 12, color: '#3b82f6', marginTop: 4, marginBottom: 0 }}>La suma de todos los pagos debe coincidir con el total</p>
             </div>
-            <div className="space-y-4">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {pagosMultiples.map((pago, index) => (
-                <div key={index} className="border-2 border-gray-200 rounded p-4">
-                  <div className="flex justify-between items-center mb-3">
-                    <h4 className="font-semibold">Pago #{index + 1}</h4>
+                <div key={index} style={{ border: '1.5px solid #e5e7eb', borderRadius: 14, padding: '16px 18px', background: '#fafafa' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <span style={{ fontWeight: 600, color: '#0f2942' }}>Pago #{index + 1}</span>
                     {pagosMultiples.length > 1 && (
-                      <button onClick={() => eliminarPago(index)} className="text-red-600 hover:text-red-800 text-sm">Eliminar</button>
+                      <button onClick={() => eliminarPago(index)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13 }}>Eliminar</button>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     <div>
-                      <label className="label">Forma de Pago</label>
-                      <select className="input-field" value={pago.forma_pago} onChange={(e) => actualizarPago(index, 'forma_pago', e.target.value)}>
+                      <label style={S.label}>Forma de Pago</label>
+                      <select style={S.select} value={pago.forma_pago} onChange={(e) => actualizarPago(index, 'forma_pago', e.target.value)}>
                         <option value="efectivo">Efectivo</option>
                         <option value="tarjeta">Tarjeta</option>
                         <option value="transferencia">Transferencia</option>
@@ -981,52 +1539,74 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                       </select>
                     </div>
                     <div>
-                      <label className="label">Monto (Q)</label>
-                      <input type="number" step="0.01" min="0" className="input-field" value={pago.monto} onChange={(e) => actualizarPago(index, 'monto', parseFloat(e.target.value) || 0)} placeholder="0.00" />
+                      <label style={S.label}>Monto (Q)</label>
+                      <input type="number" step="0.01" min="0" style={S.input} value={pago.monto}
+                        onChange={(e) => actualizarPago(index, 'monto', parseFloat(e.target.value) || 0)} placeholder="0.00" />
                     </div>
                   </div>
                   {pago.forma_pago === 'transferencia' && (
-                    <div className="mt-3">
-                      <label className="label">Número de Referencia *</label>
-                      <input type="text" className="input-field" value={pago.numero_referencia || ''} onChange={(e) => actualizarPago(index, 'numero_referencia', e.target.value)} placeholder="Número de transferencia" />
+                    <div style={{ marginTop: 12 }}>
+                      <label style={S.label}>Número de Referencia *</label>
+                      <input type="text" style={S.input} value={pago.numero_referencia || ''}
+                        onChange={(e) => actualizarPago(index, 'numero_referencia', e.target.value)} placeholder="Número de transferencia" />
                     </div>
                   )}
                 </div>
               ))}
             </div>
-            <button onClick={agregarPago} className="mt-4 w-full btn-secondary flex items-center justify-center gap-2">
-              <Plus size={18} /> Agregar Otro Pago
+            <button onClick={agregarPago} style={{ ...S.btnSecondary, width: '100%', justifyContent: 'center', marginTop: 16, padding: '11px' }}>
+              <Plus size={16} /> Agregar Otro Pago
             </button>
-            <div className="mt-4 p-3 bg-gray-100 rounded">
-              <div className="flex justify-between font-semibold">
-                <span>Total configurado:</span>
-                <span className={Math.abs(pagosMultiples.reduce((sum, p) => sum + p.monto, 0) - totales.total) < 0.01 ? 'text-green-600' : 'text-red-600'}>
+            <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: '12px 16px', marginTop: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 14 }}>
+                <span>Total configurado</span>
+                <span style={{ color: Math.abs(pagosMultiples.reduce((sum, p) => sum + p.monto, 0) - totales.total) < 0.01 ? '#16a34a' : '#ef4444' }}>
                   Q {pagosMultiples.reduce((sum, p) => sum + p.monto, 0).toFixed(2)}
                 </span>
               </div>
             </div>
-            <div className="flex gap-3 justify-end mt-6">
-              <button onClick={() => { setShowModalPagosMultiples(false); setFormaPago('efectivo'); setPagosMultiples([{ forma_pago: 'efectivo', monto: 0 }]); }} className="btn-secondary">Cancelar</button>
-              <button onClick={() => { if (validarPagosMultiples()) setShowModalPagosMultiples(false); }} className="btn-primary">Confirmar Pagos</button>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 24 }}>
+              <button onClick={() => { setShowModalPagosMultiples(false); setFormaPago('efectivo'); setPagosMultiples([{ forma_pago: 'efectivo', monto: 0 }]); }}
+                style={S.btnSecondary}>Cancelar</button>
+              <button onClick={() => { if (validarPagosMultiples()) setShowModalPagosMultiples(false); }}
+                style={S.btnPrimary}>Confirmar Pagos</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal tipo recibo */}
+      {/* ── MODAL tipo recibo ── */}
       {showModalTipoRecibo && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 text-center">¿Qué recibo desea imprimir?</h2>
-            <p className="text-gray-600 text-sm mb-6 text-center">Seleccione el tipo de recibo que desea generar</p>
-            <div className="space-y-3">
-              <button onClick={() => imprimirReciboSeleccionado('completo')} className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors flex items-center justify-between">
-                <span>📄 Recibo Completo</span><span className="text-sm opacity-90">(con precios)</span>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,41,66,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+          <div style={{ background: '#fff', borderRadius: 20, maxWidth: 420, width: '100%', padding: '36px 32px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', textAlign: 'center' }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>🖨️</div>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#0f2942', marginBottom: 8 }}>¿Qué recibo desea imprimir?</h2>
+            <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 24 }}>Seleccione el tipo de recibo que desea generar</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button onClick={() => imprimirReciboSeleccionado('completo')} style={{
+                padding: '16px', borderRadius: 12, border: 'none', cursor: 'pointer',
+                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                color: '#fff', fontWeight: 700, fontSize: 15,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                boxShadow: '0 4px 12px rgba(37,99,235,0.3)',
+              }}>
+                <span>📄 Recibo Completo</span>
+                <span style={{ fontSize: 12, opacity: 0.85 }}>con precios</span>
               </button>
-              <button onClick={() => imprimirReciboSeleccionado('medico')} className="w-full py-4 px-6 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors flex items-center justify-between">
-                <span>🩺 Orden para Médico</span><span className="text-sm opacity-90">(sin precios)</span>
+              <button onClick={() => imprimirReciboSeleccionado('medico')} style={{
+                padding: '16px', borderRadius: 12, border: 'none', cursor: 'pointer',
+                background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                color: '#fff', fontWeight: 700, fontSize: 15,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                boxShadow: '0 4px 12px rgba(5,150,105,0.3)',
+              }}>
+                <span>🩺 Orden para Médico</span>
+                <span style={{ fontSize: 12, opacity: 0.85 }}>sin precios</span>
               </button>
-              <button onClick={() => { setShowModalTipoRecibo(false); setDatosReciboTemp(null); }} className="w-full py-3 px-6 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-semibold transition-colors">Cancelar</button>
+              <button onClick={() => { setShowModalTipoRecibo(false); setDatosReciboTemp(null); }} style={{
+                padding: '13px', borderRadius: 12, border: '1.5px solid #e5e7eb',
+                background: '#fff', color: '#6b7280', fontWeight: 600, fontSize: 14, cursor: 'pointer',
+              }}>Cancelar</button>
             </div>
           </div>
         </div>

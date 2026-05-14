@@ -9,7 +9,6 @@ interface AutocompleteProps {
   disabled?: boolean;
   label: string;
   required?: boolean;
-  allowCustomValue?: boolean; // ✅ NUEVO: Permite escribir valores que no están en la lista
 }
 
 export const Autocomplete: React.FC<AutocompleteProps> = ({
@@ -19,8 +18,7 @@ export const Autocomplete: React.FC<AutocompleteProps> = ({
   placeholder = 'Escriba para buscar...',
   disabled = false,
   label,
-  required = false,
-  allowCustomValue = false // ✅ NUEVO
+  required = false
 }) => {
   const [inputValue, setInputValue] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -35,11 +33,8 @@ export const Autocomplete: React.FC<AutocompleteProps> = ({
       setInputValue(selected.nombre);
     } else if (value === '') {
       setInputValue('');
-    } else if (allowCustomValue && value) {
-      // ✅ Si allowCustomValue está activo, mostrar el valor directamente
-      setInputValue(value);
     }
-  }, [value, options, allowCustomValue]);
+  }, [value, options]);
 
   useEffect(() => {
     setFilteredOptions(options);
@@ -61,11 +56,6 @@ export const Autocomplete: React.FC<AutocompleteProps> = ({
     setInputValue(newValue);
     setIsOpen(true);
 
-    // ✅ Si allowCustomValue está activo, pasar el texto directamente a onChange
-    if (allowCustomValue) {
-      onChange(newValue);
-    }
-
     if (newValue === '') {
       setFilteredOptions(options);
     } else {
@@ -78,8 +68,7 @@ export const Autocomplete: React.FC<AutocompleteProps> = ({
 
   const handleSelectOption = (option: { id: string; nombre: string }) => {
     setInputValue(option.nombre);
-    // ✅ Si allowCustomValue está activo, pasar el nombre en vez del id
-    onChange(allowCustomValue ? option.nombre : option.id);
+    onChange(option.id);
     setIsOpen(false);
   };
 
@@ -116,7 +105,7 @@ export const Autocomplete: React.FC<AutocompleteProps> = ({
       </div>
       
       {isOpen && !disabled && filteredOptions.length > 0 && (
-        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
           {filteredOptions.map((option) => (
             <div
               key={option.id}
@@ -130,7 +119,7 @@ export const Autocomplete: React.FC<AutocompleteProps> = ({
       )}
       
       {isOpen && !disabled && filteredOptions.length === 0 && inputValue && (
-        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
           <div className="px-3 py-2 text-gray-500">No se encontraron resultados</div>
         </div>
       )}
