@@ -572,6 +572,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const [showModalTipoRecibo, setShowModalTipoRecibo] = useState(false);
   const [datosReciboTemp, setDatosReciboTemp] = useState<any>(null);
   const [periodoEspecialActivo, setPeriodoEspecialActivo] = useState<string | null>(null);
+  const [cargandoPeriodo, setCargandoPeriodo] = useState(true);
 
   // ─── All logic functions UNCHANGED ────────────────────────────────────────
   const esHorarioNormalBase = () => {
@@ -610,6 +611,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       } catch {
         setPeriodoEspecialActivo(null);
         setTipoCobro(esHorarioNormalBase() ? 'normal' : 'especial');
+      } finally {
+        setCargandoPeriodo(false);
       }
     };
     verificarPeriodoEspecial();
@@ -835,7 +838,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       return;
     }
 
-    const horarioNormal = esHorarioNormal();
+    const horarioNormal = cargandoPeriodo ? false : esHorarioNormal();
     if (tipoCobro === 'normal' && !horarioNormal && !justificacionEspecial.trim()) {
       alert('Debe proporcionar una justificación para usar tarifa normal fuera del horario establecido');
       return;
