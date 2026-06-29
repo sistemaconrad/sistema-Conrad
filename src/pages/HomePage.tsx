@@ -571,9 +571,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
 
   const [showModalTipoRecibo, setShowModalTipoRecibo] = useState(false);
   const [datosReciboTemp, setDatosReciboTemp] = useState<any>(null);
+  const [periodoEspecialActivo, setPeriodoEspecialActivo] = useState<string | null>(null);
 
   // ─── All logic functions UNCHANGED ────────────────────────────────────────
-  const esHorarioNormal = () => {
+  const esHorarioNormalBase = () => {
     const now = new Date();
     const dia = now.getDay();
     const hora = now.getHours();
@@ -582,9 +583,36 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     return false;
   };
 
+  // Si hay un periodo especial activo en Supabase, no es horario normal
+  const esHorarioNormal = () => {
+    if (periodoEspecialActivo) return false;
+    return esHorarioNormalBase();
+  };
+
   useEffect(() => {
-    const horarioNormal = esHorarioNormal();
-    setTipoCobro(horarioNormal ? 'normal' : 'especial');
+    const verificarPeriodoEspecial = async () => {
+      try {
+        const ahora = new Date().toISOString();
+        const { data } = await supabase
+          .from('periodos_especiales')
+          .select('nombre')
+          .eq('activo', true)
+          .lte('inicio', ahora)
+          .gte('fin', ahora)
+          .limit(1);
+        if (data && data.length > 0) {
+          setPeriodoEspecialActivo(data[0].nombre);
+          setTipoCobro('especial');
+        } else {
+          setPeriodoEspecialActivo(null);
+          setTipoCobro(esHorarioNormalBase() ? 'normal' : 'especial');
+        }
+      } catch {
+        setPeriodoEspecialActivo(null);
+        setTipoCobro(esHorarioNormalBase() ? 'normal' : 'especial');
+      }
+    };
+    verificarPeriodoEspecial();
   }, []);
 
   useEffect(() => {
@@ -1109,7 +1137,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               {([
                 { key: 'social', label: 'Social', disabled: esServicioMovil || !!consultaGuardada, note: esServicioMovil ? 'No disponible' : '' },
                 { key: 'normal', label: 'Normal', disabled: esServicioMovil || !!consultaGuardada, note: !horarioNormal ? '(Requiere justificación)' : '' },
-                { key: 'especial', label: 'Especial', disabled: (horarioNormal && !esServicioMovil) || !!consultaGuardada, note: esServicioMovil ? 'Precio del sistema' : horarioNormal && !esServicioMovil ? 'Solo fuera de horario' : '' },
+                { key: 'especial', label: 'Especial', disabled: (horarioNormal && !esServicioMovil) || !!consultaGuardada, note: periodoEspecialActivo ? periodoEspecialActivo : esServicioMovil ? 'Precio del sistema' : horarioNormal && !esServicioMovil ? 'Solo fuera de horario' : '' },
                 { key: 'personalizado', label: 'Personalizado', disabled: !!consultaGuardada, note: esServicioMovil ? 'Editar precios' : '', purple: true },
               ] as any[]).map(opt => (
                 <label key={opt.key} style={{
