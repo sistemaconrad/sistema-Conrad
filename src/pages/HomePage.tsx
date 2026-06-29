@@ -598,8 +598,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           .from('periodos_especiales')
           .select('nombre')
           .eq('activo', true)
-          .lte('inicio', ahora)
-          .gte('fin', ahora)
+          .lte('fecha_inicio', ahora)
+          .gte('fecha_fin', ahora)
           .limit(1);
         if (data && data.length > 0) {
           setPeriodoEspecialActivo(data[0].nombre);
