@@ -121,6 +121,9 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
   const [mostrarAnuladas, setMostrarAnuladas] = useState(false);
   const [consultasAnuladas, setConsultasAnuladas] = useState<any[]>([]);
 
+  const [mostrarModificados, setMostrarModificados] = useState(false);
+  const [preciosModificados, setPreciosModificados] = useState<any[]>([]);
+
   const cajaBloqueada = debeEstarCerrada() && !modoEdicion;
 
   const solicitarEdicion = () => {
@@ -257,6 +260,21 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
         motivo_anulacion: c.motivo_anulacion,
         total: detallesData?.filter(d => d.consulta_id === c.id).reduce((sum, d) => sum + d.precio, 0) || 0
       })));
+
+      const consultasRegularesIds = new Set(consultasRegulares.map(c => c.id));
+      const preciosModificadosData = (detallesData || [])
+        .filter((d: any) => d.precio_modificado && consultasRegularesIds.has(d.consulta_id))
+        .map((d: any) => {
+          const consultaDet = consultas?.find(c => c.id === d.consulta_id);
+          return {
+            paciente: consultaDet?.pacientes?.nombre || 'Sin nombre',
+            estudio: d.sub_estudios?.nombre || 'Estudio',
+            precio_original: d.precio_original,
+            precio_nuevo: d.precio,
+            justificacion: d.justificacion_precio || 'Sin justificación registrada'
+          };
+        });
+      setPreciosModificados(preciosModificadosData);
 
       cargarGastos();
       await cargarCuadreGuardado();
@@ -567,7 +585,8 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
           monto: parseFloat(g.monto || 0),
           categoria: g.categorias_gastos?.nombre || '',
           created_at: g.created_at || ''
-        }))
+        })),
+        preciosModificados
       });
     }
   };
@@ -1092,6 +1111,37 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
                             <div className="text-xs text-gray-500 mt-1">Anulado por: {anulada.usuario_anulo}</div>
                           </div>
                           <div className="text-lg font-bold text-red-600">Q {anulada.total.toFixed(2)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Precios Modificados */}
+            {preciosModificados.length > 0 && (
+              <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <button onClick={() => setMostrarModificados(!mostrarModificados)} className="w-full flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-amber-100 p-2 rounded-lg"><Edit size={20} className="text-amber-600" /></div>
+                    <h3 className="text-lg font-semibold text-gray-900">Precios Modificados ({preciosModificados.length})</h3>
+                  </div>
+                  {mostrarModificados ? <ChevronUp size={20} className="text-gray-400" /> : <ChevronDown size={20} className="text-gray-400" />}
+                </button>
+                {mostrarModificados && (
+                  <div className="mt-4 pt-4 border-t border-gray-200 space-y-2">
+                    {preciosModificados.map((mod, index) => (
+                      <div key={index} className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+                        <div className="flex justify-between">
+                          <div>
+                            <div className="font-semibold text-gray-900">{mod.paciente} — {mod.estudio}</div>
+                            <div className="text-sm text-gray-600 mt-1">{mod.justificacion}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xs text-gray-400 line-through">Q {(mod.precio_original ?? 0).toFixed(2)}</div>
+                            <div className="text-lg font-bold text-amber-600">Q {mod.precio_nuevo.toFixed(2)}</div>
+                          </div>
                         </div>
                       </div>
                     ))}

@@ -40,6 +40,8 @@ export interface SubEstudio {
   precio_normal: number;
   precio_social: number;
   precio_especial: number;
+  disponible_movil?: boolean;
+  precio_movil?: number;
   activo: boolean;
   created_at?: string;
 }
@@ -72,6 +74,9 @@ export interface DetalleConsulta {
   sub_estudio_id: string;
   precio: number;
   comentarios?: string; // Comentarios adicionales opcionales
+  precio_modificado?: boolean;
+  precio_original?: number;
+  justificacion_precio?: string;
   created_at?: string;
 }
 

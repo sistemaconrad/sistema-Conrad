@@ -16,6 +16,8 @@ interface SubEstudio {
   precio_normal: number;
   precio_social: number;
   precio_especial: number;
+  disponible_movil?: boolean;
+  precio_movil?: number;
   activo: boolean;
 }
 
@@ -43,6 +45,8 @@ export const ProductosPage: React.FC<ProductosPageProps> = ({ onBack }) => {
   const [precioNormal, setPrecioNormal] = useState('');
   const [precioSocial, setPrecioSocial] = useState('');
   const [precioEspecial, setPrecioEspecial] = useState('');
+  const [disponibleMovil, setDisponibleMovil] = useState(false);
+  const [precioMovil, setPrecioMovil] = useState('');
 
   useEffect(() => {
     cargarEstudios();
@@ -107,6 +111,8 @@ export const ProductosPage: React.FC<ProductosPageProps> = ({ onBack }) => {
         precio_normal: parseFloat(precioNormal),
         precio_social: parseFloat(precioSocial),
         precio_especial: parseFloat(precioEspecial),
+        disponible_movil: disponibleMovil,
+        precio_movil: disponibleMovil ? (parseFloat(precioMovil) || 0) : null,
       };
 
       if (editando) {
@@ -162,6 +168,8 @@ export const ProductosPage: React.FC<ProductosPageProps> = ({ onBack }) => {
       setPrecioNormal(subEstudio.precio_normal.toString());
       setPrecioSocial(subEstudio.precio_social.toString());
       setPrecioEspecial(subEstudio.precio_especial.toString());
+      setDisponibleMovil(!!subEstudio.disponible_movil);
+      setPrecioMovil(subEstudio.precio_movil?.toString() || '');
     }
     setShowModalSubEstudio(true);
   };
@@ -174,6 +182,8 @@ export const ProductosPage: React.FC<ProductosPageProps> = ({ onBack }) => {
     setPrecioNormal('');
     setPrecioSocial('');
     setPrecioEspecial('');
+    setDisponibleMovil(false);
+    setPrecioMovil('');
   };
 
   const subEstudiosFiltrados = estudioSeleccionado 
@@ -279,10 +289,13 @@ export const ProductosPage: React.FC<ProductosPageProps> = ({ onBack }) => {
                         className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14} /></button>
                     </div>
                   </div>
-                  <div className="flex gap-3 mt-1.5">
+                  <div className="flex gap-3 mt-1.5 flex-wrap">
                     <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">Normal: Q{sub.precio_normal}</span>
                     <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Social: Q{sub.precio_social}</span>
                     <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">Especial: Q{sub.precio_especial}</span>
+                    {sub.disponible_movil && (
+                      <span className="text-xs bg-fuchsia-100 text-fuchsia-700 px-2 py-0.5 rounded-full font-medium">📱 Móvil: Q{sub.precio_movil ?? 0}</span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -369,6 +382,21 @@ export const ProductosPage: React.FC<ProductosPageProps> = ({ onBack }) => {
                       value={f.val} onChange={(e) => f.set(e.target.value)} />
                   </div>
                 ))}
+              </div>
+              <div className={`rounded-xl border p-3 transition-colors ${disponibleMovil ? 'bg-fuchsia-50 border-fuchsia-200' : 'border-gray-200'}`}>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={disponibleMovil}
+                    onChange={(e) => setDisponibleMovil(e.target.checked)} className="w-4 h-4" />
+                  <span className="text-sm font-bold text-gray-700">📱 Disponible en Servicio Móvil</span>
+                </label>
+                {disponibleMovil && (
+                  <div className="mt-3">
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Precio Móvil (Q)</label>
+                    <input type="number" step="0.01"
+                      className="w-full px-3 py-2.5 border border-fuchsia-200 rounded-xl text-sm font-semibold text-center focus:ring-2 focus:ring-fuchsia-400 focus:border-fuchsia-400"
+                      value={precioMovil} onChange={(e) => setPrecioMovil(e.target.value)} placeholder="0.00" />
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex gap-3 mt-6">

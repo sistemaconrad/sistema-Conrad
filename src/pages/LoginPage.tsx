@@ -133,6 +133,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             </p>
           </div>
         </div>
+
+        <a
+          href="https://www.codenest.business/"
+          target="_blank"
+          rel="noreferrer"
+          className="flex flex-col items-center gap-1 mt-6 opacity-80 hover:opacity-100 transition-opacity"
+        >
+          <img src="/codenest-logo.png" alt="Codenest" className="h-10 w-auto" />
+          <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.6)' }}>
+            Desarrollado por <span className="font-medium" style={{ color: 'rgba(255,255,255,0.8)' }}>Codenest</span> · codenest.business
+          </span>
+        </a>
       </div>
     </div>
   );

@@ -38,6 +38,13 @@ interface CuadreDatos {
     categoria?: string;
     created_at?: string;
   }>;
+  preciosModificados?: Array<{
+    paciente: string;
+    estudio: string;
+    precio_original?: number;
+    precio_nuevo: number;
+    justificacion: string;
+  }>;
 }
 
 // ✅ Helpers para sanitizar valores antes de escribir en ExcelJS
@@ -405,6 +412,58 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
     r++;
   } else {
     worksheet.getCell(r, 2).value = 'No hay gastos registrados para este dia';
+    worksheet.getCell(r, 2).font = { italic: true, color: { argb: 'FF9E9E9E' } };
+    r++;
+  }
+
+  // ===== PRECIOS MODIFICADOS DEL DÍA =====
+  r += 2;
+
+  worksheet.mergeCells(`A${r}:F${r}`);
+  const cModH = worksheet.getCell(`A${r}`);
+  cModH.value = 'PRECIOS MODIFICADOS DEL DIA';
+  cModH.font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+  cModH.fill = fillOrange;
+  cModH.alignment = { horizontal: 'center', vertical: 'middle' };
+  cModH.border = borderThin;
+  r++;
+
+  ['Paciente', 'Estudio', 'Precio Original', 'Precio Nuevo', 'Justificacion'].forEach((h, i) => {
+    const cell = worksheet.getCell(r, i + 2);
+    cell.value = h;
+    cell.font = { bold: true };
+    cell.fill = fillLightOrange;
+    cell.alignment = { horizontal: 'center' };
+    cell.border = borderThin;
+  });
+  r++;
+
+  const modificadosLista = datos.preciosModificados || [];
+  if (modificadosLista.length > 0) {
+    modificadosLista.forEach(m => {
+      worksheet.getCell(r, 2).value = safeStr(m.paciente);
+      worksheet.getCell(r, 2).alignment = { horizontal: 'left' };
+
+      worksheet.getCell(r, 3).value = safeStr(m.estudio);
+      worksheet.getCell(r, 3).alignment = { horizontal: 'left' };
+
+      worksheet.getCell(r, 4).value = safeNum(m.precio_original);
+      worksheet.getCell(r, 4).numFmt = '#,##0.00';
+      worksheet.getCell(r, 4).alignment = { horizontal: 'right' };
+
+      worksheet.getCell(r, 5).value = safeNum(m.precio_nuevo);
+      worksheet.getCell(r, 5).numFmt = '#,##0.00';
+      worksheet.getCell(r, 5).alignment = { horizontal: 'right' };
+      worksheet.getCell(r, 5).font = { bold: true, color: { argb: 'FFE65100' } };
+
+      worksheet.getCell(r, 6).value = safeStr(m.justificacion);
+      worksheet.getCell(r, 6).alignment = { horizontal: 'left', wrapText: true };
+
+      for (let col = 2; col <= 6; col++) worksheet.getCell(r, col).border = borderThin;
+      r++;
+    });
+  } else {
+    worksheet.getCell(r, 2).value = 'No hubo precios modificados este dia';
     worksheet.getCell(r, 2).font = { italic: true, color: { argb: 'FF9E9E9E' } };
     r++;
   }

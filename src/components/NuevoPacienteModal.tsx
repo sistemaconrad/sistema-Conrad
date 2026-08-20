@@ -159,9 +159,9 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
 
     const tieneMedico = nombreMedico.trim() !== '';
 
-    //  Para servicios moviles: establecimiento es obligatorio SOLO si no hay medico
-    if (esServicioMovil && !tieneMedico && !establecimientoMovil.trim()) {
-      alert('Para Servicios Moviles debe ingresar al menos:\n- Un medico referente, O\n- El nombre del establecimiento\n\n(Preferiblemente ambos)');
+    //  Para servicios moviles: el establecimiento es obligatorio
+    if (esServicioMovil && !establecimientoMovil.trim()) {
+      alert('Para Servicios Moviles debe ingresar el nombre del establecimiento');
       return;
     }
 
@@ -195,20 +195,10 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
     };
 
     let medico: Medico | null = null;
-    if (tieneMedico && !sinInformacion) {
-      if ((esReferente || esServicioMovil) && medicoSeleccionado) {
+    if (!esServicioMovil && tieneMedico && !sinInformacion) {
+      if (esReferente && medicoSeleccionado) {
         //  Medico seleccionado de la lista
         medico = medicoSeleccionado;
-      } else if (esServicioMovil && !medicoSeleccionado) {
-        //  Servicio movil con nombre manual (no esta en la lista)
-        medico = {
-          nombre: nombreMedico,
-          telefono: telefonoMedico || '',
-          departamento: departamentoMedico || '',
-          municipio: municipioMedico || '',
-          direccion: direccionMedico || '',
-          es_referente: false
-        };
       } else {
         //  Medico no referente con datos completos
         medico = {
@@ -371,72 +361,14 @@ export const NuevoPacienteModal: React.FC<NuevoPacienteModalProps> = ({
                 <div className="space-y-3">
                   <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
                     <p className="text-sm text-purple-800">
-                      <strong> Servicio Movil:</strong> Este registro no cuenta como paciente regular ni genera comisin. Solo se registran estudios RX con precio personalizado.
+                      <strong> Servicio Movil:</strong> Este registro no cuenta como paciente regular ni genera comisin. Solo se registran estudios habilitados para servicio movil, con precio propio.
                     </p>
                   </div>
                   
-                  {/* MDICO con bsqueda en tiempo real */}
-                  <div>
-                    <label className="label"> Medico Referente (opcional)</label>
-                    <div className="space-y-1">
-                      {nombreMedico ? (
-                        <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5">
-                          <span className="text-sm font-medium text-blue-900">{nombreMedico}</span>
-                          <button type="button" onClick={() => {
-                            setNombreMedico(''); setMedicoSeleccionado(null);
-                            setTelefonoMedico(''); setDepartamentoMedico('');
-                            setMunicipioMedico(''); setDireccionMedico('');
-                          }} className="text-red-400 hover:text-red-600 text-xs font-bold ml-2"> Quitar</button>
-                        </div>
-                      ) : (
-                        <div className="relative">
-                          <input
-                            type="text"
-                            className="input-field pr-8"
-                            placeholder=" Buscar medico por nombre..."
-                            onChange={(e) => {
-                              const q = e.target.value.toLowerCase();
-                              const el = document.getElementById('lista-medicos-movil');
-                              if (el) {
-                                el.querySelectorAll('button[data-nombre]').forEach((btn: any) => {
-                                  btn.style.display = btn.dataset.nombre.toLowerCase().includes(q) ? '' : 'none';
-                                });
-                              }
-                            }}
-                          />
-                        </div>
-                      )}
-                      {!nombreMedico && medicosReferentes.length > 0 && (
-                        <div id="lista-medicos-movil" className="border border-blue-200 rounded-lg bg-blue-50 max-h-44 overflow-y-auto">
-                          {medicosReferentes.map(medico => (
-                            <button
-                              key={medico.id}
-                              type="button"
-                              data-nombre={medico.nombre}
-                              onClick={() => {
-                                setMedicoSeleccionado(medico);
-                                setNombreMedico(medico.nombre);
-                                setTelefonoMedico(medico.telefono);
-                                setDepartamentoMedico(medico.departamento);
-                                setMunicipioMedico(medico.municipio);
-                                setDireccionMedico(medico.direccion);
-                              }}
-                              className="w-full text-left px-3 py-2 hover:bg-blue-100 text-sm border-b border-blue-100 last:border-0 transition-colors"
-                            >
-                              {medico.nombre}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
                   {/*  Campo de texto simple para establecimiento */}
                   <div>
                     <label className="label">
-                       Establecimiento / Lugar 
-                      {!nombreMedico && <span className="text-red-500"> *</span>}
-                      {nombreMedico && <span className="text-gray-500 text-xs ml-1">(opcional si hay medico)</span>}
+                       Establecimiento / Lugar <span className="text-red-500"> *</span>
                     </label>
                     <div className="space-y-2">
                       {/* Bsqueda + lista siempre visible */}

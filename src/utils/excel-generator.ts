@@ -39,6 +39,9 @@ interface Consulta {
     numero_voucher?: string;
     numero_transferencia?: string;
     comentarios?: string;
+    precio_modificado?: boolean;
+    precio_original?: number;
+    justificacion_precio?: string;
     sub_estudios: {
       nombre: string;
       estudios: {
@@ -53,6 +56,14 @@ interface Estudio {
   id: string;
   nombre: string;
 }
+
+// Texto de justificación cuando un precio fue editado a mano (fuera del catálogo)
+const textoPrecioModificado = (d: { precio_modificado?: boolean; precio_original?: number; precio: number; justificacion_precio?: string }) => {
+  if (!d.precio_modificado) return '';
+  const original = d.precio_original !== undefined ? `Q${d.precio_original.toFixed(2)}` : '?';
+  const justificacion = d.justificacion_precio || 'sin justificación registrada';
+  return ` [PRECIO MODIFICADO de ${original} a Q${d.precio.toFixed(2)}: ${justificacion}]`;
+};
 
 // ✅ FUNCIÓN PARA GENERAR REPORTE GENERAL (COMPLETA)
 export const generarReporteExcel = async (
@@ -243,7 +254,7 @@ async function crearHojaDiaria(
       .map(d => {
         const nombre = d.sub_estudios?.nombre || '';
         const comentario = d.comentarios ? ` (${d.comentarios})` : '';
-        return nombre + comentario;
+        return nombre + comentario + textoPrecioModificado(d);
       })
       .join(', ');
     
@@ -641,7 +652,7 @@ async function crearHojaMoviles(
       .map(d => {
         const nombre = d.sub_estudios?.nombre || '';
         const comentario = d.comentarios ? ` (${d.comentarios})` : '';
-        return nombre + comentario;
+        return nombre + comentario + textoPrecioModificado(d);
       })
       .join(', ');
     
@@ -1004,7 +1015,7 @@ export const generarReporteMensualUnificado = async (
       .map(d => {
         const nombre = d.sub_estudios?.nombre || '';
         const comentario = d.comentarios ? ` (${d.comentarios})` : '';
-        return nombre + comentario;
+        return nombre + comentario + textoPrecioModificado(d);
       })
       .join(', ');
 
@@ -1306,7 +1317,7 @@ export const generarReporteMensualMoviles = async (
       .map(d => {
         const nombre = d.sub_estudios?.nombre || '';
         const comentario = d.comentarios ? ` (${d.comentarios})` : '';
-        return nombre + comentario;
+        return nombre + comentario + textoPrecioModificado(d);
       })
       .join(', ');
 

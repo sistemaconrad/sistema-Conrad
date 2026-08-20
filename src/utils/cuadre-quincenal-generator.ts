@@ -11,6 +11,14 @@ interface DatosCuadreQuincenal {
   fechaFin: Date;
 }
 
+// Texto de justificación cuando un precio fue editado a mano (fuera del catálogo)
+const textoPrecioModificado = (d: any) => {
+  if (!d.precio_modificado) return '';
+  const original = d.precio_original !== undefined && d.precio_original !== null ? `Q${Number(d.precio_original).toFixed(2)}` : '?';
+  const justificacion = d.justificacion_precio || 'sin justificación registrada';
+  return ` [PRECIO MODIFICADO de ${original} a Q${Number(d.precio).toFixed(2)}: ${justificacion}]`;
+};
+
 export const generarCuadreQuincenal = async (datos: DatosCuadreQuincenal) => {
   const workbook = new ExcelJS.Workbook();
   
@@ -121,7 +129,7 @@ export const generarCuadreQuincenal = async (datos: DatosCuadreQuincenal) => {
       // ✅ CAMBIO PRINCIPAL: Obtener estudios desde detalle_consultas
       const detalles = consulta.detalle_consultas || [];
       const estudiosTexto = detalles
-        .map((detalle: any) => detalle.sub_estudios?.nombre || 'Estudio')
+        .map((detalle: any) => (detalle.sub_estudios?.nombre || 'Estudio') + textoPrecioModificado(detalle))
         .join(', ');
       const totalConsulta = detalles.reduce((sum: number, detalle: any) => sum + (detalle.precio || 0), 0);
 
@@ -318,7 +326,7 @@ export const generarCuadreQuincenalMoviles = async (datos: DatosCuadreQuincenal)
       const pacienteNombre = consulta.pacientes?.nombre || 'Sin nombre';
       const fecha = format(new Date(consulta.fecha + 'T12:00:00'), 'dd/MM/yy');
       const detalles = consulta.detalle_consultas || [];
-      const estudiosTexto = detalles.map((d: any) => d.sub_estudios?.nombre || 'Estudio').join(', ');
+      const estudiosTexto = detalles.map((d: any) => (d.sub_estudios?.nombre || 'Estudio') + textoPrecioModificado(d)).join(', ');
       const totalConsulta = detalles.reduce((sum: number, d: any) => sum + (d.precio || 0), 0);
       const fechaObj = new Date(consulta.fecha + 'T12:00:00');
       const esInhabil = fechaObj.getDay() === 0 || fechaObj.getDay() === 6;

@@ -3,6 +3,7 @@ import { Plus, FileText, Users, BarChart3, Trash2, FileSpreadsheet, Settings, Ca
 import { NuevoPacienteModal } from '../components/NuevoPacienteModal';
 import { Autocomplete } from '../components/Autocomplete';
 import { Paciente, Medico, SubEstudio, TipoCobro, FormaPago, DetalleConsulta } from '../types';
+import { departamentosGuatemala, municipiosGuatemala } from '../data/guatemala';
 import { supabase } from '../lib/supabase';
 import { format } from 'date-fns';
 import { generarReciboCompleto, generarReciboMedico, abrirRecibo } from '../lib/recibos';
@@ -48,84 +49,67 @@ const S: Record<string, React.CSSProperties> = {
   /* Layout */
   root: {
     minHeight: '100vh',
-    background: '#f0f4f8',
+    background: '#f4f6f9',
     fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
   },
 
   /* Header */
   header: {
-    background: 'linear-gradient(135deg, #0f2942 0%, #1a4a7a 60%, #1d5c9e 100%)',
-    color: '#fff',
-    boxShadow: '0 4px 24px rgba(15,41,66,0.25)',
+    background: '#fff',
+    color: '#0f172a',
+    borderBottom: '1px solid #eef1f5',
+    boxShadow: '0 1px 3px rgba(15,23,42,0.04)',
     position: 'relative',
     overflow: 'hidden',
   },
   headerInner: {
     maxWidth: 1400,
     margin: '0 auto',
-    padding: '22px 32px',
+    padding: '13px 32px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  headerAccent: {
-    position: 'absolute',
-    right: -60,
-    top: -60,
-    width: 300,
-    height: 300,
-    background: 'rgba(255,255,255,0.04)',
-    borderRadius: '50%',
-    pointerEvents: 'none',
-  },
-  headerAccent2: {
-    position: 'absolute',
-    right: 80,
-    top: 30,
-    width: 120,
-    height: 120,
-    background: 'rgba(255,255,255,0.05)',
-    borderRadius: '50%',
-    pointerEvents: 'none',
-  },
+  headerAccent: { display: 'none' },
+  headerAccent2: { display: 'none' },
   logoMark: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    background: 'rgba(255,255,255,0.15)',
-    border: '1px solid rgba(255,255,255,0.2)',
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    background: '#eff6ff',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
+    marginRight: 12,
     flexShrink: 0,
   },
   h1: {
-    fontSize: 22,
-    fontWeight: 700,
+    fontSize: 17,
+    fontWeight: 800,
     letterSpacing: '-0.3px',
     margin: 0,
     lineHeight: 1.2,
+    color: '#0f172a',
   },
   subtitle: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.55)',
-    marginTop: 3,
-    letterSpacing: '0.3px',
+    fontSize: 10.5,
+    color: '#94a3b8',
+    marginTop: 2,
+    letterSpacing: '0.4px',
     textTransform: 'uppercase' as const,
   },
   dateBlock: {
     textAlign: 'right' as const,
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.7)',
-    lineHeight: 1.6,
+    fontSize: 12,
+    color: '#94a3b8',
+    lineHeight: 1.5,
   },
 
   /* Nav bar */
   navbar: {
     background: '#fff',
-    borderBottom: '1px solid #e8edf3',
-    boxShadow: '0 2px 8px rgba(15,41,66,0.06)',
+    borderBottom: '1px solid #eef1f5',
+    boxShadow: '0 1px 3px rgba(15,23,42,0.04)',
   },
   navInner: {
     maxWidth: 1400,
@@ -133,7 +117,7 @@ const S: Record<string, React.CSSProperties> = {
     padding: '0 32px',
     display: 'flex',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
     overflowX: 'auto' as const,
     scrollbarWidth: 'none' as const,
   },
@@ -142,80 +126,87 @@ const S: Record<string, React.CSSProperties> = {
   content: {
     maxWidth: 1400,
     margin: '0 auto',
-    padding: '28px 32px 48px',
+    padding: '20px 32px 40px',
     display: 'grid',
-    gridTemplateColumns: '1fr 360px',
-    gap: 24,
+    gridTemplateColumns: '1fr 340px',
+    gap: 18,
   },
-  leftCol: { display: 'flex', flexDirection: 'column' as const, gap: 20 },
-  rightCol: { display: 'flex', flexDirection: 'column' as const, gap: 20 },
+  leftCol: { display: 'flex', flexDirection: 'column' as const, gap: 16 },
+  rightCol: { display: 'flex', flexDirection: 'column' as const, gap: 16 },
 
   /* Cards */
   card: {
     background: '#fff',
-    borderRadius: 16,
-    padding: '24px 28px',
-    boxShadow: '0 2px 12px rgba(15,41,66,0.07)',
-    border: '1px solid #e8edf3',
+    borderRadius: 20,
+    padding: '20px 22px',
+    boxShadow: '0 1px 2px rgba(15,23,42,0.03), 0 8px 24px -12px rgba(15,23,42,0.10)',
+    border: '1px solid #f2f4f8',
   },
   cardTitle: {
-    fontSize: 14,
-    fontWeight: 600,
-    color: '#0f2942',
-    marginBottom: 18,
-    letterSpacing: '0.2px',
+    fontSize: 12.5,
+    fontWeight: 700,
+    color: '#0f172a',
+    marginBottom: 16,
+    letterSpacing: '0.15px',
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
+    gap: 9,
   },
   titleDot: {
-    width: 6,
-    height: 6,
-    borderRadius: '50%',
+    width: 7,
+    height: 7,
+    borderRadius: 3,
     background: '#2563eb',
+    boxShadow: '0 0 0 4px rgba(37,99,235,0.12)',
     flexShrink: 0,
   },
 
   /* Welcome card */
   welcomeCard: {
-    background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-    borderRadius: 16,
-    padding: '48px 32px',
-    border: '1px solid #bfdbfe',
+    background: '#fff',
+    borderRadius: 20,
+    padding: '44px 28px',
+    border: '1px solid #f2f4f8',
     textAlign: 'center' as const,
-    boxShadow: '0 2px 12px rgba(37,99,235,0.08)',
+    boxShadow: '0 1px 2px rgba(15,23,42,0.03), 0 8px 24px -12px rgba(15,23,42,0.10)',
   },
-  welcomeIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-    display: 'block',
+  welcomeIconBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+    boxShadow: '0 8px 20px -8px rgba(37,99,235,0.35)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: '0 auto 16px',
   },
   welcomeTitle: {
-    fontSize: 20,
-    fontWeight: 700,
-    color: '#1e40af',
-    marginBottom: 8,
+    fontSize: 16,
+    fontWeight: 800,
+    color: '#0f172a',
+    marginBottom: 5,
   },
   welcomeText: {
-    fontSize: 14,
-    color: '#3b82f6',
-    marginBottom: 24,
+    fontSize: 13,
+    color: '#94a3b8',
+    marginBottom: 20,
   },
 
   /* Patient info */
   patientGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: '10px 20px',
+    gap: '9px 18px',
   },
   patientField: {
-    fontSize: 13,
+    fontSize: 12.5,
     color: '#374151',
     lineHeight: 1.5,
   },
   fieldLabel: {
     color: '#9ca3af',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 600,
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
@@ -225,7 +216,7 @@ const S: Record<string, React.CSSProperties> = {
   fieldValue: {
     color: '#111827',
     fontWeight: 500,
-    fontSize: 13,
+    fontSize: 12.5,
   },
 
   /* Badges */
@@ -263,12 +254,12 @@ const S: Record<string, React.CSSProperties> = {
   radioLabel: {
     display: 'flex',
     alignItems: 'center',
-    gap: 7,
-    padding: '9px 16px',
-    borderRadius: 10,
+    gap: 6,
+    padding: '8px 15px',
+    borderRadius: 999,
     border: '1.5px solid #e5e7eb',
     cursor: 'pointer',
-    fontSize: 13,
+    fontSize: 12.5,
     color: '#374151',
     fontWeight: 500,
     transition: 'all .15s',
@@ -289,9 +280,9 @@ const S: Record<string, React.CSSProperties> = {
   descItem: {
     borderRadius: 12,
     border: '1px solid #e5e7eb',
-    padding: '14px 16px',
+    padding: '12px 14px',
     background: '#fafafa',
-    marginBottom: 10,
+    marginBottom: 9,
     transition: 'box-shadow .15s',
   },
   descItemHeader: {
@@ -301,7 +292,7 @@ const S: Record<string, React.CSSProperties> = {
   },
   descName: {
     fontWeight: 600,
-    fontSize: 14,
+    fontSize: 13,
     color: '#111827',
     marginBottom: 4,
   },
@@ -336,40 +327,42 @@ const S: Record<string, React.CSSProperties> = {
 
   /* Totales card */
   totalesCard: {
-    background: 'linear-gradient(160deg, #0f2942 0%, #1a4a7a 100%)',
+    background: '#fff',
     borderRadius: 16,
-    padding: '24px 28px',
-    color: '#fff',
-    boxShadow: '0 8px 24px rgba(15,41,66,0.25)',
-    border: 'none',
+    padding: '18px 20px',
+    color: '#0f172a',
+    boxShadow: '0 1px 3px rgba(15,23,42,0.04)',
+    border: '1px solid #f0f2f6',
   },
   totalesTitle: {
-    fontSize: 13,
+    fontSize: 11.5,
     fontWeight: 700,
-    letterSpacing: '0.8px',
+    letterSpacing: '0.6px',
     textTransform: 'uppercase' as const,
-    color: 'rgba(255,255,255,0.55)',
-    marginBottom: 18,
+    color: '#94a3b8',
+    marginBottom: 14,
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
+    gap: 7,
   },
   totalesRow: {
     display: 'flex',
     justifyContent: 'space-between',
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.65)',
-    marginBottom: 10,
+    fontSize: 12.5,
+    color: '#64748b',
+    marginBottom: 9,
   },
   totalesTotal: {
     display: 'flex',
     justifyContent: 'space-between',
-    borderTop: '1px solid rgba(255,255,255,0.15)',
-    paddingTop: 14,
-    marginTop: 8,
-    fontSize: 20,
-    fontWeight: 700,
-    color: '#fff',
+    alignItems: 'center',
+    marginTop: 12,
+    padding: '12px 14px',
+    borderRadius: 12,
+    background: '#eff6ff',
+    fontSize: 17,
+    fontWeight: 800,
+    color: '#1d4ed8',
   },
 
   /* Action buttons */
@@ -377,25 +370,25 @@ const S: Record<string, React.CSSProperties> = {
     background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
     color: '#fff',
     border: 'none',
-    borderRadius: 11,
-    padding: '12px 20px',
-    fontWeight: 600,
+    borderRadius: 14,
+    padding: '12px 22px',
+    fontWeight: 700,
     fontSize: 14,
     cursor: 'pointer',
     display: 'inline-flex',
     alignItems: 'center',
     gap: 8,
     transition: 'all .15s',
-    boxShadow: '0 3px 10px rgba(37,99,235,0.3)',
+    boxShadow: '0 8px 20px -6px rgba(37,99,235,0.45)',
     letterSpacing: '0.1px',
   },
   btnSecondary: {
     background: '#fff',
     color: '#374151',
     border: '1.5px solid #e5e7eb',
-    borderRadius: 10,
+    borderRadius: 12,
     padding: '9px 16px',
-    fontWeight: 500,
+    fontWeight: 600,
     fontSize: 13,
     cursor: 'pointer',
     display: 'inline-flex',
@@ -409,7 +402,7 @@ const S: Record<string, React.CSSProperties> = {
     border: 'none',
     cursor: 'pointer',
     padding: 6,
-    borderRadius: 8,
+    borderRadius: 10,
     display: 'flex',
     alignItems: 'center',
     transition: 'background .12s',
@@ -418,7 +411,7 @@ const S: Record<string, React.CSSProperties> = {
   btnClear: {
     width: '100%',
     padding: '11px',
-    borderRadius: 12,
+    borderRadius: 14,
     fontWeight: 600,
     fontSize: 13,
     border: '1.5px solid #e5e7eb',
@@ -433,12 +426,12 @@ const S: Record<string, React.CSSProperties> = {
     width: '100%',
     padding: '10px 14px',
     border: '1.5px solid #e5e7eb',
-    borderRadius: 10,
+    borderRadius: 12,
     fontSize: 13,
     color: '#111827',
     background: '#fff',
     outline: 'none',
-    transition: 'border .15s',
+    transition: 'border .15s, box-shadow .15s',
     boxSizing: 'border-box' as const,
   },
   label: {
@@ -454,7 +447,7 @@ const S: Record<string, React.CSSProperties> = {
     width: '100%',
     padding: '10px 14px',
     border: '1.5px solid #e5e7eb',
-    borderRadius: 10,
+    borderRadius: 12,
     fontSize: 13,
     color: '#111827',
     background: '#fff',
@@ -495,26 +488,32 @@ const NavBtn: React.FC<{
       display: 'inline-flex',
       alignItems: 'center',
       gap: 7,
-      padding: primary ? '10px 20px' : '10px 16px',
-      margin: '10px 0',
-      border: primary ? 'none' : '1px solid transparent',
-      borderRadius: 9,
+      padding: primary ? '10px 20px' : '9px 15px',
+      margin: '9px 0',
+      border: primary ? 'none' : '1px solid #eef1f5',
+      borderRadius: 999,
       fontSize: 13,
-      fontWeight: primary ? 700 : 500,
+      fontWeight: primary ? 700 : 600,
       cursor: 'pointer',
       whiteSpace: 'nowrap' as const,
       transition: 'all .15s',
       background: primary
         ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
-        : 'transparent',
-      color: primary ? '#fff' : '#4b5563',
+        : '#f8fafc',
+      color: primary ? '#fff' : '#64748b',
       boxShadow: primary ? '0 3px 10px rgba(37,99,235,0.25)' : 'none',
     }}
     onMouseEnter={e => {
-      if (!primary) (e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6';
+      if (!primary) {
+        (e.currentTarget as HTMLButtonElement).style.background = '#eff6ff';
+        (e.currentTarget as HTMLButtonElement).style.color = '#2563eb';
+      }
     }}
     onMouseLeave={e => {
-      if (!primary) (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+      if (!primary) {
+        (e.currentTarget as HTMLButtonElement).style.background = '#f8fafc';
+        (e.currentTarget as HTMLButtonElement).style.color = '#64748b';
+      }
     }}
   >
     {icon}
@@ -556,6 +555,9 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const [subEstudioSeleccionado, setSubEstudioSeleccionado] = useState('');
 
   const [descripcion, setDescripcion] = useState<(DetalleConsulta & { es_referido: boolean; comentarios?: string })[]>([]);
+  const [editandoPrecioIndex, setEditandoPrecioIndex] = useState<number | null>(null);
+  const [precioEditTemp, setPrecioEditTemp] = useState('');
+  const [justificacionPrecioTemp, setJustificacionPrecioTemp] = useState('');
 
   const [requiereFactura, setRequiereFactura] = useState(false);
   const [nit, setNit] = useState('');
@@ -628,7 +630,9 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       const nuevaDescripcion = descripcion.map(item => {
         const subEstudio = subEstudios.find(se => se.id === item.sub_estudio_id);
         if (!subEstudio) return item;
-        const nuevoPrecio = tipoCobro === 'normal'
+        const nuevoPrecio = esServicioMovil
+          ? obtenerPrecioMovil(subEstudio.id!)
+          : tipoCobro === 'normal'
           ? subEstudio.precio_normal
           : tipoCobro === 'social'
           ? subEstudio.precio_social
@@ -678,22 +682,36 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     }
   };
 
-  const subEstudiosFiltrados = subEstudios.filter(se => se.estudio_id === estudioSeleccionado);
+  const obtenerPrecioMovil = (subEstudioId: string) => {
+    const subEstudio = subEstudios.find(se => se.id === subEstudioId);
+    return subEstudio?.precio_movil || 0;
+  };
+
+  const esComisionable = (subEstudioId: string) => {
+    if (esServicioMovil) return false;
+    const subEstudio = subEstudios.find(se => se.id === subEstudioId);
+    if (!subEstudio) return false;
+    const estudio = estudios.find(e => e.id === subEstudio.estudio_id);
+    return (estudio?.porcentaje_comision || 0) > 0;
+  };
+
+  const subEstudiosFiltrados = subEstudios
+    .filter(se => se.estudio_id === estudioSeleccionado)
+    .filter(se => !esServicioMovil || se.disponible_movil);
 
   const agregarSubEstudio = () => {
     if (!subEstudioSeleccionado) return;
     const subEstudio = subEstudios.find(se => se.id === subEstudioSeleccionado);
     if (!subEstudio) return;
 
-    if (esServicioMovil) {
-      const estudio = estudios.find(e => e.id === subEstudio.estudio_id);
-      if (estudio && estudio.nombre.toUpperCase() !== 'RX') {
-        alert('⚠️ Servicios Móviles: Solo se permiten estudios de RX');
-        return;
-      }
+    if (esServicioMovil && !subEstudio.disponible_movil) {
+      alert('⚠️ Servicios Móviles: Este sub-estudio no está habilitado para servicio móvil');
+      return;
     }
 
-    const precio = tipoCobro === 'normal'
+    const precio = esServicioMovil
+      ? obtenerPrecioMovil(subEstudio.id!)
+      : tipoCobro === 'normal'
       ? subEstudio.precio_normal
       : tipoCobro === 'social'
       ? subEstudio.precio_social
@@ -703,7 +721,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       sub_estudio_id: subEstudio.id!,
       precio,
       consulta_id: '',
-      es_referido: true,
+      es_referido: esComisionable(subEstudio.id!),
       comentarios: ''
     };
 
@@ -719,6 +737,42 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     const nuevaDescripcion = [...descripcion];
     nuevaDescripcion[index].es_referido = !nuevaDescripcion[index].es_referido;
     setDescripcion(nuevaDescripcion);
+  };
+
+  const abrirEditarPrecio = (index: number) => {
+    setEditandoPrecioIndex(index);
+    setPrecioEditTemp(descripcion[index].precio.toString());
+    setJustificacionPrecioTemp(descripcion[index].justificacion_precio || '');
+  };
+
+  const cancelarEditarPrecio = () => {
+    setEditandoPrecioIndex(null);
+    setPrecioEditTemp('');
+    setJustificacionPrecioTemp('');
+  };
+
+  const guardarPrecioEditado = (index: number) => {
+    const nuevoPrecio = parseFloat(precioEditTemp);
+    if (isNaN(nuevoPrecio) || nuevoPrecio < 0) {
+      alert('Ingrese un precio válido');
+      return;
+    }
+    const precioActual = descripcion[index].precio;
+    const cambio = nuevoPrecio !== precioActual;
+    if (cambio && !justificacionPrecioTemp.trim()) {
+      alert('Debe ingresar una justificación para modificar el precio');
+      return;
+    }
+    const nuevaDescripcion = [...descripcion];
+    const item = nuevaDescripcion[index];
+    if (cambio) {
+      if (!item.precio_modificado) item.precio_original = precioActual;
+      item.precio_modificado = true;
+      item.justificacion_precio = justificacionPrecioTemp.trim();
+    }
+    item.precio = nuevoPrecio;
+    setDescripcion(nuevaDescripcion);
+    cancelarEditarPrecio();
   };
 
   const actualizarComentarios = (index: number, comentarios: string) => {
@@ -754,13 +808,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
 
       if (medico && !sinInfo) {
         if (!medico.id) {
-          const { data: medicoData, error: medicoError } = await supabase
+          const { error: medicoError } = await supabase
             .from('medicos')
-            .insert([{ ...medico, activo: true }])
-            .select()
-            .single();
+            .insert([{ ...medico, activo: true }]);
           if (medicoError) throw medicoError;
-          setMedicoActual(medicoData);
         }
       }
 
@@ -888,7 +939,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         .insert([{
           numero_paciente: siguienteNumero,
           paciente_id: pacienteActual.id,
-          medico_id: medicoActual?.id || null,
+          medico_id: (!esServicioMovil && medicoActual?.id) || null,
           medico_recomendado: medicoActual?.nombre || null,
           tipo_cobro: tipoCobro,
           requiere_factura: requiereFactura,
@@ -915,7 +966,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         sub_estudio_id: d.sub_estudio_id,
         precio: d.precio,
         es_referido: d.es_referido,
-        comentarios: d.comentarios || null
+        comentarios: d.comentarios || null,
+        precio_modificado: d.precio_modificado || false,
+        precio_original: d.precio_modificado ? d.precio_original : null,
+        justificacion_precio: d.precio_modificado ? (d.justificacion_precio || null) : null
       }));
 
       const { error: detallesError } = await supabase.from('detalle_consultas').insert(detalles);
@@ -1029,7 +1083,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         <div style={S.headerInner}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <div style={S.logoMark}>
-              <Activity size={22} color="#fff" />
+              <Activity size={18} color="#2563eb" />
             </div>
             <div>
               <h1 style={S.h1}>Centro de Diagnóstico</h1>
@@ -1037,10 +1091,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             </div>
           </div>
           <div style={S.dateBlock}>
-            <div style={{ fontWeight: 600, color: 'rgba(255,255,255,0.9)', fontSize: 14 }}>
+            <div style={{ fontWeight: 600, color: '#64748b', fontSize: 12.5 }}>
               {format(new Date(), "EEEE, dd 'de' MMMM yyyy")}
             </div>
-            <div style={{ fontSize: 20, fontWeight: 700, marginTop: 2 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, marginTop: 2, color: '#0f172a' }}>
               {format(new Date(), 'HH:mm')}
             </div>
           </div>
@@ -1083,8 +1137,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                   ['Nombre', pacienteActual.nombre],
                   ['Edad', `${pacienteActual.edad} años`],
                   ['Teléfono', pacienteActual.telefono],
-                  ['Departamento', pacienteActual.departamento],
-                  ['Municipio', pacienteActual.municipio],
+                  ['Departamento', departamentosGuatemala.find(d => d.id === pacienteActual.departamento)?.nombre || pacienteActual.departamento],
+                  ['Municipio', municipiosGuatemala.find(m => m.id === pacienteActual.municipio)?.nombre || pacienteActual.municipio],
                 ].map(([label, value]) => (
                   <div key={label} style={S.patientField}>
                     <span style={S.fieldLabel}>{label}</span>
@@ -1110,8 +1164,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                     {[
                       ['Nombre', medicoActual.nombre],
                       ['Teléfono', medicoActual.telefono],
-                      ['Departamento', medicoActual.departamento],
-                      ['Municipio', medicoActual.municipio],
+                      ['Departamento', departamentosGuatemala.find(d => d.id === medicoActual.departamento)?.nombre || medicoActual.departamento],
+                      ['Municipio', municipiosGuatemala.find(m => m.id === medicoActual.municipio)?.nombre || medicoActual.municipio],
                     ].map(([label, value]) => (
                       <div key={label} style={S.patientField}>
                         <span style={S.fieldLabel}>{label}</span>
@@ -1124,7 +1178,9 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             </div>
           ) : (
             <div style={S.welcomeCard}>
-              <span style={S.welcomeIcon}>🏥</span>
+              <div style={S.welcomeIconBadge}>
+                <Activity size={28} color="#2563eb" />
+              </div>
               <div style={S.welcomeTitle}>Bienvenido al Centro de Diagnóstico</div>
               <p style={S.welcomeText}>Para comenzar, registra un nuevo paciente</p>
               <button onClick={() => setShowNuevoModal(true)} style={S.btnPrimary}>
@@ -1150,6 +1206,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                   color: opt.disabled ? '#9ca3af' : opt.purple ? '#7c3aed' : '#374151',
                   cursor: opt.disabled ? 'not-allowed' : 'pointer',
                   opacity: opt.disabled ? 0.6 : 1,
+                  boxShadow: tipoCobro === opt.key ? `0 4px 12px -4px ${opt.purple ? 'rgba(124,58,237,0.3)' : 'rgba(37,99,235,0.3)'}` : 'none',
                 }}>
                   <input type="radio" name="tipoCobro" checked={tipoCobro === opt.key}
                     onChange={() => {
@@ -1203,11 +1260,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                 <Autocomplete
                   label=""
                   options={estudios
-                    .filter(e => !esServicioMovil || e.nombre.toUpperCase() === 'RX')
+                    .filter(e => !esServicioMovil || subEstudios.some(se => se.estudio_id === e.id && se.disponible_movil))
                     .map(e => ({ id: e.id, nombre: e.nombre }))}
                   value={estudioSeleccionado}
                   onChange={(val) => { setEstudioSeleccionado(val); setSubEstudioSeleccionado(''); }}
-                  placeholder={esServicioMovil ? 'Solo estudios RX' : 'Seleccione estudio'}
+                  placeholder={esServicioMovil ? 'Solo estudios disponibles en móvil' : 'Seleccione estudio'}
                   disabled={!!consultaGuardada}
                 />
               </div>
@@ -1261,20 +1318,56 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               <div>
                 {descripcion.map((item, index) => {
                   const subEstudio = subEstudios.find(se => se.id === item.sub_estudio_id);
+                  const comisionable = esComisionable(item.sub_estudio_id);
                   return (
                     <div key={index} style={{
                       ...S.descItem,
-                      borderLeft: `3px solid ${item.es_referido ? '#10b981' : '#d1d5db'}`,
+                      borderLeft: `3px solid ${comisionable && item.es_referido ? '#10b981' : '#d1d5db'}`,
                     }}>
                       <div style={S.descItemHeader}>
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                             <span style={S.descName}>{subEstudio?.nombre}</span>
-                            {item.es_referido
+                            {comisionable && item.es_referido
                               ? <span style={S.tagRef}>✓ Genera comisión</span>
                               : <span style={S.tagNoRef}>Sin comisión</span>}
+                            {item.precio_modificado && (
+                              <span style={{ fontSize: 11, fontWeight: 700, color: '#b45309', background: '#fef3c7', padding: '2px 8px', borderRadius: 999 }}>
+                                ✎ Precio modificado
+                              </span>
+                            )}
                           </div>
-                          {tipoCobro === 'personalizado' ? (
+                          {editandoPrecioIndex === index ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ fontSize: 13, color: '#6b7280' }}>Q</span>
+                                <input
+                                  type="number" step="0.01" min="0"
+                                  value={precioEditTemp}
+                                  onChange={(e) => setPrecioEditTemp(e.target.value)}
+                                  style={{ width: 90, padding: '5px 10px', border: '1.5px solid #a78bfa', borderRadius: 8, fontSize: 13, outline: 'none' }}
+                                  autoFocus
+                                />
+                              </div>
+                              <input
+                                type="text"
+                                placeholder="Justificación del cambio de precio"
+                                value={justificacionPrecioTemp}
+                                onChange={(e) => setJustificacionPrecioTemp(e.target.value)}
+                                style={{ padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 12, outline: 'none', width: 260 }}
+                              />
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button onClick={() => guardarPrecioEditado(index)}
+                                  style={{ padding: '4px 10px', fontSize: 12, fontWeight: 700, borderRadius: 8, border: 'none', cursor: 'pointer', background: '#1d4ed8', color: '#fff' }}>
+                                  Guardar
+                                </button>
+                                <button onClick={cancelarEditarPrecio}
+                                  style={{ padding: '4px 10px', fontSize: 12, fontWeight: 700, borderRadius: 8, border: 'none', cursor: 'pointer', background: '#f3f4f6', color: '#6b7280' }}>
+                                  Cancelar
+                                </button>
+                              </div>
+                            </div>
+                          ) : tipoCobro === 'personalizado' ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                               <span style={{ fontSize: 13, color: '#6b7280' }}>Q</span>
                               <input
@@ -1290,11 +1383,19 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                               />
                             </div>
                           ) : (
-                            <span style={{ fontSize: 14, fontWeight: 600, color: '#1d4ed8' }}>Q {item.precio.toFixed(2)}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontSize: 14, fontWeight: 600, color: '#1d4ed8' }}>Q {item.precio.toFixed(2)}</span>
+                              {!consultaGuardada && (
+                                <button onClick={() => abrirEditarPrecio(index)}
+                                  style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                                  Editar precio
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          {!consultaGuardada && medicoActual && !sinInfoMedico && (
+                          {comisionable && !consultaGuardada && medicoActual && !sinInfoMedico && (
                             <button
                               onClick={() => toggleReferido(index)}
                               style={{
@@ -1372,9 +1473,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                 {[['Sí', true], ['No', false]].map(([lbl, val]) => (
                   <label key={String(lbl)} style={{
                     display: 'flex', alignItems: 'center', gap: 7,
-                    padding: '8px 18px', borderRadius: 9, border: '1.5px solid',
+                    padding: '8px 18px', borderRadius: 999, border: '1.5px solid',
                     borderColor: requiereFactura === val ? '#2563eb' : '#e5e7eb',
                     background: requiereFactura === val ? '#eff6ff' : '#fafafa',
+                    boxShadow: requiereFactura === val ? '0 4px 12px -4px rgba(37,99,235,0.3)' : 'none',
                     cursor: 'pointer', fontSize: 13, fontWeight: 500,
                   }}>
                     <input type="radio" name="factura"

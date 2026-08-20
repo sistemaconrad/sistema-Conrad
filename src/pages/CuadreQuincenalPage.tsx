@@ -48,6 +48,9 @@ export const CuadreQuincenalPage: React.FC<CuadreQuincenalPageProps> = ({ onBack
           medicos(nombre),
           detalle_consultas(
             precio,
+            precio_modificado,
+            precio_original,
+            justificacion_precio,
             sub_estudios(nombre)
           )
         `)
@@ -97,6 +100,9 @@ export const CuadreQuincenalPage: React.FC<CuadreQuincenalPageProps> = ({ onBack
           medicos(nombre),
           detalle_consultas(
             precio,
+            precio_modificado,
+            precio_original,
+            justificacion_precio,
             sub_estudios(nombre)
           )
         `)

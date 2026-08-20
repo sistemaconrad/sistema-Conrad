@@ -91,7 +91,10 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
             nit,
             numero_voucher,
             numero_transferencia,
-            comentarios
+            comentarios,
+            precio_modificado,
+            precio_original,
+            justificacion_precio
           )
         `)
         .gte('fecha', primerDia)
@@ -168,7 +171,10 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
             nit,
             numero_voucher,
             numero_transferencia,
-            comentarios
+            comentarios,
+            precio_modificado,
+            precio_original,
+            justificacion_precio
           )
         `)
         .gte('fecha', primerDia)
