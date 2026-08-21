@@ -88,7 +88,8 @@ export const ProductosPage: React.FC<ProductosPageProps> = ({ onBack }) => {
   };
 
   const guardarSubEstudio = async () => {
-    if (!nombreSubEstudio.trim() || !estudioSeleccionado) return;
+    if (!estudioSeleccionado) { alert('⚠️ Selecciona el Estudio al que pertenece este sub-estudio'); return; }
+    if (!nombreSubEstudio.trim()) { alert('⚠️ Ingresa el nombre del sub-estudio'); return; }
 
     try {
       // Verificar duplicados (solo si es nuevo, no al editar)
@@ -108,9 +109,9 @@ export const ProductosPage: React.FC<ProductosPageProps> = ({ onBack }) => {
       const data = {
         nombre: nombreSubEstudio,
         estudio_id: estudioSeleccionado,
-        precio_normal: parseFloat(precioNormal),
-        precio_social: parseFloat(precioSocial),
-        precio_especial: parseFloat(precioEspecial),
+        precio_normal: parseFloat(precioNormal) || 0,
+        precio_social: parseFloat(precioSocial) || 0,
+        precio_especial: parseFloat(precioEspecial) || 0,
         disponible_movil: disponibleMovil,
         precio_movil: disponibleMovil ? (parseFloat(precioMovil) || 0) : null,
       };
@@ -120,9 +121,11 @@ export const ProductosPage: React.FC<ProductosPageProps> = ({ onBack }) => {
       } else {
         await supabase.from('sub_estudios').insert([data]);
       }
-      
+
       cargarSubEstudios();
+      const estudioActual = estudioSeleccionado;
       cerrarModalSubEstudio();
+      setEstudioSeleccionado(estudioActual); // conserva el estudio filtrado/seleccionado para poder agregar otro sub-estudio seguido
       alert('Sub-estudio guardado exitosamente');
     } catch (error) {
       console.error('Error:', error);
