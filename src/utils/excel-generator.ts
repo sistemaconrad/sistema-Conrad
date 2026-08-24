@@ -614,7 +614,7 @@ async function crearHojaMoviles(
     'ESTABLECIMIENTO',
     'PACIENTE',
     'EDAD',
-    'ESTUDIOS RX',
+    'ESTUDIOS',
     'PRECIO',
     'EXTRAS',
     'TOTAL',
@@ -648,16 +648,14 @@ async function crearHojaMoviles(
 
   consultas.forEach((consulta) => {
     const estudiosRX = consulta.detalle_consultas
-      .filter(d => d.sub_estudios?.estudios?.nombre?.toUpperCase() === 'RX')
       .map(d => {
         const nombre = d.sub_estudios?.nombre || '';
         const comentario = d.comentarios ? ` (${d.comentarios})` : '';
         return nombre + comentario + textoPrecioModificado(d);
       })
       .join(', ');
-    
+
     const precioRX = consulta.detalle_consultas
-      .filter(d => d.sub_estudios?.estudios?.nombre?.toUpperCase() === 'RX')
       .reduce((sum, det) => sum + det.precio, 0);
 
     let extras = 0;
@@ -753,7 +751,6 @@ async function crearHojaMoviles(
   
   consultas.forEach(c => {
     const precioRX = c.detalle_consultas
-      .filter(d => d.sub_estudios?.estudios?.nombre?.toUpperCase() === 'RX')
       .reduce((s, d) => s + d.precio, 0);
     
     const extras = (c.movil_incluye_placas ? (c.movil_precio_placas || 0) : 0) +
@@ -1263,7 +1260,15 @@ export const generarReporteMensualMoviles = async (
 
   if (errorEstudios) throw errorEstudios;
 
-  const estudios = estudiosDisponibles || [];
+  const { data: subEstudiosMoviles, error: errorSubEstudiosMoviles } = await supabase
+    .from('sub_estudios')
+    .select('estudio_id')
+    .eq('disponible_movil', true);
+
+  if (errorSubEstudiosMoviles) throw errorSubEstudiosMoviles;
+
+  const idsEstudiosMoviles = new Set((subEstudiosMoviles || []).map(s => s.estudio_id));
+  const estudios = (estudiosDisponibles || []).filter(e => idsEstudiosMoviles.has(e.id));
   const numColumnasFijas = 8;
   const numColumnasEstudios = estudios.length;
   const numColumnasFinales = 3;
@@ -1321,22 +1326,11 @@ export const generarReporteMensualMoviles = async (
       })
       .join(', ');
 
-    const fechaConsulta = new Date(consulta.created_at);
-    const diaSemana = fechaConsulta.getDay();
-    const hora = fechaConsulta.getHours();
+    const estudioTexto = nombresEstudios.toUpperCase();
 
-    let esInhabil = false;
-    if (diaSemana === 0) {
-      esInhabil = true;
-    } else if (diaSemana === 6) {
-      esInhabil = hora < 7 || hora >= 11;
-    } else {
-      esInhabil = hora < 7 || hora >= 16;
-    }
-
-    const estudioTexto = esInhabil ? `${nombresEstudios.toUpperCase()} INHABIL` : nombresEstudios.toUpperCase();
-
-    const medicoNombre = consulta.sin_informacion_medico
+    const medicoNombre = consulta.es_servicio_movil
+      ? (consulta.movil_establecimiento || 'SIN ESPECIFICAR')
+      : consulta.sin_informacion_medico
       ? 'SIN INFORMACIÓN'
       : (consulta.medicos?.nombre || consulta.medico_recomendado || 'N/A');
 
@@ -1397,10 +1391,6 @@ export const generarReporteMensualMoviles = async (
 
       if (typeof valor === 'number') {
         cell.numFmt = '#,##0.00';
-      }
-
-      if (esInhabil && colIdx === 5) {
-        cell.font = { ...cell.font, color: { argb: 'FFFF0000' }, bold: true };
       }
     });
 
