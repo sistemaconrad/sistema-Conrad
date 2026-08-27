@@ -549,6 +549,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const [tipoCobro, setTipoCobro] = useState<TipoCobro>('normal');
   const [justificacionEspecial, setJustificacionEspecial] = useState('');
   const [showJustificacion, setShowJustificacion] = useState(false);
+  const [comisionaPersonalizado, setComisionaPersonalizado] = useState<boolean | null>(null);
   const [estudios, setEstudios] = useState<any[]>([]);
   const [subEstudios, setSubEstudios] = useState<SubEstudio[]>([]);
   const [estudioSeleccionado, setEstudioSeleccionado] = useState('');
@@ -558,6 +559,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const [editandoPrecioIndex, setEditandoPrecioIndex] = useState<number | null>(null);
   const [precioEditTemp, setPrecioEditTemp] = useState('');
   const [justificacionPrecioTemp, setJustificacionPrecioTemp] = useState('');
+  const [referidoEditTemp, setReferidoEditTemp] = useState<boolean | null>(null);
 
   const [requiereFactura, setRequiereFactura] = useState(false);
   const [nit, setNit] = useState('');
@@ -743,12 +745,14 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     setEditandoPrecioIndex(index);
     setPrecioEditTemp(descripcion[index].precio.toString());
     setJustificacionPrecioTemp(descripcion[index].justificacion_precio || '');
+    setReferidoEditTemp(null);
   };
 
   const cancelarEditarPrecio = () => {
     setEditandoPrecioIndex(null);
     setPrecioEditTemp('');
     setJustificacionPrecioTemp('');
+    setReferidoEditTemp(null);
   };
 
   const guardarPrecioEditado = (index: number) => {
@@ -763,12 +767,18 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       alert('Debe ingresar una justificación para modificar el precio');
       return;
     }
+    const esComisionableItem = esComisionable(descripcion[index].sub_estudio_id);
+    if (cambio && esComisionableItem && referidoEditTemp === null) {
+      alert('Debe indicar si este estudio sigue generando comisión con el nuevo precio');
+      return;
+    }
     const nuevaDescripcion = [...descripcion];
     const item = nuevaDescripcion[index];
     if (cambio) {
       if (!item.precio_modificado) item.precio_original = precioActual;
       item.precio_modificado = true;
       item.justificacion_precio = justificacionPrecioTemp.trim();
+      if (esComisionableItem) item.es_referido = !!referidoEditTemp;
     }
     item.precio = nuevoPrecio;
     setDescripcion(nuevaDescripcion);
@@ -843,6 +853,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       setTipoCobro('normal');
       setJustificacionEspecial('');
       setShowJustificacion(false);
+      setComisionaPersonalizado(null);
       setEstudioSeleccionado('');
       setSubEstudioSeleccionado('');
       setDescripcion([]);
@@ -898,6 +909,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       alert('Debe proporcionar una justificación para usar precio personalizado');
       return;
     }
+    if (tipoCobro === 'personalizado' && !esServicioMovil && comisionaPersonalizado === null) {
+      alert('Debe indicar si esta consulta genera comisión para el médico referente');
+      return;
+    }
     if (formaPago === 'multiple' && !validarPagosMultiples()) return;
     if (formaPago === 'transferencia' && !numeroTransferencia.trim()) {
       alert('Debe ingresar el número de transferencia');
@@ -950,6 +965,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           numero_voucher: formaPago === 'tarjeta' ? numeroVoucher : null,
           sin_informacion_medico: sinInfoMedico,
           justificacion_especial: ((tipoCobro === 'normal' && !esHorarioNormal()) || (tipoCobro === 'personalizado' && !esServicioMovil)) ? justificacionEspecial : null,
+          comisiona_personalizado: (tipoCobro === 'personalizado' && !esServicioMovil) ? !!comisionaPersonalizado : null,
           fecha: format(new Date(), 'yyyy-MM-dd'),
           es_servicio_movil: esServicioMovil,
           movil_establecimiento: esServicioMovil ? establecimientoMovil : null,
@@ -1213,6 +1229,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                       if (opt.key === 'normal' && !horarioNormal) setShowJustificacion(true);
                       else if (opt.key === 'personalizado') setShowJustificacion(!esServicioMovil);
                       else { setShowJustificacion(false); setJustificacionEspecial(''); }
+                      if (opt.key !== 'personalizado') setComisionaPersonalizado(null);
                       setTipoCobro(opt.key as TipoCobro);
                     }}
                     disabled={opt.disabled}
@@ -1239,6 +1256,34 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                   disabled={!!consultaGuardada}
                 />
                 <p style={{ fontSize: 11, color: '#92400e', marginTop: 6 }}>* Esta justificación quedará registrada en el sistema</p>
+
+                {tipoCobro === 'personalizado' && (
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px dashed #d1d5db' }}>
+                    <label style={S.label}>¿Esta consulta genera comisión para el médico referente?</label>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                      <button type="button" onClick={() => setComisionaPersonalizado(true)}
+                        disabled={!!consultaGuardada}
+                        style={{
+                          flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: consultaGuardada ? 'not-allowed' : 'pointer',
+                          border: `1.5px solid ${comisionaPersonalizado === true ? '#059669' : '#d1d5db'}`,
+                          background: comisionaPersonalizado === true ? '#d1fae5' : '#fff',
+                          color: comisionaPersonalizado === true ? '#065f46' : '#6b7280',
+                        }}>
+                        ✓ Sí comisiona
+                      </button>
+                      <button type="button" onClick={() => setComisionaPersonalizado(false)}
+                        disabled={!!consultaGuardada}
+                        style={{
+                          flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: consultaGuardada ? 'not-allowed' : 'pointer',
+                          border: `1.5px solid ${comisionaPersonalizado === false ? '#dc2626' : '#d1d5db'}`,
+                          background: comisionaPersonalizado === false ? '#fee2e2' : '#fff',
+                          color: comisionaPersonalizado === false ? '#991b1b' : '#6b7280',
+                        }}>
+                        ✗ No comisiona
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1356,6 +1401,31 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                                 onChange={(e) => setJustificacionPrecioTemp(e.target.value)}
                                 style={{ padding: '6px 10px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 12, outline: 'none', width: 260 }}
                               />
+                              {comisionable && (
+                                <div>
+                                  <p style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: 4 }}>¿Sigue generando comisión con el nuevo precio?</p>
+                                  <div style={{ display: 'flex', gap: 6 }}>
+                                    <button type="button" onClick={() => setReferidoEditTemp(true)}
+                                      style={{
+                                        padding: '4px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, cursor: 'pointer',
+                                        border: `1.5px solid ${referidoEditTemp === true ? '#059669' : '#d1d5db'}`,
+                                        background: referidoEditTemp === true ? '#d1fae5' : '#fff',
+                                        color: referidoEditTemp === true ? '#065f46' : '#6b7280',
+                                      }}>
+                                      ✓ Sí comisiona
+                                    </button>
+                                    <button type="button" onClick={() => setReferidoEditTemp(false)}
+                                      style={{
+                                        padding: '4px 10px', fontSize: 12, fontWeight: 600, borderRadius: 8, cursor: 'pointer',
+                                        border: `1.5px solid ${referidoEditTemp === false ? '#dc2626' : '#d1d5db'}`,
+                                        background: referidoEditTemp === false ? '#fee2e2' : '#fff',
+                                        color: referidoEditTemp === false ? '#991b1b' : '#6b7280',
+                                      }}>
+                                      ✗ No comisiona
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                               <div style={{ display: 'flex', gap: 6 }}>
                                 <button onClick={() => guardarPrecioEditado(index)}
                                   style={{ padding: '4px 10px', fontSize: 12, fontWeight: 700, borderRadius: 8, border: 'none', cursor: 'pointer', background: '#1d4ed8', color: '#fff' }}>

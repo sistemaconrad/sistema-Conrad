@@ -6,7 +6,7 @@
  */
 import ExcelJS from 'exceljs';
 
-interface CuadreDatos {
+export interface CuadreDatos {
   fecha: string;
   horaActual: string;
   totalConsultas: number;
@@ -17,6 +17,8 @@ interface CuadreDatos {
   tarjetaContado: number;
   transferenciaEsperada: number;
   transferenciaContado: number;
+  estadoCuentaEsperada?: number;
+  estadoCuentaContado?: number;
   diferencias: {
     efectivo: number;
     tarjeta: number;
@@ -75,16 +77,18 @@ const borderMedium = {
   right: { style: 'medium' as const }
 };
 
-const fillBlue = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF4472C4' } };
-const fillLightBlue = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF5B9BD5' } };
-const fillLightBlue2 = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFD9E1F2' } };
-const fillGreen = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF70AD47' } };
-const fillPurple = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF7B1FA2' } };
-const fillLightPurple = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFE1BEE7' } };
-const fillOKGreen = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFC6EFCE' } };
-const fillErrRed = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFFFC7CE' } };
-const fillOrange = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFE65100' } };
-const fillLightOrange = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFFFE0B2' } };
+// Paleta unificada — consistente con el PDF y la marca de Centro de Diagnóstico Conrad
+const fillTitulo = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF0F172A' } };
+const fillCuadre = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF0D9488' } };
+const fillCuadreLight = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFCCFBF1' } };
+const fillMoviles = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF9333EA' } };
+const fillMovilesLight = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFF3E8FF' } };
+const fillGastos = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFD97706' } };
+const fillGastosLight = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFFEF3C7' } };
+const fillFirma = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF059669' } };
+const fillOKGreen = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFD1FAE5' } };
+const fillErrRed = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFFEE2E2' } };
+const fillBanda = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFF8FAFC' } };
 
 export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
   const workbook = new ExcelJS.Workbook();
@@ -106,55 +110,12 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
   // ===== TÍTULO =====
   worksheet.mergeCells(`A${r}:F${r}`);
   const cTitulo = worksheet.getCell(`A${r}`);
-  cTitulo.value = 'CUADRE DE CAJA DIARIO - CONRAD';
+  cTitulo.value = 'CUADRE DE CAJA DIARIO - CENTRO DE DIAGNOSTICO CONRAD';
   cTitulo.font = { name: 'Calibri', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
-  cTitulo.fill = fillBlue;
+  cTitulo.fill = fillTitulo;
   cTitulo.alignment = { horizontal: 'center', vertical: 'middle' };
   cTitulo.border = borderThin;
-  worksheet.getRow(r).height = 25;
-  r++;
-
-  // ===== INFO GENERAL =====
-  r++;
-  worksheet.getCell(`B${r}`).value = 'Fecha';
-  worksheet.getCell(`B${r}`).font = { bold: true };
-  worksheet.getCell(`C${r}`).value = safeStr(datos.fecha);
-
-  r++;
-  worksheet.getCell(`B${r}`).value = 'Hora de Cuadre';
-  worksheet.getCell(`B${r}`).font = { bold: true };
-  worksheet.getCell(`C${r}`).value = safeStr(datos.horaActual);
-
-  if (datos.cajero) {
-    r++;
-    worksheet.getCell(`B${r}`).value = 'Cajero';
-    worksheet.getCell(`B${r}`).font = { bold: true };
-    worksheet.getCell(`C${r}`).value = safeStr(datos.cajero);
-  }
-
-  r += 2;
-
-  // ===== RESUMEN =====
-  worksheet.mergeCells(`A${r}:F${r}`);
-  const cResumen = worksheet.getCell(`A${r}`);
-  cResumen.value = 'RESUMEN';
-  cResumen.font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
-  cResumen.fill = fillBlue;
-  cResumen.alignment = { horizontal: 'center', vertical: 'middle' };
-  cResumen.border = borderThin;
-  r++;
-
-  worksheet.getCell(`B${r}`).value = 'Total Consultas (Regulares + Moviles)';
-  worksheet.getCell(`B${r}`).font = { bold: true };
-  worksheet.getCell(`C${r}`).value = safeNum(datos.totalConsultas);
-  worksheet.getCell(`C${r}`).alignment = { horizontal: 'center' };
-  r++;
-
-  worksheet.getCell(`B${r}`).value = 'Total Ventas';
-  worksheet.getCell(`B${r}`).font = { bold: true };
-  worksheet.getCell(`C${r}`).value = safeNum(datos.totalVentas);
-  worksheet.getCell(`C${r}`).numFmt = '#,##0.00';
-  worksheet.getCell(`C${r}`).alignment = { horizontal: 'center' };
+  worksheet.getRow(r).height = 28;
   r += 2;
 
   // ===== CUADRE POR FORMA DE PAGO =====
@@ -162,7 +123,7 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
   const cCuadre = worksheet.getCell(`A${r}`);
   cCuadre.value = 'CUADRE POR FORMA DE PAGO';
   cCuadre.font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
-  cCuadre.fill = fillBlue;
+  cCuadre.fill = fillCuadre;
   cCuadre.alignment = { horizontal: 'center', vertical: 'middle' };
   cCuadre.border = borderThin;
   r++;
@@ -171,8 +132,8 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
   ['Forma de Pago', 'Esperado', 'Contado', 'Diferencia', 'Estado'].forEach((h, i) => {
     const cell = worksheet.getCell(r, i + 2);
     cell.value = h;
-    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    cell.fill = fillLightBlue;
+    cell.font = { bold: true, color: { argb: 'FF134E4A' } };
+    cell.fill = fillCuadreLight;
     cell.alignment = { horizontal: 'center', vertical: 'middle' };
     cell.border = borderThin;
   });
@@ -181,8 +142,12 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
   const filasDatos = [
     ['Efectivo', safeNum(datos.efectivoEsperado), safeNum(datos.efectivoContado), safeNum(datos.diferencias.efectivo)],
     ['Tarjeta', safeNum(datos.tarjetaEsperada), safeNum(datos.tarjetaContado), safeNum(datos.diferencias.tarjeta)],
-    ['Transferencia', safeNum(datos.transferenciaEsperada), safeNum(datos.transferenciaContado), safeNum(datos.diferencias.depositado)]
+    ['Transferencia/Deposito', safeNum(datos.transferenciaEsperada), safeNum(datos.transferenciaContado), safeNum(datos.diferencias.depositado)]
   ] as Array<[string, number, number, number]>;
+
+  if (safeNum(datos.estadoCuentaEsperada) > 0) {
+    filasDatos.push(['Estado de Cuenta', safeNum(datos.estadoCuentaEsperada), safeNum(datos.estadoCuentaContado), safeNum(datos.diferencias.estado_cuenta)]);
+  }
 
   filasDatos.forEach(([formaPago, esperado, contado, diferencia]) => {
     const esOK = Math.abs(diferencia) < 0.01;
@@ -202,7 +167,7 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
     worksheet.getCell(r, 5).value = diferencia;
     worksheet.getCell(r, 5).numFmt = '#,##0.00';
     worksheet.getCell(r, 5).alignment = { horizontal: 'right' };
-    worksheet.getCell(r, 5).font = { color: { argb: esOK ? 'FF008000' : 'FFFF0000' }, bold: true };
+    worksheet.getCell(r, 5).font = { color: { argb: esOK ? 'FF059669' : 'FFDC2626' }, bold: true };
 
     worksheet.getCell(r, 6).value = estado;
     worksheet.getCell(r, 6).alignment = { horizontal: 'center' };
@@ -215,6 +180,25 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
     r++;
   });
 
+  // Fila TOTAL del cuadre por forma de pago
+  const totalEsperadoCuadre = safeNum(datos.efectivoEsperado) + safeNum(datos.tarjetaEsperada) + safeNum(datos.transferenciaEsperada) + safeNum(datos.estadoCuentaEsperada);
+  const totalContadoCuadre = safeNum(datos.efectivoContado) + safeNum(datos.tarjetaContado) + safeNum(datos.transferenciaContado) + safeNum(datos.estadoCuentaContado);
+  worksheet.getCell(r, 2).value = 'TOTAL:';
+  worksheet.getCell(r, 2).font = { bold: true };
+  worksheet.getCell(r, 3).value = totalEsperadoCuadre;
+  worksheet.getCell(r, 3).numFmt = '#,##0.00';
+  worksheet.getCell(r, 3).alignment = { horizontal: 'right' };
+  worksheet.getCell(r, 3).font = { bold: true };
+  worksheet.getCell(r, 4).value = totalContadoCuadre;
+  worksheet.getCell(r, 4).numFmt = '#,##0.00';
+  worksheet.getCell(r, 4).alignment = { horizontal: 'right' };
+  worksheet.getCell(r, 4).font = { bold: true };
+  for (let col = 2; col <= 6; col++) {
+    worksheet.getCell(r, col).fill = fillCuadreLight;
+    worksheet.getCell(r, col).border = borderThin;
+  }
+  r++;
+
   r++;
 
   // ===== RESULTADO FINAL =====
@@ -226,7 +210,7 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
   cResultado.fill = {
     type: 'pattern',
     pattern: 'solid',
-    fgColor: { argb: datos.cuadreCorrecto ? 'FF70AD47' : 'FFFF0000' }
+    fgColor: { argb: datos.cuadreCorrecto ? 'FF059669' : 'FFDC2626' }
   };
   cResultado.alignment = { horizontal: 'center', vertical: 'middle' };
   cResultado.border = borderMedium;
@@ -239,7 +223,7 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
     const cObsH = worksheet.getCell(`A${r}`);
     cObsH.value = 'OBSERVACIONES';
     cObsH.font = { bold: true };
-    cObsH.fill = fillLightBlue2;
+    cObsH.fill = fillCuadreLight;
     r++;
 
     worksheet.mergeCells(`B${r}:F${r}`);
@@ -249,62 +233,12 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
     r += 2;
   }
 
-  // ===== CONSULTAS REGULARES =====
-  worksheet.mergeCells(`A${r}:F${r}`);
-  const cDetalle = worksheet.getCell(`A${r}`);
-  cDetalle.value = 'CONSULTAS REGULARES - DETALLE POR FORMA DE PAGO';
-  cDetalle.font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
-  cDetalle.fill = fillBlue;
-  cDetalle.alignment = { horizontal: 'center', vertical: 'middle' };
-  cDetalle.border = borderThin;
-  r++;
-
-  ['Forma de Pago', 'Cantidad', 'Total'].forEach((h, i) => {
-    const cell = worksheet.getCell(r, i + 2);
-    cell.value = h;
-    cell.font = { bold: true };
-    cell.fill = fillLightBlue2;
-    cell.alignment = { horizontal: 'center' };
-    cell.border = borderThin;
-  });
-  r++;
-
-  const regulares = datos.cuadresPorFormaPago.filter(c => !c.es_servicio_movil);
-  if (regulares.length > 0) {
-    regulares.forEach(c => {
-      worksheet.getCell(r, 2).value = safeStr(c.forma_pago);
-      worksheet.getCell(r, 3).value = safeNum(c.cantidad);
-      worksheet.getCell(r, 3).alignment = { horizontal: 'center' };
-      worksheet.getCell(r, 4).value = safeNum(c.total);
-      worksheet.getCell(r, 4).numFmt = '#,##0.00';
-      worksheet.getCell(r, 4).alignment = { horizontal: 'right' };
-      for (let col = 2; col <= 4; col++) worksheet.getCell(r, col).border = borderThin;
-      r++;
-    });
-
-    const totalReg = regulares.reduce((s, c) => s + safeNum(c.total), 0);
-    worksheet.getCell(r, 2).value = 'TOTAL REGULARES:';
-    worksheet.getCell(r, 2).font = { bold: true };
-    worksheet.getCell(r, 4).value = totalReg;
-    worksheet.getCell(r, 4).numFmt = '#,##0.00';
-    worksheet.getCell(r, 4).alignment = { horizontal: 'right' };
-    worksheet.getCell(r, 4).font = { bold: true };
-    worksheet.getCell(r, 4).fill = fillLightBlue2;
-    r++;
-  } else {
-    worksheet.getCell(r, 2).value = 'No hay consultas regulares';
-    worksheet.getCell(r, 2).font = { italic: true, color: { argb: 'FF9E9E9E' } };
-    r++;
-  }
-
-  r += 2;
-
   // ===== SERVICIOS MOVILES =====
   worksheet.mergeCells(`A${r}:F${r}`);
   const cMoviles = worksheet.getCell(`A${r}`);
   cMoviles.value = 'SERVICIOS MOVILES - DETALLE POR FORMA DE PAGO';
   cMoviles.font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
-  cMoviles.fill = fillPurple;
+  cMoviles.fill = fillMoviles;
   cMoviles.alignment = { horizontal: 'center', vertical: 'middle' };
   cMoviles.border = borderThin;
   r++;
@@ -312,8 +246,8 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
   ['Forma de Pago', 'Cantidad', 'Total'].forEach((h, i) => {
     const cell = worksheet.getCell(r, i + 2);
     cell.value = h;
-    cell.font = { bold: true };
-    cell.fill = fillLightPurple;
+    cell.font = { bold: true, color: { argb: 'FF6B21A8' } };
+    cell.fill = fillMovilesLight;
     cell.alignment = { horizontal: 'center' };
     cell.border = borderThin;
   });
@@ -321,13 +255,14 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
 
   const moviles = datos.cuadresPorFormaPago.filter(c => c.es_servicio_movil);
   if (moviles.length > 0) {
-    moviles.forEach(m => {
+    moviles.forEach((m, idx) => {
       worksheet.getCell(r, 2).value = safeStr(m.forma_pago);
       worksheet.getCell(r, 3).value = safeNum(m.cantidad);
       worksheet.getCell(r, 3).alignment = { horizontal: 'center' };
       worksheet.getCell(r, 4).value = safeNum(m.total);
       worksheet.getCell(r, 4).numFmt = '#,##0.00';
       worksheet.getCell(r, 4).alignment = { horizontal: 'right' };
+      if (idx % 2 === 1) for (let col = 2; col <= 4; col++) worksheet.getCell(r, col).fill = fillBanda;
       for (let col = 2; col <= 4; col++) worksheet.getCell(r, col).border = borderThin;
       r++;
     });
@@ -339,7 +274,7 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
     worksheet.getCell(r, 4).numFmt = '#,##0.00';
     worksheet.getCell(r, 4).alignment = { horizontal: 'right' };
     worksheet.getCell(r, 4).font = { bold: true };
-    worksheet.getCell(r, 4).fill = fillLightPurple;
+    for (let col = 2; col <= 4; col++) { worksheet.getCell(r, col).fill = fillMovilesLight; worksheet.getCell(r, col).border = borderThin; }
     r++;
   } else {
     worksheet.getCell(r, 2).value = 'No hay servicios moviles registrados';
@@ -354,7 +289,7 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
   const cGastosH = worksheet.getCell(`A${r}`);
   cGastosH.value = 'GASTOS DEL DIA';
   cGastosH.font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
-  cGastosH.fill = fillOrange;
+  cGastosH.fill = fillGastos;
   cGastosH.alignment = { horizontal: 'center', vertical: 'middle' };
   cGastosH.border = borderThin;
   r++;
@@ -363,8 +298,8 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
   ['Concepto', 'Categoria', 'Hora', 'Monto'].forEach((h, i) => {
     const cell = worksheet.getCell(r, i + 2);
     cell.value = h;
-    cell.font = { bold: true };
-    cell.fill = fillLightOrange;
+    cell.font = { bold: true, color: { argb: 'FF92400E' } };
+    cell.fill = fillGastosLight;
     cell.alignment = { horizontal: 'center' };
     cell.border = borderThin;
   });
@@ -372,7 +307,7 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
 
   const gastosLista = datos.gastos || [];
   if (gastosLista.length > 0) {
-    gastosLista.forEach(g => {
+    gastosLista.forEach((g, idx) => {
       let horaStr = '';
       if (g.created_at) {
         try {
@@ -395,6 +330,7 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
       worksheet.getCell(r, 5).alignment = { horizontal: 'right' };
       worksheet.getCell(r, 5).font = { color: { argb: 'FFC62828' } };
 
+      if (idx % 2 === 1) for (let col = 2; col <= 5; col++) worksheet.getCell(r, col).fill = fillBanda;
       for (let col = 2; col <= 5; col++) worksheet.getCell(r, col).border = borderThin;
       r++;
     });
@@ -407,63 +343,10 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
     worksheet.getCell(r, 5).numFmt = '#,##0.00';
     worksheet.getCell(r, 5).alignment = { horizontal: 'right' };
     worksheet.getCell(r, 5).font = { bold: true, color: { argb: 'FFC62828' } };
-    worksheet.getCell(r, 5).fill = fillLightOrange;
-    for (let col = 2; col <= 5; col++) worksheet.getCell(r, col).border = borderThin;
+    for (let col = 2; col <= 5; col++) { worksheet.getCell(r, col).fill = fillGastosLight; worksheet.getCell(r, col).border = borderThin; }
     r++;
   } else {
     worksheet.getCell(r, 2).value = 'No hay gastos registrados para este dia';
-    worksheet.getCell(r, 2).font = { italic: true, color: { argb: 'FF9E9E9E' } };
-    r++;
-  }
-
-  // ===== PRECIOS MODIFICADOS DEL DÍA =====
-  r += 2;
-
-  worksheet.mergeCells(`A${r}:F${r}`);
-  const cModH = worksheet.getCell(`A${r}`);
-  cModH.value = 'PRECIOS MODIFICADOS DEL DIA';
-  cModH.font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
-  cModH.fill = fillOrange;
-  cModH.alignment = { horizontal: 'center', vertical: 'middle' };
-  cModH.border = borderThin;
-  r++;
-
-  ['Paciente', 'Estudio', 'Precio Original', 'Precio Nuevo', 'Justificacion'].forEach((h, i) => {
-    const cell = worksheet.getCell(r, i + 2);
-    cell.value = h;
-    cell.font = { bold: true };
-    cell.fill = fillLightOrange;
-    cell.alignment = { horizontal: 'center' };
-    cell.border = borderThin;
-  });
-  r++;
-
-  const modificadosLista = datos.preciosModificados || [];
-  if (modificadosLista.length > 0) {
-    modificadosLista.forEach(m => {
-      worksheet.getCell(r, 2).value = safeStr(m.paciente);
-      worksheet.getCell(r, 2).alignment = { horizontal: 'left' };
-
-      worksheet.getCell(r, 3).value = safeStr(m.estudio);
-      worksheet.getCell(r, 3).alignment = { horizontal: 'left' };
-
-      worksheet.getCell(r, 4).value = safeNum(m.precio_original);
-      worksheet.getCell(r, 4).numFmt = '#,##0.00';
-      worksheet.getCell(r, 4).alignment = { horizontal: 'right' };
-
-      worksheet.getCell(r, 5).value = safeNum(m.precio_nuevo);
-      worksheet.getCell(r, 5).numFmt = '#,##0.00';
-      worksheet.getCell(r, 5).alignment = { horizontal: 'right' };
-      worksheet.getCell(r, 5).font = { bold: true, color: { argb: 'FFE65100' } };
-
-      worksheet.getCell(r, 6).value = safeStr(m.justificacion);
-      worksheet.getCell(r, 6).alignment = { horizontal: 'left', wrapText: true };
-
-      for (let col = 2; col <= 6; col++) worksheet.getCell(r, col).border = borderThin;
-      r++;
-    });
-  } else {
-    worksheet.getCell(r, 2).value = 'No hubo precios modificados este dia';
     worksheet.getCell(r, 2).font = { italic: true, color: { argb: 'FF9E9E9E' } };
     r++;
   }
@@ -476,7 +359,7 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
     const cFirmaH = worksheet.getCell(`A${r}`);
     cFirmaH.value = 'FIRMA DIGITAL';
     cFirmaH.font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
-    cFirmaH.fill = fillGreen;
+    cFirmaH.fill = fillFirma;
     cFirmaH.alignment = { horizontal: 'center', vertical: 'middle' };
     cFirmaH.border = borderThin;
     r++;
@@ -484,7 +367,7 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
     worksheet.getCell(`B${r}`).value = 'Cajero Responsable:';
     worksheet.getCell(`B${r}`).font = { bold: true };
     worksheet.getCell(`C${r}`).value = safeStr(datos.cajero);
-    worksheet.getCell(`C${r}`).font = { bold: true, color: { argb: 'FF70AD47' } };
+    worksheet.getCell(`C${r}`).font = { bold: true, color: { argb: 'FF059669' } };
 
     r++;
     worksheet.getCell(`B${r}`).value = 'Fecha y Hora de Cierre:';
@@ -495,34 +378,17 @@ export const generarCuadreExcel = async (datos: CuadreDatos): Promise<void> => {
     worksheet.getCell(`B${r}`).value = 'Estado:';
     worksheet.getCell(`B${r}`).font = { bold: true };
     worksheet.getCell(`C${r}`).value = 'CAJA CERRADA Y CONFIRMADA';
-    worksheet.getCell(`C${r}`).font = { bold: true, color: { argb: 'FF70AD47' } };
+    worksheet.getCell(`C${r}`).font = { bold: true, color: { argb: 'FF059669' } };
   }
 
   // ===== MARCA DE AGUA =====
   r += 2;
   worksheet.mergeCells(`A${r}:F${r}`);
   const cWater = worksheet.getCell(`A${r}`);
-  cWater.value = 'DOCUMENTO OFICIAL - SOLO LECTURA - CONRAD CENTRAL - PROHIBIDA SU MODIFICACION';
+  cWater.value = 'DOCUMENTO GENERADO POR CENTRO DE DIAGNOSTICO CONRAD';
   cWater.font = { name: 'Calibri', size: 9, bold: true, italic: true, color: { argb: 'FFBDBDBD' } };
   cWater.alignment = { horizontal: 'center', vertical: 'middle' };
   worksheet.getRow(r).height = 18;
-
-  // ===== PROTECCIÓN DE HOJA (solo lectura con contraseña) =====
-  await worksheet.protect('Conrad2024!', {
-    selectLockedCells: true,
-    selectUnlockedCells: false,
-    formatCells: false,
-    formatColumns: false,
-    formatRows: false,
-    insertColumns: false,
-    insertRows: false,
-    insertHyperlinks: false,
-    deleteColumns: false,
-    deleteRows: false,
-    sort: false,
-    autoFilter: false,
-    pivotTables: false
-  });
 
   // ===== DESCARGAR =====
   const buffer = await workbook.xlsx.writeBuffer();

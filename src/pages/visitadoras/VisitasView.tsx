@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   MapPin, Plus, X, Search, CheckCircle,
   PenTool, Navigation, Stethoscope, MessageSquare, Eye,
-  Trash2, Clock, Calendar, TrendingUp, Users
+  Trash2, Clock, Calendar, TrendingUp, Users, Camera
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { departamentosGuatemala, municipiosGuatemala } from '../../data/guatemala';
@@ -17,6 +17,7 @@ interface Visita {
   medico_especialidad?: string; visitadora_nombre: string;
   latitud?: number; longitud?: number; firma_receptor?: string;
   nombre_receptor?: string; comentario?: string; created_at: string;
+  foto_lugar_url?: string; foto_lugar_path?: string;
 }
 
 const getNombreDepto = (id: string) => departamentosGuatemala.find(d => d.id === id)?.nombre || id;
@@ -53,6 +54,12 @@ export const VisitasView: React.FC = () => {
   const lastPos = useRef<{ x: number; y: number } | null>(null);
   const [vistaDetalle, setVistaDetalle] = useState<Visita | null>(null);
   const [fechaVer, setFechaVer] = useState<string>(''); // vacío = hoy
+  const [fotoLugarUrl, setFotoLugarUrl] = useState<string | null>(null);
+  const [fotoLugarPath, setFotoLugarPath] = useState<string | null>(null);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const fotoInputRef = useRef<HTMLInputElement>(null);
+  const [limpiando, setLimpiando] = useState(false);
+  const esAdmin = localStorage.getItem('rolUsuarioConrad') !== 'visitadora';
 
   useEffect(() => { cargarDatos(); }, [fechaVer]);
 
@@ -107,20 +114,85 @@ export const VisitasView: React.FC = () => {
       { timeout: 10000, enableHighAccuracy: true }
     );
   };
+  const comprimirImagen = (file: File, maxDim = 1280, calidad = 0.7): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > height && width > maxDim) { height = height * (maxDim / width); width = maxDim; }
+        else if (height > maxDim) { width = width * (maxDim / height); height = maxDim; }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('No se pudo procesar la imagen')), 'image/jpeg', calidad);
+      };
+      img.onerror = () => reject(new Error('No se pudo cargar la imagen'));
+      img.src = url;
+    });
+  };
+  const handleFotoLugarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { alert('Selecciona una imagen'); return; }
+    setSubiendoFoto(true);
+    try {
+      const blob = await comprimirImagen(file);
+      const path = `${medicoSeleccionado?.id || 'sin-medico'}/${Date.now()}.jpg`;
+      const { error: upErr } = await supabase.storage.from('visitas').upload(path, blob, { contentType: 'image/jpeg' });
+      if (upErr) throw upErr;
+      const { data } = supabase.storage.from('visitas').getPublicUrl(path);
+      setFotoLugarUrl(data.publicUrl);
+      setFotoLugarPath(path);
+    } catch (err: any) {
+      alert('Error al subir la foto: ' + (err.message || 'intenta de nuevo'));
+    }
+    setSubiendoFoto(false);
+  };
+  const quitarFotoLugar = async () => {
+    if (fotoLugarPath) { try { await supabase.storage.from('visitas').remove([fotoLugarPath]); } catch {} }
+    setFotoLugarUrl(null); setFotoLugarPath(null);
+  };
   const registrarVisita = async () => {
     if (!medicoSeleccionado) return;
     if (!ubicacionObtenida) { alert('Debes obtener la ubicación GPS'); return; }
+    if (!fotoLugarUrl) { alert('Debes tomar la foto del lugar'); return; }
     if (!firmaGuardada) { alert('Debes obtener la firma'); return; }
     if (!nombreReceptor.trim()) { alert('Indica quién recibió la visita'); return; }
     setGuardando(true);
     try {
       const visitadora = localStorage.getItem('nombreUsuarioConrad') || 'Visitadora';
-      await supabase.from('visitas_medicas').insert([{ medico_id: medicoSeleccionado.id, medico_nombre: medicoSeleccionado.nombre, medico_especialidad: medicoSeleccionado.especialidad || null, visitadora_nombre: visitadora, latitud, longitud, firma_receptor: firmaGuardada, nombre_receptor: nombreReceptor, comentario: comentario || null }]);
+      await supabase.from('visitas_medicas').insert([{ medico_id: medicoSeleccionado.id, medico_nombre: medicoSeleccionado.nombre, medico_especialidad: medicoSeleccionado.especialidad || null, visitadora_nombre: visitadora, latitud, longitud, firma_receptor: firmaGuardada, nombre_receptor: nombreReceptor, comentario: comentario || null, foto_lugar_url: fotoLugarUrl, foto_lugar_path: fotoLugarPath }]);
       await cargarDatos(); cerrarModal(); alert('✅ Visita registrada');
     } catch { alert('Error al registrar la visita'); }
     setGuardando(false);
   };
-  const cerrarModal = () => { setShowModal(false); setStep(1); setMedicoSeleccionado(null); setBusqueda(''); setUbicacionObtenida(false); setLatitud(null); setLongitud(null); setNombreReceptor(''); setComentario(''); setFirmaGuardada(null); };
+  const cerrarModal = () => { setShowModal(false); setStep(1); setMedicoSeleccionado(null); setBusqueda(''); setUbicacionObtenida(false); setLatitud(null); setLongitud(null); setNombreReceptor(''); setComentario(''); setFirmaGuardada(null); setFotoLugarUrl(null); setFotoLugarPath(null); };
+  const limpiarFotosAntiguas = async () => {
+    const limite = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: antiguas, error } = await supabase
+      .from('visitas_medicas')
+      .select('id, foto_lugar_path')
+      .lt('created_at', limite)
+      .not('foto_lugar_path', 'is', null);
+    if (error) { alert('Error al buscar fotos: ' + error.message); return; }
+    if (!antiguas || antiguas.length === 0) { alert('No hay fotos de más de 7 días para eliminar'); return; }
+    if (!confirm(`Se eliminarán ${antiguas.length} foto(s) de visitas con más de 7 días de antigüedad.\n\nEl resto de la visita (GPS, firma, receptor, comentario) no se toca.\n\n¿Continuar?`)) return;
+    setLimpiando(true);
+    try {
+      const paths = antiguas.map(a => a.foto_lugar_path).filter(Boolean) as string[];
+      if (paths.length) await supabase.storage.from('visitas').remove(paths);
+      await supabase.from('visitas_medicas').update({ foto_lugar_url: null, foto_lugar_path: null }).in('id', antiguas.map(a => a.id));
+      await cargarDatos();
+      alert(`✅ Se eliminaron ${antiguas.length} foto(s)`);
+    } catch (e: any) {
+      alert('Error al eliminar: ' + e.message);
+    }
+    setLimpiando(false);
+  };
 
   const medicosFiltrados = medicos.filter(m => m.nombre.toLowerCase().includes(busqueda.toLowerCase()) || (m.especialidad||'').toLowerCase().includes(busqueda.toLowerCase()));
   const hoyGT = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Guatemala' });
@@ -178,6 +250,14 @@ export const VisitasView: React.FC = () => {
             </button>
           )}
         </div>
+        {esAdmin && (
+          <button onClick={limpiarFotosAntiguas} disabled={limpiando}
+            title="Eliminar fotos de visitas con más de 7 días"
+            className="flex items-center gap-2 bg-white border border-gray-200 text-gray-500 px-3 py-2.5 rounded-xl hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-all text-sm font-semibold shrink-0 disabled:opacity-50">
+            {limpiando ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400" /> : <Trash2 size={15} />}
+            <span className="hidden sm:inline">Limpiar fotos</span>
+          </button>
+        )}
         <button onClick={() => setShowModal(true)}
           className="flex items-center gap-2 bg-gradient-to-r from-pink-500 to-rose-600 text-white px-5 py-2.5 rounded-xl hover:from-pink-600 hover:to-rose-700 transition-all text-sm font-bold shadow-md shadow-pink-200 shrink-0">
           <Plus size={16} /> Nueva Visita
@@ -333,6 +413,29 @@ export const VisitasView: React.FC = () => {
                     </button>
                   )}
                   <div>
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">
+                      <Camera size={12} /> Foto del lugar *
+                    </label>
+                    {fotoLugarUrl ? (
+                      <div className="border-2 border-emerald-200 rounded-xl overflow-hidden bg-emerald-50 relative">
+                        <img src={fotoLugarUrl} alt="Foto del lugar" className="w-full h-40 object-cover" />
+                        <div className="absolute top-2 left-3 flex items-center gap-1 bg-white/80 backdrop-blur rounded-lg px-2 py-0.5">
+                          <CheckCircle size={12} className="text-emerald-600" />
+                          <span className="text-xs font-bold text-emerald-700">Foto OK</span>
+                        </div>
+                        <button onClick={quitarFotoLugar} className="absolute top-2 right-2 bg-white border border-gray-200 text-gray-500 rounded-lg p-1.5 shadow-sm hover:bg-red-50 hover:text-red-500">
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button onClick={() => fotoInputRef.current?.click()} disabled={subiendoFoto}
+                        className="w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed border-gray-200 rounded-xl text-sm font-semibold text-gray-500 hover:border-pink-300 hover:text-pink-600 hover:bg-pink-50 transition-all disabled:opacity-60">
+                        {subiendoFoto ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-pink-500" /> Subiendo...</> : <><Camera size={16} /> 📷 Tomar foto del lugar</>}
+                      </button>
+                    )}
+                    <input ref={fotoInputRef} type="file" accept="image/*" capture="environment" onChange={handleFotoLugarChange} className="hidden" />
+                  </div>
+                  <div>
                     <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">Recibido por *</label>
                     <input type="text" value={nombreReceptor} onChange={e => setNombreReceptor(e.target.value)}
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-pink-400 outline-none"
@@ -370,7 +473,7 @@ export const VisitasView: React.FC = () => {
                   </div>
                   {/* Indicadores requerimientos */}
                   <div className="flex gap-2 text-xs">
-                    {[{ ok: ubicacionObtenida, label: 'GPS' }, { ok: !!firmaGuardada, label: 'Firma' }, { ok: !!nombreReceptor.trim(), label: 'Receptor' }].map(({ ok, label }) => (
+                    {[{ ok: ubicacionObtenida, label: 'GPS' }, { ok: !!fotoLugarUrl, label: 'Foto' }, { ok: !!firmaGuardada, label: 'Firma' }, { ok: !!nombreReceptor.trim(), label: 'Receptor' }].map(({ ok, label }) => (
                       <div key={label} className={`flex items-center gap-1 px-2 py-1 rounded-lg font-medium transition-all ${ok ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'}`}>
                         {ok ? <CheckCircle size={11} /> : <div className="w-2.5 h-2.5 rounded-full border-2 border-gray-300" />}
                         {label}
@@ -378,7 +481,7 @@ export const VisitasView: React.FC = () => {
                     ))}
                   </div>
                   <button onClick={registrarVisita}
-                    disabled={guardando || !ubicacionObtenida || !firmaGuardada || !nombreReceptor.trim()}
+                    disabled={guardando || !ubicacionObtenida || !fotoLugarUrl || !firmaGuardada || !nombreReceptor.trim()}
                     className="w-full flex items-center justify-center gap-2 py-4 bg-gradient-to-r from-pink-500 to-rose-600 text-white rounded-xl font-bold text-sm hover:from-pink-600 hover:to-rose-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md shadow-pink-200">
                     {guardando ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> Registrando...</> : <><CheckCircle size={17} /> Registrar Visita</>}
                   </button>
@@ -463,6 +566,14 @@ export const VisitasView: React.FC = () => {
                   <div className="bg-blue-100 rounded-lg p-1.5"><Navigation size={14} className="text-blue-600" /></div>
                   Ver en Google Maps <span className="ml-auto text-blue-400">↗</span>
                 </a>
+              )}
+              {vistaDetalle.foto_lugar_url && (
+                <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1"><Camera size={11} /> Foto del lugar</p>
+                  <div className="border-2 border-gray-100 rounded-xl overflow-hidden bg-gray-50">
+                    <img src={vistaDetalle.foto_lugar_url} alt="Foto del lugar" className="w-full" />
+                  </div>
+                </div>
               )}
               {vistaDetalle.firma_receptor && (
                 <div>

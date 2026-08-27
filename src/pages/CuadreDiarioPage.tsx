@@ -3,6 +3,7 @@ import { ArrowLeft, Calendar, DollarSign, CheckCircle2, Plus, Trash2, X, Chevron
 import { supabase } from '../lib/supabase';
 import { format, subDays } from 'date-fns';
 import { generarCuadreExcel } from '../utils/cuadre-excel-generator';
+import { abrirCuadrePDF } from '../utils/cuadre-pdf-generator';
 import { AutorizacionModal } from '../components/AutorizacionModal';
 
 interface CuadrePorFormaPago {
@@ -77,7 +78,7 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
 
   const [modoEdicion, setModoEdicion] = useState(false);
   const [mostrarModalToken, setMostrarModalToken] = useState(false);
-  const [mostrarModalTokenExcel, setMostrarModalTokenExcel] = useState(false);
+  const [formatoDescargaPendiente, setFormatoDescargaPendiente] = useState<'csv' | 'pdf' | null>(null);
 
   const [billetes, setBilletes] = useState({
     b200: '',
@@ -138,17 +139,18 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
     alert('✅ Modo edición activado. Puede modificar y re-validar el cuadre.');
   };
 
-  const solicitarDescargaExcel = () => {
+  const solicitarDescarga = (formato: 'csv' | 'pdf') => {
     if (necesitaAutorizacionParaExcel()) {
-      setMostrarModalTokenExcel(true);
+      setFormatoDescargaPendiente(formato);
     } else {
-      descargarCuadre('csv');
+      descargarCuadre(formato);
     }
   };
 
-  const ejecutarDescargaExcel = async () => {
-    setMostrarModalTokenExcel(false);
-    await descargarCuadre('csv');
+  const ejecutarDescargaPendiente = async () => {
+    const formato = formatoDescargaPendiente;
+    setFormatoDescargaPendiente(null);
+    if (formato) await descargarCuadre(formato);
   };
 
   useEffect(() => {
@@ -558,36 +560,42 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
     const fechaFormateada = format(new Date(fecha + 'T12:00:00'), 'dd/MM/yyyy');
     const horaActual = format(new Date(), 'HH:mm');
 
+    const datosCuadre = {
+      fecha: fechaFormateada,
+      horaActual,
+      totalConsultas: cuadre?.total_consultas || 0,
+      totalVentas: cuadre?.total_ventas || 0,
+      efectivoEsperado,
+      efectivoContado: efectivoContadoNum,
+      tarjetaEsperada,
+      tarjetaContado: tarjetaContadoNum,
+      transferenciaEsperada: depositadoEsperado,
+      transferenciaContado: depositadoContadoNum,
+      estadoCuentaEsperada,
+      estadoCuentaContado: estadoCuentaContadoNum,
+      diferencias,
+      cuadreCorrecto,
+      observaciones,
+      cajero: nombreCajero,
+      cuadresPorFormaPago: cuadre?.cuadres_forma_pago.map(c => ({
+        forma_pago: getFormaPagoNombre(c.forma_pago),
+        cantidad: c.cantidad,
+        total: c.total,
+        es_servicio_movil: c.es_servicio_movil || false
+      })) || [],
+      gastos: gastos.map(g => ({
+        concepto: g.concepto || '',
+        monto: parseFloat(g.monto || 0),
+        categoria: g.categorias_gastos?.nombre || '',
+        created_at: g.created_at || ''
+      })),
+      preciosModificados
+    };
+
     if (formato === 'csv') {
-      await generarCuadreExcel({
-        fecha: fechaFormateada,
-        horaActual,
-        totalConsultas: cuadre?.total_consultas || 0,
-        totalVentas: cuadre?.total_ventas || 0,
-        efectivoEsperado,
-        efectivoContado: efectivoContadoNum,
-        tarjetaEsperada,
-        tarjetaContado: tarjetaContadoNum,
-        transferenciaEsperada: depositadoEsperado,
-        transferenciaContado: depositadoContadoNum,
-        diferencias,
-        cuadreCorrecto,
-        observaciones,
-        cajero: nombreCajero,
-        cuadresPorFormaPago: cuadre?.cuadres_forma_pago.map(c => ({
-          forma_pago: getFormaPagoNombre(c.forma_pago),
-          cantidad: c.cantidad,
-          total: c.total,
-          es_servicio_movil: c.es_servicio_movil || false
-        })) || [],
-        gastos: gastos.map(g => ({
-          concepto: g.concepto || '',
-          monto: parseFloat(g.monto || 0),
-          categoria: g.categorias_gastos?.nombre || '',
-          created_at: g.created_at || ''
-        })),
-        preciosModificados
-      });
+      await generarCuadreExcel(datosCuadre);
+    } else {
+      abrirCuadrePDF(datosCuadre);
     }
   };
 
@@ -922,11 +930,18 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
                       {cuadreValidado ? '✓ Cuadre Validado' : 'Validar Cuadre'}
                     </button>
                     {cuadreValidado && !cuadreCerrado && (
-                      <button onClick={solicitarDescargaExcel} className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 transition-colors mb-6">
-                        <FileText size={24} />
-                        📥 Descargar Excel del Cuadre
-                        {necesitaAutorizacionParaExcel() && <span className="ml-2 text-xs bg-orange-500 px-2 py-1 rounded">Requiere autorización</span>}
-                      </button>
+                      <div className="grid grid-cols-2 gap-3 mb-6">
+                        <button onClick={() => solicitarDescarga('csv')} className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 transition-colors">
+                          <FileText size={24} />
+                          📥 Excel
+                          {necesitaAutorizacionParaExcel() && <span className="ml-1 text-xs bg-orange-500 px-2 py-1 rounded">Auth</span>}
+                        </button>
+                        <button onClick={() => solicitarDescarga('pdf')} className="w-full bg-teal-600 hover:bg-teal-700 text-white px-6 py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 transition-colors">
+                          <FileText size={24} />
+                          📄 PDF
+                          {necesitaAutorizacionParaExcel() && <span className="ml-1 text-xs bg-orange-500 px-2 py-1 rounded">Auth</span>}
+                        </button>
+                      </div>
                     )}
                   </>
                 )}
@@ -941,11 +956,18 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
                       Re-Validar Cuadre
                     </button>
                     {cuadreValidado && (
-                      <button onClick={solicitarDescargaExcel} className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 transition-colors mb-6">
-                        <FileText size={24} />
-                        📥 Descargar Excel del Cuadre
-                        {necesitaAutorizacionParaExcel() && <span className="ml-2 text-xs bg-orange-500 px-2 py-1 rounded">Requiere autorización</span>}
-                      </button>
+                      <div className="grid grid-cols-2 gap-3 mb-6">
+                        <button onClick={() => solicitarDescarga('csv')} className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 transition-colors">
+                          <FileText size={24} />
+                          📥 Excel
+                          {necesitaAutorizacionParaExcel() && <span className="ml-1 text-xs bg-orange-500 px-2 py-1 rounded">Auth</span>}
+                        </button>
+                        <button onClick={() => solicitarDescarga('pdf')} className="w-full bg-teal-600 hover:bg-teal-700 text-white px-6 py-4 rounded-lg font-bold text-lg flex items-center justify-center gap-2 transition-colors">
+                          <FileText size={24} />
+                          📄 PDF
+                          {necesitaAutorizacionParaExcel() && <span className="ml-1 text-xs bg-orange-500 px-2 py-1 rounded">Auth</span>}
+                        </button>
+                      </div>
                     )}
                   </>
                 )}
@@ -1010,10 +1032,16 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
                               <Lock size={24} />
                               Confirmar y Cerrar Caja
                             </button>
-                            <button onClick={solicitarDescargaExcel} className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors">
-                              <FileText size={20} />
-                              Descargar Excel del Cuadre
-                            </button>
+                            <div className="grid grid-cols-2 gap-3">
+                              <button onClick={() => solicitarDescarga('csv')} className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors">
+                                <FileText size={20} />
+                                Excel
+                              </button>
+                              <button onClick={() => solicitarDescarga('pdf')} className="w-full bg-teal-600 hover:bg-teal-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors">
+                                <FileText size={20} />
+                                PDF
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </>
@@ -1201,12 +1229,12 @@ export const CuadreDiarioPage: React.FC<CuadreDiarioPageProps> = ({ onBack }) =>
         />
       )}
 
-      {mostrarModalTokenExcel && (
+      {formatoDescargaPendiente && (
         <AutorizacionModal
-          accion="Descargar Excel de Cuadre"
+          accion={`Descargar ${formatoDescargaPendiente === 'pdf' ? 'PDF' : 'Excel'} de Cuadre`}
           detalles={`Cuadre del ${format(new Date(fecha + 'T12:00:00'), 'dd/MM/yyyy')} - Requiere autorización administrativa`}
-          onAutorizado={ejecutarDescargaExcel}
-          onCancelar={() => setMostrarModalTokenExcel(false)}
+          onAutorizado={ejecutarDescargaPendiente}
+          onCancelar={() => setFormatoDescargaPendiente(null)}
         />
       )}
     </div>

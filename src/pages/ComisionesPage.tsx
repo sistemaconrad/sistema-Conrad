@@ -40,6 +40,7 @@ export const ComisionesPage: React.FC<ComisionesPageProps> = ({ onBack }) => {
           medicos(id, nombre, es_referente),
           detalle_consultas(
             precio,
+            es_referido,
             sub_estudios(
               nombre,
               estudios(
@@ -64,16 +65,16 @@ export const ComisionesPage: React.FC<ComisionesPageProps> = ({ onBack }) => {
 
       consultas?.forEach(consulta => {
         // NO generar comisión si:
-        // 1. tipo_cobro es 'social' o 'personalizado'
-        // 2. forma_pago es 'estado_cuenta'
+        // 1. tipo_cobro es 'social'
+        // 2. tipo_cobro es 'personalizado' y no se marcó que sí comisiona al justificar
         // 3. es_servicio_movil es true
         // ✅ Solo médicos REFERENTES generan comisión
         if (!consulta.medicos?.es_referente) return;
 
-        // ✅ SÍ genera: normal, especial, estado_cuenta
-        // ❌ NO genera: social, personalizado, servicio_movil
-        if (consulta.tipo_cobro === 'social' || 
-            consulta.tipo_cobro === 'personalizado' ||
+        // ✅ SÍ genera: normal, especial, estado_cuenta, personalizado (si se marcó "Sí comisiona")
+        // ❌ NO genera: social, personalizado (sin marcar), servicio_movil
+        if (consulta.tipo_cobro === 'social' ||
+            (consulta.tipo_cobro === 'personalizado' && !consulta.comisiona_personalizado) ||
             consulta.es_servicio_movil === true ||
             consulta.sin_orden_medica === true) {
           return;
@@ -106,7 +107,9 @@ export const ComisionesPage: React.FC<ComisionesPageProps> = ({ onBack }) => {
           const precio = d.precio || 0;
           const estudio = d.sub_estudios?.estudios?.nombre || 'Otros';
           const pct = d.sub_estudios?.estudios?.porcentaje_comision || 0;
-          const comisionLinea = precio * (pct / 100);
+          // d.es_referido === false -> el estudio fue marcado explícitamente como "No comisiona"
+          // (al justificar un cambio de precio, por ejemplo). null/undefined = sin marcar, sí comisiona.
+          const comisionLinea = d.es_referido === false ? 0 : precio * (pct / 100);
           totalConsulta += precio;
           comisionTotal += comisionLinea;
           estudiosUsados.push(estudio);

@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { GenerarCodigosPanel } from '../components/GenerarCodigosPanel';
-import { generarCuadreExcel } from '../utils/cuadre-excel-generator';
+import { generarCuadreExcel, type CuadreDatos } from '../utils/cuadre-excel-generator';
+import { abrirCuadrePDF } from '../utils/cuadre-pdf-generator';
 import { generarReporteGastosDiario } from '../utils/gastos-excel-generator';
 import { PeriodosEspecialesPanel } from '../components/PeriodosEspecialesPanel';
 
@@ -139,12 +140,11 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
     }
   };
 
-  const descargarExcelCuadre = async () => {
-    try {
+  const construirDatosCuadre = async (): Promise<CuadreDatos | null> => {
       const { data: cuadreGuardado, error } = await supabase
         .from('cuadres_diarios').select('*').eq('fecha', fecha).maybeSingle();
-      if (error) { alert('❌ Error al cargar cuadre guardado'); return; }
-      if (!cuadreGuardado) { alert('⚠️ No hay cuadre guardado para esta fecha'); return; }
+      if (error) { alert('❌ Error al cargar cuadre guardado'); return null; }
+      if (!cuadreGuardado) { alert('⚠️ No hay cuadre guardado para esta fecha'); return null; }
 
       const { data: consultas } = await supabase
         .from('consultas').select('*, detalle_consultas(precio)')
@@ -190,33 +190,54 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
 
       const tarjetaContado       = parseFloat(cuadreGuardado.tarjeta_contado       || 0);
       const transferenciaContado = parseFloat(cuadreGuardado.transferencia_contado || 0);
+      const estadoCuentaContado  = parseFloat(cuadreGuardado.estado_cuenta_contado || 0);
 
       const diferencias = {
         efectivo:      efectivoContado      - efectivoEsperado,
         tarjeta:       tarjetaContado       - tarjetaEsperada,
         depositado:    transferenciaContado - transferenciaEsperada,
-        estado_cuenta: 0
+        estado_cuenta: estadoCuentaContado  - estadoCuentaEsperada
       };
 
-      const cuadreCorrecto = Math.abs(diferencias.efectivo) < 0.01 && Math.abs(diferencias.tarjeta) < 0.01 && Math.abs(diferencias.depositado) < 0.01;
+      const cuadreCorrecto = Math.abs(diferencias.efectivo) < 0.01 && Math.abs(diferencias.tarjeta) < 0.01 && Math.abs(diferencias.depositado) < 0.01 &&
+        (estadoCuentaEsperada < 0.01 || Math.abs(diferencias.estado_cuenta) < 0.01);
       const [yyyy, mm, dd] = fecha.split('-');
       const horaActual = getGuatemalaTime().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', hour12: false });
 
-      await generarCuadreExcel({
+      return {
         fecha: `${dd}/${mm}/${yyyy}`, horaActual,
         totalConsultas: consultas?.length || 0, totalVentas: resumen.totalIngresos,
         efectivoEsperado, efectivoContado, tarjetaEsperada, tarjetaContado,
-        transferenciaEsperada, transferenciaContado, diferencias, cuadreCorrecto,
+        transferenciaEsperada, transferenciaContado, estadoCuentaEsperada, estadoCuentaContado,
+        diferencias, cuadreCorrecto,
         observaciones: cuadreGuardado.observaciones, cajero: cuadreGuardado.nombre_cajero,
         cuadresPorFormaPago: Object.values(cuadrePorForma).map((c: any) => ({
           forma_pago: getFormaPagoNombre(c.forma_pago), cantidad: c.cantidad,
           total: c.total, es_servicio_movil: c.es_servicio_movil
         })),
         gastos: gastosParaExcel
-      });
+      };
+  };
+
+  const descargarExcelCuadre = async () => {
+    try {
+      const datos = await construirDatosCuadre();
+      if (!datos) return;
+      await generarCuadreExcel(datos);
     } catch (error) {
       console.error('Error al descargar Excel:', error);
       alert('❌ Error al descargar Excel');
+    }
+  };
+
+  const descargarPDFCuadre = async () => {
+    try {
+      const datos = await construirDatosCuadre();
+      if (!datos) return;
+      abrirCuadrePDF(datos);
+    } catch (error) {
+      console.error('Error al descargar PDF:', error);
+      alert('❌ Error al descargar PDF');
     }
   };
 
@@ -286,7 +307,11 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
               </div>
               <button onClick={descargarExcelCuadre}
                 className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-emerald-900/30">
-                <FileText size={14} /> Descargar Excel
+                <FileText size={14} /> Excel
+              </button>
+              <button onClick={descargarPDFCuadre}
+                className="flex items-center gap-2 bg-teal-500 hover:bg-teal-400 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-teal-900/30">
+                <FileText size={14} /> PDF
               </button>
               <button
                 onClick={async () => {
@@ -299,13 +324,6 @@ export const ResumenDiaPage: React.FC<ResumenDiaPageProps> = ({ onBack, onNaviga
                 className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-red-900/30 disabled:opacity-50">
                 <FileText size={14} /> {descargandoGastos ? 'Generando...' : 'Gastos del Día'}
               </button>
-              {esAdmin && (
-                <div className="flex items-center gap-1.5 bg-white/10 border border-white/15 rounded-xl px-3 py-2" title="Contraseña para desproteger el Excel">
-                  <Shield size={12} className="text-yellow-300 shrink-0" />
-                  <span className="text-xs text-white/60 font-medium">Excel:</span>
-                  <span className="text-xs text-yellow-300 font-bold tracking-wide">Conrad2024!</span>
-                </div>
-              )}
               {esAdmin && onNavigate && (
                 <button onClick={() => onNavigate('usuarios')}
                   className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all">

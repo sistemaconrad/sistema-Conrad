@@ -97,6 +97,7 @@ export const ComisionesPagarPage: React.FC<ComisionesPagarPageProps> = ({ onBack
           medicos(id, nombre),
           detalle_consultas(
             precio,
+            es_referido,
             sub_estudios(
               nombre,
               estudios(
@@ -116,9 +117,9 @@ export const ComisionesPagarPage: React.FC<ComisionesPagarPageProps> = ({ onBack
       const medicoMap = new Map<string, ComisionPago>();
 
       consultas?.forEach(consulta => {
-        // NO generar comisión si es social, personalizado o estado de cuenta
-        if (consulta.tipo_cobro === 'social' || 
-            consulta.tipo_cobro === 'personalizado' ||
+        // NO generar comisión si es social, estado de cuenta, o personalizado sin marcar "Sí comisiona"
+        if (consulta.tipo_cobro === 'social' ||
+            (consulta.tipo_cobro === 'personalizado' && !consulta.comisiona_personalizado) ||
             consulta.forma_pago === 'estado_cuenta' ||
             consulta.es_servicio_movil === true) {
           return;
@@ -143,11 +144,16 @@ export const ComisionesPagarPage: React.FC<ComisionesPagarPageProps> = ({ onBack
         const medico = medicoMap.get(medicoId)!;
         medico.total_pacientes++;
 
-        const totalConsulta = consulta.detalle_consultas?.reduce((sum, d) => sum + d.precio, 0) || 0;
+        // Cálculo línea por línea (igual que ComisionesPage): cada estudio comisiona
+        // según su propio porcentaje, salvo que se haya marcado explícitamente "No comisiona".
+        let comisionTotal = 0;
+        (consulta.detalle_consultas || []).forEach((d: any) => {
+          const precio = d.precio || 0;
+          const pct = d.sub_estudios?.estudios?.porcentaje_comision || 0;
+          if (d.es_referido !== false) comisionTotal += precio * (pct / 100);
+        });
         const primerDetalle = consulta.detalle_consultas?.[0];
         const estudioNombre = primerDetalle?.sub_estudios?.estudios?.nombre || 'Otros';
-        const porcentaje = primerDetalle?.sub_estudios?.estudios?.porcentaje_comision || 0;
-        const comisionTotal = totalConsulta * (porcentaje / 100);
 
         if (!medico.detalles_comisiones[estudioNombre]) {
           medico.detalles_comisiones[estudioNombre] = 0;
