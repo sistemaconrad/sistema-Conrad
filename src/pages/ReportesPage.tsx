@@ -51,6 +51,52 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
     { value: 12, label: 'Diciembre' }
   ];
 
+  const SELECT_CONSULTAS = `
+    *,
+    pacientes(nombre, edad, edad_valor, edad_tipo),
+    medicos(nombre, es_referente),
+    detalle_consultas(
+      sub_estudios(
+        nombre,
+        estudios(id, nombre)
+      ),
+      precio,
+      numero_factura,
+      nit,
+      numero_voucher,
+      numero_transferencia,
+      comentarios,
+      precio_modificado,
+      precio_original,
+      justificacion_precio
+    )
+  `;
+
+  // ✅ Supabase limita a 1000 filas por consulta si no se pagina — un mes con
+  // más de 1000 consultas se cortaba a mitad de mes. Traemos todo por páginas.
+  const fetchConsultasCompleto = async (primerDia: string, ultimoDia: string, soloMovil: boolean) => {
+    const PAGE_SIZE = 1000;
+    let desde = 0;
+    let todas: any[] = [];
+    while (true) {
+      let query = supabase
+        .from('consultas')
+        .select(SELECT_CONSULTAS)
+        .gte('fecha', primerDia)
+        .lte('fecha', ultimoDia)
+        .order('fecha', { ascending: true })
+        .order('created_at', { ascending: true })
+        .range(desde, desde + PAGE_SIZE - 1);
+      if (soloMovil) query = query.eq('es_servicio_movil', true);
+      const { data, error } = await query;
+      if (error) throw error;
+      todas = todas.concat(data || []);
+      if (!data || data.length < PAGE_SIZE) break;
+      desde += PAGE_SIZE;
+    }
+    return todas;
+  };
+
   const handleGenerarReporte = async () => {
     setGenerando(true);
     try {
@@ -75,34 +121,7 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
         anioReporte = anio;
       }
 
-      const { data: consultasRaw, error } = await supabase
-        .from('consultas')
-        .select(`
-          *,
-          pacientes(nombre, edad, edad_valor, edad_tipo),
-          medicos(nombre, es_referente),
-          detalle_consultas(
-            sub_estudios(
-              nombre,
-              estudios(id, nombre)
-            ),
-            precio,
-            numero_factura,
-            nit,
-            numero_voucher,
-            numero_transferencia,
-            comentarios,
-            precio_modificado,
-            precio_original,
-            justificacion_precio
-          )
-        `)
-        .gte('fecha', primerDia)
-        .lte('fecha', ultimoDia)
-        .order('fecha', { ascending: true })
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
+      const consultasRaw = await fetchConsultasCompleto(primerDia, ultimoDia, false);
 
       const consultas = consultasRaw?.filter(c => {
         return c.anulado !== true && c.es_servicio_movil !== true;
@@ -155,35 +174,7 @@ export const ReportesPage: React.FC<ReportesPageProps> = ({ onBack }) => {
         anioReporte = anio;
       }
 
-      const { data: consultasRaw, error } = await supabase
-        .from('consultas')
-        .select(`
-          *,
-          pacientes(nombre, edad, edad_valor, edad_tipo),
-          medicos(nombre, es_referente),
-          detalle_consultas(
-            sub_estudios(
-              nombre,
-              estudios(id, nombre)
-            ),
-            precio,
-            numero_factura,
-            nit,
-            numero_voucher,
-            numero_transferencia,
-            comentarios,
-            precio_modificado,
-            precio_original,
-            justificacion_precio
-          )
-        `)
-        .gte('fecha', primerDia)
-        .lte('fecha', ultimoDia)
-        .eq('es_servicio_movil', true)
-        .order('fecha', { ascending: true })
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
+      const consultasRaw = await fetchConsultasCompleto(primerDia, ultimoDia, true);
 
       const consultas = consultasRaw?.filter(c => c.anulado !== true) || [];
 
